@@ -1,0 +1,452 @@
+/**
+ * DATA-ACCESS LAYER (Phase 1 = zustand mock).
+ *
+ * Screens import ONLY from here — never from '@/stores/*' or '@/data/*'.
+ * In Phase 2 the internals swap to TanStack Query + Supabase while these
+ * hook signatures stay identical (optimistic check-in etc.).
+ */
+import { useEffect, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMockStore, CreateChallengeInput } from '@/stores/mockStore';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { insertChallenge, fetchMyChallenges } from '@/data/challenges';
+import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
+import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
+import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
+import {
+  ME_ID,
+  ME_NAME,
+  ME_INITIALS,
+  TEMPLATES,
+  STAKE_PRESETS,
+  REACTION_EMOJIS,
+  INVITE_JOINERS,
+} from '@/data/mock';
+import { formatLongDate, waitingNames } from '@/lib/day';
+import { firstName } from '@/stores/mockStore';
+import { Challenge, Participant } from '@/data/types';
+
+// Re-export types + static config so screens have a single import source.
+export type { Challenge, Participant, Message, Stake, StakeOption, SegmentState, Momentum } from '@/data/types';
+export type { CreateChallengeInput };
+export { ME_ID, ME_NAME, ME_INITIALS, TEMPLATES, STAKE_PRESETS, REACTION_EMOJIS, INVITE_JOINERS };
+
+/** Single challenge by id (undefined if not found). */
+export function useChallenge(id: string | undefined): Challenge | undefined {
+  return useMockStore((s) => s.challenges.find((c) => c.id === id));
+}
+
+/** Query key for the current user's challenge list. */
+export const MY_CHALLENGES_KEY = ['challenges', 'mine'] as const;
+
+/** Home aggregation: date header + the three card buckets. */
+export function useTodayStatus() {
+  const challenges = useMockStore((s) => s.challenges);
+  const setChallenges = useMockStore((s) => s.setChallenges);
+
+  // When Supabase is configured, hydrate the store from the real list so every
+  // screen (Home + detail) reads the same, real data.
+  const { data, isLoading } = useQuery({
+    queryKey: MY_CHALLENGES_KEY,
+    queryFn: fetchMyChallenges,
+    enabled: isSupabaseConfigured,
+    // Polling fallback so other people's check-ins/joins show up while this
+    // screen is open even if the Realtime subscription (or its Supabase
+    // project setup) isn't delivering events.
+    refetchInterval: isSupabaseConfigured ? 5000 : false,
+  });
+  useEffect(() => {
+    if (isSupabaseConfigured && data) setChallenges(data);
+  }, [data, setChallenges]);
+
+  const buckets = useMemo(() => {
+    const active = challenges.filter((c) => c.status === 'active');
+    const pending = active.filter((c) => !c.meCheckedInToday);
+    const done = active.filter((c) => c.meCheckedInToday);
+    const upcoming = challenges.filter((c) => c.status === 'upcoming');
+    return { pending, done, upcoming };
+  }, [challenges]);
+
+  return {
+    dateLabel: formatLongDate(new Date()),
+    ...buckets,
+    loading: isSupabaseConfigured && isLoading,
+  };
+}
+
+/**
+ * Pull-to-refresh for Home + Detail. There's no realtime subscription yet
+ * (Faz 2 checklist §7), so this is the interim way to see other people's
+ * check-ins / new joiners without leaving and re-entering the screen.
+ */
+export function useRefreshChallenges() {
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    if (!isSupabaseConfigured) return;
+    setRefreshing(true);
+    try {
+      await queryClient.refetchQueries({ queryKey: MY_CHALLENGES_KEY });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return { refreshing, refresh };
+}
+
+/** Archived / completed challenges (drives E9 entry from Settings). */
+export function useCompletedChallenges(): Challenge[] {
+  return useMockStore((s) => s.challenges.filter((c) => c.status === 'completed'));
+}
+
+/** Preview lookup by invite code (E5 deep-link welcome) — Phase 1 mock only. */
+export function useChallengeByCode(code: string | undefined): Challenge | undefined {
+  return useMockStore((s) => s.challenges.find((c) => c.inviteCode === code));
+}
+
+export interface JoinPreview {
+  loading: boolean;
+  notFound: boolean;
+  title: string;
+  totalDays: number;
+  scheduleSummary: string;
+  startsWhen: string;
+  stakeText?: string;
+  participants: { id: string; initials: string; name: string }[];
+}
+
+/**
+ * Join-screen (E5) preview by invite code. Works for a code the viewer hasn't
+ * joined yet: Supabase path uses the `get_challenge_preview` RPC (public read
+ * of a few safe fields); mock path reads the local store directly.
+ */
+export function useJoinPreview(code: string | undefined): JoinPreview {
+  const mock = useChallengeByCode(code);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['challenge-preview', code],
+    queryFn: () => fetchChallengePreview(code as string),
+    enabled: isSupabaseConfigured && !!code,
+  });
+
+  if (isSupabaseConfigured) {
+    if (!data) {
+      return {
+        loading: isLoading,
+        notFound: !isLoading,
+        title: '',
+        totalDays: 0,
+        scheduleSummary: '',
+        startsWhen: '',
+        participants: [],
+      };
+    }
+    return {
+      loading: false,
+      notFound: false,
+      title: data.title,
+      totalDays: data.totalDays,
+      scheduleSummary: `${data.dailyAction} · ${data.totalDays} gün`,
+      startsWhen: data.status === 'upcoming' ? 'Yarın başlıyor' : 'Devam ediyor',
+      stakeText: data.stakeText,
+      participants: data.sampleNames.map((name, i) => ({
+        id: `s${i}`,
+        name,
+        initials: name.slice(0, 2).toUpperCase(),
+      })),
+    };
+  }
+
+  if (!mock) {
+    return {
+      loading: false,
+      notFound: true,
+      title: '',
+      totalDays: 0,
+      scheduleSummary: '',
+      startsWhen: '',
+      participants: [],
+    };
+  }
+  return {
+    loading: false,
+    notFound: false,
+    title: mock.title,
+    totalDays: mock.totalDays,
+    scheduleSummary: mock.scheduleSummary,
+    startsWhen: mock.startsWhen,
+    stakeText: mock.stake?.text,
+    participants: mock.participants
+      .filter((p) => !p.isMe)
+      .map((p) => ({ id: p.id, name: p.name, initials: p.initials })),
+  };
+}
+
+/** Check-in action + derived status for one challenge. */
+export function useCheckIn(id: string) {
+  const checkIn = useMockStore((s) => s.checkIn);
+  const undo = useMockStore((s) => s.undoCheckIn);
+  const challenge = useChallenge(id);
+  const queryClient = useQueryClient();
+
+  const doCheckIn = () => {
+    // A challenge that hasn't started yet (upcoming, currentDay < 1) has
+    // nothing to check in to — guard here too, even though the UI already
+    // hides the button, so no stray caller can trigger a write.
+    if (!challenge || challenge.status !== 'active' || challenge.currentDay < 1) return;
+    checkIn(id); // optimistic: instant ring/animation feedback
+    if (isSupabaseConfigured && challenge) {
+      insertCheckIn(id, challenge.currentDay, 'done')
+        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
+        .catch((e) => {
+          undo(id); // roll back the optimistic update
+          const msg = e instanceof Error ? e.message : String(e);
+          Alert.alert('Check-in kaydedilemedi', msg);
+        });
+    }
+  };
+
+  const doUndo = () => {
+    undo(id);
+    if (isSupabaseConfigured && challenge) {
+      deleteCheckIn(id, challenge.currentDay)
+        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
+        .catch(() => {});
+    }
+  };
+
+  return {
+    meCheckedInToday: challenge?.meCheckedInToday ?? false,
+    myOrder: challenge?.myOrder,
+    myCheckinTime: challenge?.myCheckinTime,
+    checkIn: doCheckIn,
+    undo: doUndo,
+  };
+}
+
+/** Query key for one challenge's chat. */
+export function messagesKey(id: string) {
+  return ['messages', id] as const;
+}
+
+/**
+ * Hydrates a single challenge's real messages (Detail screen only — Home
+ * never needs chat). Call once from the Detail screen; it writes into the
+ * same store entry `useChallenge(id)` already reads.
+ */
+export function useChallengeMessages(id: string | undefined) {
+  const setMessages = useMockStore((s) => s.setChallengeMessages);
+  const { data } = useQuery({
+    queryKey: messagesKey(id ?? ''),
+    queryFn: () => fetchMessages(id as string),
+    enabled: isSupabaseConfigured && !!id,
+    // Same polling fallback as useTodayStatus — new messages/reactions from
+    // others show up within a few seconds even without a working Realtime
+    // subscription.
+    refetchInterval: isSupabaseConfigured && !!id ? 4000 : false,
+  });
+  useEffect(() => {
+    if (!isSupabaseConfigured || !id || !data) return;
+    // Guard against a stale in-flight fetch (started before a send) resolving
+    // *after* an optimistic local append and wiping it out — only apply
+    // server data when it's not behind what's already showing locally.
+    const current = useMockStore.getState().challenges.find((c) => c.id === id);
+    if (current && data.length < current.messages.length) return;
+    setMessages(id, data);
+  }, [data, id, setMessages]);
+}
+
+/**
+ * Live updates for one challenge: someone else's check-in, a new joiner, a
+ * new chat message, or a reaction all invalidate the relevant query so the
+ * screen refreshes without a manual pull-to-refresh.
+ */
+export function useRealtimeChallenge(id: string | undefined) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!isSupabaseConfigured || !id) return;
+    const bump = (key: readonly unknown[]) => queryClient.invalidateQueries({ queryKey: key });
+    const channel = supabase
+      .channel(`challenge-${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'check_ins', filter: `challenge_id=eq.${id}` },
+        () => bump(MY_CHALLENGES_KEY),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'participants', filter: `challenge_id=eq.${id}` },
+        () => bump(MY_CHALLENGES_KEY),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages', filter: `challenge_id=eq.${id}` },
+        () => bump(messagesKey(id)),
+      )
+      .on(
+        // message_reactions has no challenge_id column to filter on, so this
+        // channel sees reactions from every challenge — harmless, it only
+        // ever invalidates this challenge's own message-list query.
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_reactions' },
+        () => bump(messagesKey(id)),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, queryClient]);
+}
+
+/** All challenge-scoped actions in one place. */
+export function useChallengeActions(id: string) {
+  const useJoker = useMockStore((s) => s.useJoker);
+  const ackMissed = useMockStore((s) => s.ackMissed);
+  const sendMessageMock = useMockStore((s) => s.sendMessage);
+  const reactMock = useMockStore((s) => s.react);
+  const nudgeMock = useMockStore((s) => s.nudge);
+  const restart = useMockStore((s) => s.restart);
+  const endEarly = useMockStore((s) => s.endEarly);
+  const challenge = useChallenge(id);
+  const queryClient = useQueryClient();
+
+  const doUseJoker = () => {
+    useJoker(id); // optimistic: yesterday's segment flips to amber immediately
+    if (isSupabaseConfigured && challenge) {
+      insertCheckIn(id, challenge.currentDay - 1, 'joker')
+        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          Alert.alert('Joker kaydedilemedi', msg);
+        });
+    }
+  };
+
+  const removeMessageMock = useMockStore((s) => s.removeMessage);
+
+  const doSendMessage = (text: string) => {
+    const localId = sendMessageMock(id, text); // optimistic local bubble
+    if (isSupabaseConfigured && challenge) {
+      insertMessage(id, challenge.currentDay, text)
+        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+        .catch((e) => {
+          removeMessageMock(id, localId); // roll back — it never actually sent
+          const msg = e instanceof Error ? e.message : String(e);
+          Alert.alert('Mesaj gönderilemedi', msg);
+        });
+    }
+  };
+
+  const doReact = (messageId: string, emoji: string) => {
+    reactMock(id, messageId, emoji); // optimistic +1
+    if (isSupabaseConfigured) {
+      insertReaction(messageId, emoji)
+        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+        .catch(() => {});
+    }
+  };
+
+  const doNudge = (participantId: string) => {
+    nudgeMock(id, participantId); // optimistic "Sallandı ✓"
+    if (isSupabaseConfigured) {
+      insertNudge(id, participantId).catch(() => {});
+    }
+  };
+
+  return {
+    useJoker: doUseJoker,
+    ackMissed: () => ackMissed(id),
+    sendMessage: doSendMessage,
+    react: doReact,
+    nudge: doNudge,
+    restart: () => restart(id),
+    endEarly: () => endEarly(id),
+  };
+}
+
+/**
+ * Creates a challenge. Adds it to the local mock store for instant UI, and —
+ * when Supabase is configured — performs the real write (challenges +
+ * participants + stake). Returns the id used by the UI.
+ */
+export function useCreateChallenge() {
+  const create = useMockStore((s) => s.createChallenge);
+  const queryClient = useQueryClient();
+  return async (input: CreateChallengeInput): Promise<string> => {
+    if (isSupabaseConfigured) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          const row = await insertChallenge(input, user.id);
+          // Optimistically add the real row to the cache, then refetch so the
+          // list matches the server (real id keeps navigation working).
+          const id = create(input, { id: row.id, inviteCode: row.invite_code });
+          queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+          return id;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          Alert.alert(
+            'Supabase kaydı başarısız',
+            `${msg}\n\nchallenges/participants tablolarını ve RLS'i kurdun mu? (docs/PHASE2-SUPABASE.md · Ek A)`,
+          );
+        }
+      }
+    }
+    return create(input);
+  };
+}
+
+/** Join by invite code. Returns the challenge id to navigate to. */
+export function useJoin() {
+  const joinByCode = useMockStore((s) => s.joinByCode);
+  const setChallenges = useMockStore((s) => s.setChallenges);
+  const queryClient = useQueryClient();
+  return async (code: string, name: string): Promise<string> => {
+    if (isSupabaseConfigured) {
+      const id = await joinChallengeByCode(code); // throws with a real message on failure
+      // The joined challenge is brand new to this device's store. A plain
+      // invalidateQueries() only refetches *active* (mounted) queries — Home
+      // isn't mounted while we're on the join screen, so it would silently
+      // no-op and the immediate router.replace(`/challenge/${id}`) would hit
+      // "Challenge bulunamadı". Fetch + write the store directly instead.
+      const fresh = await queryClient.fetchQuery({
+        queryKey: MY_CHALLENGES_KEY,
+        queryFn: fetchMyChallenges,
+      });
+      setChallenges(fresh);
+      return id;
+    }
+    return joinByCode(code, name);
+  };
+}
+
+/** E10 momentum demo toggle (fired from Settings). */
+export function useMomentumDemo() {
+  const momentumDemoId = useMockStore((s) => s.momentumDemoId);
+  const open = useMockStore((s) => s.openMomentumDemo);
+  const close = useMockStore((s) => s.closeMomentumDemo);
+  return { momentumDemoId, open, close };
+}
+
+/* ---- derived helpers used across screens ---- */
+
+export function completedCount(c: Challenge): number {
+  return c.participants.filter((p) => p.checkedInToday).length;
+}
+
+export function meParticipant(c: Challenge): Participant | undefined {
+  return c.participants.find((p) => p.isMe);
+}
+
+/** "Ayşe, Mert ve Can'i bekliyoruz" from the not-yet-done others. */
+export function waitingLine(c: Challenge): string {
+  const names = c.participants
+    .filter((p) => !p.isMe && !p.checkedInToday)
+    .map((p) => firstName(p.name));
+  return waitingNames(names);
+}
