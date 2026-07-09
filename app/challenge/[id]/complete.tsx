@@ -108,8 +108,9 @@ export default function CompleteScreen() {
           })}
         </View>
 
-        {/* stake result — celebratory */}
-        {challenge.stakeResult ? (
+        {/* stake — a computed "who lost" result when we have one (mock demo),
+            otherwise just the stake's own text so real challenges aren't blank */}
+        {challenge.stakeResult || challenge.stake?.text ? (
           <View
             style={{
               marginTop: 24,
@@ -121,7 +122,7 @@ export default function CompleteScreen() {
             }}
           >
             <AppText variant="bodyMedium" color={colors.ember}>
-              {challenge.stakeResult}
+              {challenge.stakeResult ?? `Bahis: ${challenge.stake!.text}`}
             </AppText>
           </View>
         ) : null}

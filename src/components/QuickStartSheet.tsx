@@ -121,7 +121,7 @@ export function QuickStartSheet({
       }}
     >
       <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <KeyboardAvoidingView  behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <Animated.View
         entering={SlideInDown.duration(260)}
         style={{

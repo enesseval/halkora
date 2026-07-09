@@ -214,6 +214,8 @@ export function UpcomingRow({
         {challenge.title}
         <Text style={{ fontSize: 13, color: colors.textTertiary }}>
           {'  ·  '}
+          {challenge.startsWhen}
+          {'  ·  '}
           {challenge.participants.length} kişi hazır
         </Text>
       </Text>

@@ -5,15 +5,16 @@
  * In Phase 2 the internals swap to TanStack Query + Supabase while these
  * hook signatures stay identical (optimistic check-in etc.).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMockStore, CreateChallengeInput } from '@/stores/mockStore';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { insertChallenge, fetchMyChallenges } from '@/data/challenges';
+import { insertChallenge, fetchMyChallenges, restartChallenge, endChallengeEarly } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
+import { errMessage } from '@/lib/errors';
 import {
   ME_ID,
   ME_NAME,
@@ -191,6 +192,9 @@ export function useCheckIn(id: string) {
   const undo = useMockStore((s) => s.undoCheckIn);
   const challenge = useChallenge(id);
   const queryClient = useQueryClient();
+  // The Edge Function decides the real day_number server-side; remember it
+  // (rather than trusting challenge.currentDay) so undo removes the right row.
+  const lastServerDay = useRef<number | null>(null);
 
   const doCheckIn = () => {
     // A challenge that hasn't started yet (upcoming, currentDay < 1) has
@@ -199,12 +203,14 @@ export function useCheckIn(id: string) {
     if (!challenge || challenge.status !== 'active' || challenge.currentDay < 1) return;
     checkIn(id); // optimistic: instant ring/animation feedback
     if (isSupabaseConfigured && challenge) {
-      insertCheckIn(id, challenge.currentDay, 'done')
-        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
+      insertCheckIn(id, 'done')
+        .then(({ dayNumber }) => {
+          lastServerDay.current = dayNumber;
+          queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+        })
         .catch((e) => {
           undo(id); // roll back the optimistic update
-          const msg = e instanceof Error ? e.message : String(e);
-          Alert.alert('Check-in kaydedilemedi', msg);
+          Alert.alert('Check-in kaydedilemedi', errMessage(e));
         });
     }
   };
@@ -212,7 +218,8 @@ export function useCheckIn(id: string) {
   const doUndo = () => {
     undo(id);
     if (isSupabaseConfigured && challenge) {
-      deleteCheckIn(id, challenge.currentDay)
+      const day = lastServerDay.current ?? challenge.currentDay;
+      deleteCheckIn(id, day)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
         .catch(() => {});
     }
@@ -266,11 +273,19 @@ export function useChallengeMessages(id: string | undefined) {
  */
 export function useRealtimeChallenge(id: string | undefined) {
   const queryClient = useQueryClient();
+  // A fixed channel name (e.g. `challenge-${id}`) can collide with a
+  // not-yet-cleaned-up channel from a fast unmount/remount (React
+  // StrictMode's double-invoke, or a quick nav-away-and-back): supabase-js
+  // then reuses the still-subscribed channel object and throws "cannot add
+  // postgres_changes callbacks ... after subscribe()" when we .on() it
+  // again. A per-mount unique suffix sidesteps the collision entirely —
+  // realtime topic names don't need to be stable across mounts.
+  const instanceId = useRef(Math.random().toString(36).slice(2)).current;
   useEffect(() => {
     if (!isSupabaseConfigured || !id) return;
     const bump = (key: readonly unknown[]) => queryClient.invalidateQueries({ queryKey: key });
     const channel = supabase
-      .channel(`challenge-${id}`)
+      .channel(`challenge-${id}-${instanceId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'check_ins', filter: `challenge_id=eq.${id}` },
@@ -298,7 +313,7 @@ export function useRealtimeChallenge(id: string | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, queryClient]);
+  }, [id, queryClient, instanceId]);
 }
 
 /** All challenge-scoped actions in one place. */
@@ -310,34 +325,54 @@ export function useChallengeActions(id: string) {
   const nudgeMock = useMockStore((s) => s.nudge);
   const restart = useMockStore((s) => s.restart);
   const endEarly = useMockStore((s) => s.endEarly);
+  const setChallenges = useMockStore((s) => s.setChallenges);
   const challenge = useChallenge(id);
   const queryClient = useQueryClient();
 
   const doUseJoker = () => {
     useJoker(id); // optimistic: yesterday's segment flips to amber immediately
     if (isSupabaseConfigured && challenge) {
-      insertCheckIn(id, challenge.currentDay - 1, 'joker')
+      insertCheckIn(id, 'joker') // day_number (yesterday) + allowance validated server-side
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => {
-          const msg = e instanceof Error ? e.message : String(e);
-          Alert.alert('Joker kaydedilemedi', msg);
+        .catch(async (e) => {
+          // The optimistic amber flip didn't actually happen server-side (no
+          // joker left, day already covered, etc.) — resync with the truth.
+          // A plain invalidateQueries() only refetches *active* queries, and
+          // Home isn't mounted while we're on this Detail screen, so fetch +
+          // write the store directly instead (same fix as useJoin()).
+          try {
+            const fresh = await queryClient.fetchQuery({
+              queryKey: MY_CHALLENGES_KEY,
+              queryFn: fetchMyChallenges,
+            });
+            setChallenges(fresh);
+          } catch {
+            // best-effort resync; the alert below still tells the user it failed
+          }
+          Alert.alert('Joker kaydedilemedi', errMessage(e));
         });
     }
   };
 
   const removeMessageMock = useMockStore((s) => s.removeMessage);
 
-  const doSendMessage = (text: string) => {
+  /** Returns true once the message is confirmed sent (or in mock mode) — the
+   * composer only dismisses the keyboard on true, so a failed send leaves it
+   * open with the draft still visible next to the error alert. */
+  const doSendMessage = async (text: string): Promise<boolean> => {
     const localId = sendMessageMock(id, text); // optimistic local bubble
     if (isSupabaseConfigured && challenge) {
-      insertMessage(id, challenge.currentDay, text)
-        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
-        .catch((e) => {
-          removeMessageMock(id, localId); // roll back — it never actually sent
-          const msg = e instanceof Error ? e.message : String(e);
-          Alert.alert('Mesaj gönderilemedi', msg);
-        });
+      try {
+        await insertMessage(id, challenge.currentDay, text);
+        queryClient.invalidateQueries({ queryKey: messagesKey(id) });
+        return true;
+      } catch (e) {
+        removeMessageMock(id, localId); // roll back — it never actually sent
+        Alert.alert('Mesaj gönderilemedi', errMessage(e));
+        return false;
+      }
     }
+    return true;
   };
 
   const doReact = (messageId: string, emoji: string) => {
@@ -356,14 +391,32 @@ export function useChallengeActions(id: string) {
     }
   };
 
+  const doRestart = () => {
+    restart(id); // optimistic: local state already reflects "restarted"
+    if (isSupabaseConfigured) {
+      restartChallenge(id)
+        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
+        .catch((e) => Alert.alert('Yeniden başlatılamadı', errMessage(e)));
+    }
+  };
+
+  const doEndEarly = () => {
+    endEarly(id); // optimistic: local state already reflects "completed"
+    if (isSupabaseConfigured) {
+      endChallengeEarly(id)
+        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
+        .catch((e) => Alert.alert('Bitirilemedi', errMessage(e)));
+    }
+  };
+
   return {
     useJoker: doUseJoker,
     ackMissed: () => ackMissed(id),
     sendMessage: doSendMessage,
     react: doReact,
     nudge: doNudge,
-    restart: () => restart(id),
-    endEarly: () => endEarly(id),
+    restart: doRestart,
+    endEarly: doEndEarly,
   };
 }
 
@@ -389,7 +442,7 @@ export function useCreateChallenge() {
           queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
           return id;
         } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
+          const msg = errMessage(e);
           Alert.alert(
             'Supabase kaydı başarısız',
             `${msg}\n\nchallenges/participants tablolarını ve RLS'i kurdun mu? (docs/PHASE2-SUPABASE.md · Ek A)`,

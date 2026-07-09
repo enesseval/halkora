@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -91,6 +91,7 @@ export default function StartScreen() {
   if (mode === 'join') {
     return (
       <Screen edges={['top', 'bottom']}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {/* top bar */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 6, paddingBottom: 16 }}>
           <IconButton size={40} onPress={() => setMode('fork')}>
@@ -164,6 +165,7 @@ export default function StartScreen() {
         <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center', paddingBottom: spacing.section }}>
           Yanlış davet mi? Linki yukarıya yapıştır.
         </AppText>
+        </KeyboardAvoidingView>
       </Screen>
     );
   }

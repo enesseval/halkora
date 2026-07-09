@@ -220,7 +220,7 @@ export default function OnboardingScreen() {
     <Screen edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* skip */}
         <View style={{ height: 28, justifyContent: 'center', alignItems: 'flex-end' }}>

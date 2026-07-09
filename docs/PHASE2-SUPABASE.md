@@ -4,6 +4,22 @@
 > Faz 2'de **sadece** o katmanın içi (`src/stores/mockStore.ts` → Supabase sorguları)
 > değişecek; ekranların hook imzaları aynı kalacak.
 
+## 📍 Şu an neredeyiz
+
+**Bitti:** 1–6. maddeler (proje, şema, RLS, auth/onboarding, check-in/create/join/chat
+gerçek Supabase) + realtime aboneliği (madde 7'nin ilk parçası).
+
+**Yarım kalanlar (bilerek):**
+- `check-in`'in gün numarası hâlâ istemcide hesaplanıyor — sunucu doğrulaması yok.
+- `restart` / `endEarly` hâlâ sadece mock (Supabase'e yazmıyor).
+- Davet linki deep-link olarak (`thechallenge://join/...`) hiç test edilmedi.
+- `mockStore`/`mock.ts` bilerek duruyor (optimistic-UI + Supabase kapalıyken fallback katmanı).
+
+**Yapılmadı:** Edge Function (check-in doğrulama), Push, Apple native girişi (madde 7'nin geri kalanı + madde 8) — hepsi dev build gerektiriyor, en sona bırakıldı.
+
+**Sıradaki en mantıklı adım:** check-in Edge Function'ı (güvenlik açığını kapatır) **veya**
+`restart`/`endEarly`'i gerçek yazıma taşımak (mockStore'u tamamen kaldırmanın önündeki son engel).
+
 ---
 
 ## ⚠️ 0. Önce bunu bil (sıralamayı bu belirliyor)
@@ -21,14 +37,14 @@
 
 ## 1. Supabase projesi
 
-- [ ] supabase.com → yeni proje oluştur, **Project URL** ve **anon public key**'i not al.
-- [ ] Auth → Providers: **Anonymous** aç (hızlı test için). **Email** opsiyonel.
+- [x] supabase.com → yeni proje oluştur, **Project URL** ve **anon public key**'i not al.
+- [x] Auth → Providers: **Anonymous** aç (hızlı test için). **Email** opsiyonel.
 - [ ] Auth → URL Configuration: redirect URL'e uygulama şeması ekle → `thechallenge://`
-      (app.json'da `scheme: "thechallenge"` zaten var).
+      (app.json'da `scheme: "thechallenge"` zaten var — dashboard tarafı teyit edilmedi).
 
 ## 2. Şema + RLS (SQL Editor'de çalıştır)
 
-- [ ] Tabloları oluştur (özet — tam SQL aşağıda "Ek A"):
+- [x] Tabloları oluştur (özet — tam SQL aşağıda "Ek A"):
   - `profiles(id→auth.users, name, initials)`
   - `challenges(id, owner_id, title, daily_action, total_days, start_date, timezone, status, invite_code UNIQUE, joker_allowance)`
   - `participants(challenge_id, user_id, UNIQUE(challenge_id,user_id))`
@@ -37,62 +53,72 @@
   - `message_reactions(message_id, user_id, emoji, UNIQUE(message_id,user_id,emoji))`
   - `stakes(challenge_id, mode∈{direct,vote}, text)` + `stake_options(stake_id,label)` + `stake_votes(option_id,user_id UNIQUE)`
   - `nudges(challenge_id, from_user, to_user)`
-- [ ] **RLS aç** (her tabloda `enable row level security`).
-- [ ] Politikalar:
+- [x] **RLS aç** (her tabloda `enable row level security`).
+- [x] Politikalar (Ek A + B + C + D + E ile tamamlandı):
   - Bir kullanıcı **üyesi olduğu** challenge'ın satırlarını okuyabilir.
   - Kullanıcı **kendi** check_in / message / reaction / vote / nudge satırını yazabilir.
   - `invite_code` ile challenge önizlemesi herkese açık okunabilir (join ekranı için) —
-    ya ayrı bir "public preview" view'ı, ya da güvenli bir RPC ile.
-- [ ] `profiles` için: yeni `auth.users` eklendiğinde otomatik boş profil açan **trigger**
+    RPC ile çözüldü (Ek C).
+  - Co-participant `profiles` okuma (Ek E) — "Katılımcı" fallback bug'ının düzeltmesi.
+- [x] `profiles` için: yeni `auth.users` eklendiğinde otomatik boş profil açan **trigger**
       (`on auth.users insert → create profile`).
 
 ## 3. İstemci entegrasyonu (uygulamada)
 
-- [ ] Paketler: `npx expo install @supabase/supabase-js @react-native-async-storage/async-storage react-native-url-polyfill`
-- [ ] `.env` + `app.config` ile `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
-- [ ] **Yeni dosya `src/lib/supabase.ts`**: AsyncStorage'lı Supabase client (session persist).
-- [ ] TanStack Query kur: `npm i @tanstack/react-query` → `app/_layout.tsx`'te `QueryClientProvider` ile sar.
+- [x] Paketler: `npx expo install @supabase/supabase-js @react-native-async-storage/async-storage react-native-url-polyfill`
+- [x] `.env` + `app.config` ile `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+- [x] **Yeni dosya `src/lib/supabase.ts`**: AsyncStorage'lı Supabase client (session persist).
+- [x] TanStack Query kur: `npm i @tanstack/react-query` → `app/_layout.tsx`'te `QueryClientProvider` ile sar.
 
 ## 4. Auth + Onboarding (senin asıl istediğin akış)
 
-- [ ] **Yeni `src/hooks/useAuth.ts`** (veya store): session'ı dinle (`supabase.auth.onAuthStateChange`).
-- [ ] `app/_layout.tsx`'te yönlendirme mantığı:
+- [x] **Yeni `src/hooks/useAuth.ts`**: session'ı dinler (`onAuthStateChange`) + açılışta `getUser()` ile
+      sunucuya karşı doğrulama (silinmiş kullanıcı → otomatik sign-out, "hayalet oturum" koruması).
+- [x] `app/_layout.tsx`'te yönlendirme mantığı:
   - session yok → `(auth)/welcome` (E1)
-  - session var + profil ismi yok → **onboarding: isim iste** (yeni ekran `app/(auth)/onboarding.tsx`)
+  - session var + profil ismi yok → **onboarding** (O1–O6: kanca, mekanik, bahis, isim, oluştur/katıl, kodla katıl)
   - session var + isim var → `(main)` (Home)
-- [ ] **E1 Welcome** butonları:
-  - [ ] "Apple ile devam et" → (şimdilik) `signInAnonymously()`, sonra dev build'de gerçek Apple.
-  - [ ] (opsiyonel) "İsimle hızlı başla" → anonim giriş.
-- [ ] **Onboarding ekranı**: tek input "Adın" + Devam → `profiles.name` güncelle → Home.
-      (İleride buraya değer önerisi / kısa tur eklersin — "onu hallederiz" dediğin kısım.)
+- [x] **E1 Welcome** butonları: ikisi de (Apple/Google) → `signInAnonymously()` (Apple gerçek native girişi Faz 2'nin en sonunda, dev build ile).
+- [x] **Onboarding ekranı**: O1–O6 tam akış, isim → `profiles.name` güncelle → `/start` (oluştur/katıl seçimi).
 
 ## 5. Mock → Supabase geçişi (hook hook)
 
-`src/hooks/index.ts` imzaları AYNI kalır; içleri Supabase/Query olur:
+`src/hooks/index.ts` imzaları AYNI kaldı; içleri Supabase/Query oldu:
 
-- [ ] `useTodayStatus()` → `challenges` + bugünkü `check_ins` join eden Query.
-- [ ] `useChallenge(id)` → tek challenge + participants + messages Query.
-- [ ] `useCheckIn(id)` → **optimistic mutation** (`check_ins` insert, `day_number`'ı sunucu doğrular).
-- [ ] `useChallengeActions(id)` → sendMessage/react/nudge/useJoker/restart/endEarly = ilgili insert/update mutation'ları.
-- [ ] `useCreateChallenge()` → `challenges` insert (owner = ben) + `participants` insert (ben) + stake insert.
-- [ ] `useJoin()` → `invite_code`'dan challenge bul + `participants` insert (ben).
-- [ ] Bittiğinde `src/stores/mockStore.ts` ve `src/data/mock.ts` kaldırılabilir.
+- [x] `useTodayStatus()` → `challenges` + `check_ins` join eden Query (+ 5sn polling fallback).
+- [x] `useChallenge(id)` / `useChallengeMessages(id)` → challenge + participants + messages gerçek veriden.
+- [x] `useCheckIn(id)` → optimistic mutation (`check_ins` insert) + rollback.
+      ⚠️ `day_number` hâlâ **istemcide** hesaplanıp gönderiliyor — sunucu tarafı doğrulama yok (bkz. madde 7'deki Edge Function, henüz yapılmadı).
+- [x] `useChallengeActions(id)` → `sendMessage` / `react` / `nudge` / `useJoker` gerçek Supabase insert'leri (optimistic + rollback + realtime + polling).
+      ⚠️ `restart` / `endEarly` **hâlâ sadece mock** — `challenges.status` güncellemesi Supabase'e yazılmıyor.
+- [x] `useCreateChallenge()` → `challenges` + `participants` + `stakes` insert.
+- [x] `useJoin()` → `join_challenge_by_code` RPC ile `participants` insert.
+- [ ] `src/stores/mockStore.ts` / `src/data/mock.ts` kaldırılması — bilinçli olarak **henüz yapılmadı**:
+      store hâlâ optimistic-UI + local cache katmanı olarak kullanılıyor (Supabase configured değilken de
+      çalışmaya devam etmesi için). Kaldırmak, restart/endEarly'nin de gerçek yazıma taşınmasını gerektirir.
 
 ## 6. Create / Join akışları (uçtan uca)
 
-- [ ] Create (E3) bitince gerçek `invite_code` üret (DB default: `gen_random_uuid` kısaltması) → E4 Davet.
-- [ ] E4 "Daveti paylaş" linki: `https://thechallenge.app/j/{invite_code}` **+** `thechallenge://join/{invite_code}` deep link.
-- [ ] `join/[code]` (E5): koddan önizleme (public read) → "Katıl" → participant ekle → Detay.
-- [ ] app.json `scheme` + (ileride) Universal Links / App Links kurulumu.
+- [x] Create (E3) bitince gerçek `invite_code` üret (DB default) → E4 Davet.
+- [~] E4 "Daveti paylaş" linki: şu an yalnızca `thechallenge.app/j/{invite_code}` (düz metin,
+      `https://` prefiksi yok). **`thechallenge://join/{invite_code}` deep link hiç test edilmedi** —
+      linke gerçekten tıklayınca uygulamanın açılıp doğru ekrana düştüğü doğrulanmadı.
+- [x] `join/[code]` (E5): `get_challenge_preview` RPC ile önizleme → "Katıl" → `participants` insert → Detay.
+      Ayrıca: geri/kapat butonu, isim tekrar sormama, klavye davranışı düzeltildi.
+- [x] app.json `scheme: "thechallenge"` eklendi. Universal Links / App Links kurulumu **yapılmadı** (ileride).
+- [x] Home'daki "+" → `QuickStartSheet` (oluştur / kodla katıl, pano otomatik yakalama) — checklist'te
+      yoktu ama aynı akışın parçası olarak eklendi.
 
 ## 7. Realtime + Edge Functions + Push
 
-- [ ] **Realtime**: sohbet mesajları ve check-in'ler için `supabase.channel().on('postgres_changes')` → Query invalidate.
-- [ ] **Edge Function `check-in`**: `day_number`'ı challenge `start_date` + `timezone`'a göre sunucuda hesapla,
-      "günde bir" ve joker kuralını doğrula (istemciye güvenme).
-- [ ] **Edge Function `join`** (opsiyonel): koddan güvenli katılım.
-- [ ] **Push**: `npx expo install expo-notifications` → token'ı `profiles`'a yaz →
-      DB trigger/function ile "herkes bekliyor / X tamamladı" bildirimi. (Push da dev build ister.)
+- [x] **Realtime**: `useRealtimeChallenge(id)` — check_ins/participants/messages/message_reactions için
+      `postgres_changes` aboneliği + Query invalidate. Ayrıca **polling fallback** (4–5sn) eklendi çünkü
+      realtime'ın senin projende gerçekten tetiklendiği net doğrulanamadı (Ek D'nin publication adımı kritik).
+- [ ] **Edge Function `check-in`**: yapılmadı. `day_number` hâlâ istemci tarafından hesaplanıp gönderiliyor —
+      teorik olarak sahtelenebilir. **Sıradaki en önemli iş bu.**
+- [ ] **Edge Function `join`**: ayrı bir Edge Function yerine RPC (`join_challenge_by_code`, Ek C) ile
+      çözüldü — aynı güvenlik amacına hizmet ediyor, bu haliyle kapatılmış sayılabilir.
+- [ ] **Push**: yapılmadı (dev build gerektiriyor, en sona bırakıldı).
 
 ## 8. Apple ile Giriş (EN SON — dev build)
 
@@ -388,3 +414,117 @@ alter publication supabase_realtime add table check_ins, messages, message_react
 Detay ekranı artık her açılışta bir `postgres_changes` kanalına abone oluyor
 (`useRealtimeChallenge`): biri check-in yapınca, katılınca, mesaj/tepki atınca
 diğer cihazlar **pull-to-refresh'e gerek kalmadan** otomatik güncelleniyor.
+
+## Ek E — Co-participant profil okuma (ZORUNLU — "Katılımcı" fallback'i için)
+
+`profiles` üzerindeki `"own profile"` politikası (`for all using (auth.uid() = id)`)
+yalnızca **kendi** profilini okumana izin veriyor. Katılımcı listesi, sohbet yazar
+adları ve davet önizlemesi başka kullanıcıların `profiles.name`'ini okumaya çalıştığında
+RLS bunu sessizce engelliyor — sorgu hata vermiyor, sadece o satırı döndürmüyor, bu
+yüzden kodumuzdaki fallback (`'Katılımcı'`) devreye giriyor. Bu, aynı challenge'ı
+paylaşan biri için ekle:
+
+```sql
+create policy "read co-participant profiles" on profiles
+  for select using (
+    exists (
+      select 1 from participants p1
+      join participants p2 on p1.challenge_id = p2.challenge_id
+      where p1.user_id = auth.uid() and p2.user_id = profiles.id
+    )
+  );
+```
+
+Bu, mevcut `"own profile"` politikasının **yanına eklenir** (OR'lanır) — kendi
+profilini okuma hâlâ çalışır, ayrıca seninle en az bir challenge'ı paylaşan
+herkesin adını/baş harflerini de okuyabilirsin. Bunu çalıştırdıktan sonra
+katılımcı listesindeki, sohbetteki ve davet önizlemesindeki "Katılımcı"
+yer tutucuları gerçek isimlere döner (uygulamayı yeniden açmana gerek yok —
+sıradaki fetch'te otomatik gelir).
+
+## Ek F — Check-in Edge Function (madde 7'nin en kritik parçası)
+
+**Neden gerekli:** Şu ana kadar check-in'in `day_number`'ı **istemci tarafından**
+hesaplanıp gönderiliyordu (telefonun/tarayıcının yerel saatine göre). Teoride biri
+uygulamayı değiştirip herhangi bir günü işaretleyebilir, ya da telefon saatini
+oynayabilir. Bu Edge Function, `day_number`'ı **sunucuda**, challenge'ın kendi
+`start_date` + `timezone`'una göre hesaplayıp doğruluyor — istemciye artık hiç
+güvenmiyoruz. Joker hakkı ve "gerçekten kaçırılmış mı" kontrolü de sunucuda.
+
+Kod zaten repoda: [`supabase/functions/check-in/index.ts`](../supabase/functions/check-in/index.ts).
+İstemci tarafı (`src/data/checkins.ts`, `src/hooks/index.ts`) bu fonksiyonu
+`supabase.functions.invoke('check-in', ...)` ile çağıracak şekilde **zaten güncellendi** —
+tek eksik, fonksiyonu senin Supabase projene **deploy etmen**.
+
+### Deploy adımları
+
+1. Supabase CLI'ı kur (bir kere):
+   ```powershell
+   npm install -g supabase
+   ```
+2. Giriş yap ve projeni bağla (proje ref'i Dashboard → Project Settings → General'da):
+   ```powershell
+   supabase login
+   supabase link --project-ref <PROJECT_REF>
+   ```
+   (`D:\theChallange` klasöründe çalıştır — `supabase/functions/check-in` zaten orada.)
+3. Deploy et:
+   ```powershell
+   supabase functions deploy check-in
+   ```
+   `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` ortam değişkenleri
+   Supabase tarafından fonksiyona **otomatik** enjekte edilir — elle bir secret
+   ayarlaman gerekmiyor.
+4. JWT doğrulaması varsayılan olarak **açık** kalmalı (`--no-verify-jwt` **kullanma**) —
+   yalnızca giriş yapmış kullanıcıların çağırabilmesini istiyoruz; `supabase.functions.invoke()`
+   zaten aktif oturumun token'ını otomatik ekliyor.
+
+### Deploy sonrası
+
+Kod tarafında değişiklik gerekmiyor — check-in/joker butonlarına basınca istemci
+otomatik olarak bu fonksiyonu çağıracak. Hata mesajları artık gerçekten sunucudan
+geliyor (`"Joker hakkın kalmadı."`, `"Bu challenge henüz başlamadı."` gibi) —
+`errMessage()` / `FunctionsHttpError` üzerinden okunuyor.
+
+> Not: `check_ins` tablosundaki mevcut RLS politikaları (Ek B) hâlâ duruyor ve
+> zararsız — Edge Function `service_role` ile yazdığı için onları bypass ediyor,
+> ama tabloyu doğrudan (fonksiyon dışından) yazmaya çalışan biri için hâlâ geçerli
+> bir güvenlik katmanı.
+
+## Ek G — restart / endEarly RPC'leri (madde 5'in son mock-only aksiyonları)
+
+E10 Momentum sheet'indeki "Yeniden başlat" / "Erken bitir" artık gerçek Supabase'e
+yazıyor. Genel bir `UPDATE` RLS politikası yerine (ki bu, bir katılımcının title/owner
+gibi alakasız alanları da değiştirebilmesi anlamına gelirdi) iki dar RPC kullanıyoruz —
+yalnızca `start_date`+`status` ya da yalnızca `status` günceller:
+
+```sql
+create or replace function public.restart_challenge(p_challenge_id uuid)
+returns void language plpgsql security definer as $$
+begin
+  if not public.is_member(p_challenge_id) then
+    raise exception 'Bu challenge''in üyesi değilsin.';
+  end if;
+  update challenges
+  set start_date = current_date, status = 'active'
+  where id = p_challenge_id;
+end;
+$$;
+grant execute on function public.restart_challenge(uuid) to authenticated;
+
+create or replace function public.end_challenge_early(p_challenge_id uuid)
+returns void language plpgsql security definer as $$
+begin
+  if not public.is_member(p_challenge_id) then
+    raise exception 'Bu challenge''in üyesi değilsin.';
+  end if;
+  update challenges set status = 'completed' where id = p_challenge_id;
+end;
+$$;
+grant execute on function public.end_challenge_early(uuid) to authenticated;
+```
+
+> ⚠️ Bilinen eksik: E9 (Bitiş & Kutlama) ekranındaki `finishStats` (kişi/check-in/
+> tamamlama %) ve katılımcı sıralaması hâlâ yalnızca **mock arşiv verisinde**
+> (`archive1`) dolu geliyor — gerçek bir challenge'ı `endEarly` ile bitirince o
+> istatistikler henüz `check_ins`'ten hesaplanmıyor. Ayrı bir iş olarak bırakıldı.

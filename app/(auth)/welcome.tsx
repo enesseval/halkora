@@ -6,6 +6,7 @@ import { colors, spacing } from '@/theme/tokens';
 import { ProgressRing } from '@/components/ProgressRing';
 import { AppText, Button, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { errMessage } from '@/lib/errors';
 import type { SegmentState } from '@/hooks';
 
 const LOGO_DAYS: SegmentState[] = [
@@ -33,8 +34,7 @@ export default function WelcomeScreen() {
       await fn();
     } catch (e) {
       // Surface the real reason (e.g. "Anonymous sign-ins are disabled").
-      const msg = e instanceof Error ? e.message : String(e);
-      setErr(msg || 'Giriş yapılamadı. Tekrar dene.');
+      setErr(errMessage(e) || 'Giriş yapılamadı. Tekrar dene.');
       setBusy(false);
     }
   };

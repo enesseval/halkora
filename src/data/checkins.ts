@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 export type CheckInType = 'done' | 'joker';
@@ -13,28 +14,36 @@ async function myParticipantId(challengeId: string, userId: string): Promise<str
   return data.id as string;
 }
 
-/** Insert today's (or a given) check-in. Unique(participant_id, day_number) enforces one per day. */
-export async function insertCheckIn(
-  challengeId: string,
-  dayNumber: number,
-  type: CheckInType = 'done',
-): Promise<void> {
-  // day_number must be a real day of the challenge — belt-and-suspenders
-  // against upcoming challenges (currentDay < 1) or a stale caller.
-  if (dayNumber < 1) throw new Error('Bu challenge henüz başlamadı.');
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Oturum bulunamadı.');
-  const participantId = await myParticipantId(challengeId, user.id);
-
-  const { error } = await supabase
-    .from('check_ins')
-    .insert({ participant_id: participantId, challenge_id: challengeId, day_number: dayNumber, type });
-  if (error) throw error;
+/** Pull the real `{ error }` JSON body out of a failed Edge Function call. */
+async function edgeFunctionError(e: unknown): Promise<Error> {
+  if (e instanceof FunctionsHttpError) {
+    try {
+      const body = await e.context.json();
+      if (body?.error) return new Error(body.error as string);
+    } catch {
+      // fall through to the generic message below
+    }
+  }
+  return e instanceof Error ? e : new Error(String(e));
 }
 
-/** Undo (within the mock 5-minute window the UI already enforces via long-press). */
+/**
+ * Real check-in write. The day_number is computed and validated
+ * SERVER-SIDE by the `check-in` Edge Function (supabase/functions/check-in) —
+ * never trusted from the client. See docs/PHASE2-SUPABASE.md "Ek F".
+ */
+export async function insertCheckIn(
+  challengeId: string,
+  type: CheckInType = 'done',
+): Promise<{ dayNumber: number }> {
+  const { data, error } = await supabase.functions.invoke('check-in', {
+    body: { challenge_id: challengeId, type },
+  });
+  if (error) throw await edgeFunctionError(error);
+  return { dayNumber: (data as { day_number: number }).day_number };
+}
+
+/** Undo — removes the check-in this device just added (own row only, RLS-scoped). */
 export async function deleteCheckIn(challengeId: string, dayNumber: number): Promise<void> {
   const {
     data: { user },

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
@@ -23,6 +23,7 @@ import { AppText, AvatarStack, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
 import { StakeBadge } from '@/components/StakeBadge';
+import { InviteShare } from '@/components/InviteShare';
 import { ParticipantRow } from '@/components/ParticipantRow';
 import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
 import { MissedDaySheet, MomentumSheet } from '@/components/Sheets';
@@ -177,6 +178,13 @@ export default function DetailScreen() {
         </View>
       ) : null}
 
+      {/* upcoming: invite is still open — let the owner pull people in later too */}
+      {isUpcoming ? (
+        <View style={{ marginTop: 24 }}>
+          <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+        </View>
+      ) : null}
+
       {/* today count — meaningless before the challenge has actually started */}
       {!isUpcoming ? (
         <View
@@ -237,7 +245,7 @@ export default function DetailScreen() {
         {topBar}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <FlashList
             data={rows}
@@ -290,11 +298,12 @@ export default function DetailScreen() {
               }}
             />
             <Pressable
-              onPress={() => {
+              onPress={async () => {
                 const t = draft.trim();
                 if (!t) return;
-                actions.sendMessage(t);
                 setDraft('');
+                const sent = await actions.sendMessage(t);
+                if (sent) Keyboard.dismiss();
               }}
               style={{
                 width: 44,

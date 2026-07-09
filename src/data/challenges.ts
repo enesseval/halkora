@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
-import { buildDays } from '@/lib/day';
+import { buildDays, formatShortDate } from '@/lib/day';
 
 export interface InsertedChallenge {
   id: string;
@@ -81,6 +81,12 @@ interface CheckInRow {
   created_at: string;
 }
 
+interface StakeRow {
+  challenge_id: string;
+  mode: 'direct' | 'vote';
+  text: string | null;
+}
+
 /** Whole days from `startISO` (local midnight) to today. 0 === starts today. */
 function daysSinceStart(startISO: string): number {
   const start = new Date(`${startISO}T00:00:00`);
@@ -100,12 +106,29 @@ function mapRow(
   profMap: Map<string, { name?: string; initials?: string }>,
   checkIns: CheckInRow[],
   myUserId: string,
+  stake?: StakeRow,
 ): Challenge {
   const diff = daysSinceStart(row.start_date);
   const rawDay = diff + 1; // day 1 == start day
-  const status: Challenge['status'] =
+  const dateBasedStatus: Challenge['status'] =
     rawDay <= 0 ? 'upcoming' : rawDay > row.total_days ? 'completed' : 'active';
+  // A manual "Erken bitir" (endEarly) sets challenges.status='completed' in
+  // the DB *before* the days have naturally run out — that's the entire
+  // point of ending early. Date math alone would never see it as completed,
+  // so the DB's own status is authoritative whenever it says 'completed'.
+  const status: Challenge['status'] =
+    row.status === 'completed' ? 'completed' : dateBasedStatus;
   const currentDay = status === 'upcoming' ? 0 : Math.min(rawDay, row.total_days);
+
+  // "Yarın başlıyor" only when it's actually tomorrow — a challenge starting
+  // in 20 days showed that same label before this fix, which is just wrong.
+  const daysUntilStart = -diff;
+  const startsWhen =
+    status === 'upcoming'
+      ? daysUntilStart === 1
+        ? 'Yarın başlıyor'
+        : `${formatShortDate(new Date(`${row.start_date}T00:00:00`))}'da başlıyor`
+      : 'Devam ediyor';
 
   const myParticipant = parts.find((p) => p.user_id === myUserId);
   const myCheckIns = myParticipant
@@ -142,6 +165,8 @@ function mapRow(
     const prof = profMap.get(p.user_id);
     const name = prof?.name ?? 'Katılımcı';
     const todayCi = checkIns.find((c) => c.participant_id === p.id && c.day_number === currentDay);
+    // Every day this participant covered (done or joker) — the E9 leaderboard.
+    const completedDays = checkIns.filter((c) => c.participant_id === p.id).length;
     return {
       id: p.user_id,
       name,
@@ -149,8 +174,19 @@ function mapRow(
       isMe: p.user_id === myUserId,
       checkedInToday: !!todayCi,
       checkinTime: todayCi ? hhmm(todayCi.created_at) : undefined,
+      completedDays,
     };
   });
+
+  // E9 finish stats — only meaningful once the challenge is actually over.
+  const finishStats =
+    status === 'completed' && parts.length > 0
+      ? {
+          people: parts.length,
+          checkins: checkIns.length,
+          completionPct: Math.round((checkIns.length / (parts.length * row.total_days)) * 100),
+        }
+      : undefined;
 
   return {
     id: row.id,
@@ -160,7 +196,7 @@ function mapRow(
     currentDay,
     days: buildDays(row.total_days, explicit),
     status,
-    startsLabel: status === 'upcoming' ? 'Yarın başlıyor' : undefined,
+    startsLabel: status === 'upcoming' ? startsWhen : undefined,
     meCheckedInToday,
     myCheckinTime: myTodayCheckIn ? hhmm(myTodayCheckIn.created_at) : undefined,
     myOrder: meCheckedInToday ? myOrder || undefined : undefined,
@@ -168,9 +204,15 @@ function mapRow(
     hasMissedYesterday,
     inviteCode: row.invite_code,
     scheduleSummary: `${row.daily_action} · ${row.total_days} gün`,
-    startsWhen: status === 'upcoming' ? 'Yarın başlıyor' : 'Devam ediyor',
+    startsWhen,
+    stake: stake ? { mode: stake.mode, text: stake.text ?? '' } : undefined,
     participants,
     messages: [],
+    finishStats,
+    // No automatic "kim kaybetti" computation from real data (that's a group
+    // decision, not something we can infer) — the stake's own text is shown
+    // instead by the Detail/complete screens when this is absent.
+    stakeResult: undefined,
   };
 }
 
@@ -189,21 +231,27 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
   const ids = (mine ?? []).map((r) => r.challenge_id as string);
   if (ids.length === 0) return [];
 
-  const [{ data: rows, error: e2 }, { data: allParts, error: e3 }, { data: checkIns, error: e4 }] =
-    await Promise.all([
-      supabase
-        .from('challenges')
-        .select('id, title, daily_action, total_days, start_date, status, invite_code, joker_allowance')
-        .in('id', ids),
-      supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),
-      supabase
-        .from('check_ins')
-        .select('participant_id, challenge_id, day_number, type, created_at')
-        .in('challenge_id', ids),
-    ]);
+  const [
+    { data: rows, error: e2 },
+    { data: allParts, error: e3 },
+    { data: checkIns, error: e4 },
+    { data: stakes, error: e5 },
+  ] = await Promise.all([
+    supabase
+      .from('challenges')
+      .select('id, title, daily_action, total_days, start_date, status, invite_code, joker_allowance')
+      .in('id', ids),
+    supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),
+    supabase
+      .from('check_ins')
+      .select('participant_id, challenge_id, day_number, type, created_at')
+      .in('challenge_id', ids),
+    supabase.from('stakes').select('challenge_id, mode, text').in('challenge_id', ids),
+  ]);
   if (e2) throw e2;
   if (e3) throw e3;
   if (e4) throw e4;
+  if (e5) throw e5;
 
   const parts = (allParts ?? []) as ParticipantRow[];
   const userIds = Array.from(new Set(parts.map((p) => p.user_id)));
@@ -227,6 +275,10 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
     list.push(c);
     checkInsByChallenge.set(c.challenge_id, list);
   }
+  const stakeByChallenge = new Map<string, StakeRow>();
+  for (const s of (stakes ?? []) as StakeRow[]) {
+    stakeByChallenge.set(s.challenge_id, s);
+  }
 
   return (rows ?? []).map((r) => {
     const row = r as ChallengeRow;
@@ -236,6 +288,19 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
       profMap,
       checkInsByChallenge.get(row.id) ?? [],
       user.id,
+      stakeByChallenge.get(row.id),
     );
   });
+}
+
+/** E10 "Yeniden başlat" — resets start_date to today and status to active. */
+export async function restartChallenge(challengeId: string): Promise<void> {
+  const { error } = await supabase.rpc('restart_challenge', { p_challenge_id: challengeId });
+  if (error) throw error;
+}
+
+/** E10 "Erken bitir" — marks the challenge completed. */
+export async function endChallengeEarly(challengeId: string): Promise<void> {
+  const { error } = await supabase.rpc('end_challenge_early', { p_challenge_id: challengeId });
+  if (error) throw error;
 }

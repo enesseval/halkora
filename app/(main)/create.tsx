@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker, {
@@ -74,7 +74,59 @@ function DatePill({
   );
 }
 
-const DAY_OPTIONS = [7, 14, 21, 30];
+/** Editable "gün sayısı" pill — sits next to the 7/30 quick-pick chips so the
+ * user can type any custom day count (3, 5, 15, ...). */
+function DayInput({
+  value,
+  onChangeText,
+  selected,
+}: {
+  value: string;
+  onChangeText: (t: string) => void;
+  selected: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: selected ? colors.emberSoft : colors.bgElevated,
+        borderColor: selected ? colors.ember : colors.strokeSubtle,
+        borderWidth: hairline,
+        borderRadius: radius.badge,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+      }}
+    >
+      <TextInput
+        value={value}
+        onChangeText={(t) => onChangeText(t.replace(/[^0-9]/g, '').slice(0, 3))}
+        placeholder="Özel"
+        placeholderTextColor={colors.textTertiary}
+        keyboardType="number-pad"
+        maxLength={3}
+        style={{
+          minWidth: 26,
+          padding: 0,
+          fontFamily: fonts.bodyMedium,
+          fontSize: 15,
+          color: selected ? colors.textPrimary : colors.textSecondary,
+        }}
+      />
+      <AppText
+        style={{
+          ...type.secondary,
+          color: selected ? colors.textPrimary : colors.textSecondary,
+        }}
+      >
+        gün
+      </AppText>
+    </View>
+  );
+}
+
+const DAY_OPTIONS = [7, 30];
 const JOKER_OPTIONS = [
   { v: 0, label: 'Yok' },
   { v: 1, label: '1' },
@@ -147,6 +199,18 @@ export default function CreateScreen() {
   const [title, setTitle] = useState('');
   const [action, setAction] = useState('');
   const [totalDays, setTotalDays] = useState(14);
+  // Empty when a 7/30 preset chip is active; holds the raw typed text
+  // whenever a custom day count is in use (initially the 14-day default).
+  const [daysText, setDaysText] = useState('14');
+  const pickPresetDays = (d: number) => {
+    setTotalDays(d);
+    setDaysText('');
+  };
+  const changeCustomDays = (raw: string) => {
+    setDaysText(raw);
+    const n = parseInt(raw, 10);
+    if (!Number.isNaN(n) && n > 0) setTotalDays(n);
+  };
   const today = new Date();
   const tomorrow = addDays(today, 1);
   const [startDate, setStartDate] = useState<Date>(tomorrow);
@@ -193,6 +257,10 @@ export default function CreateScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       {/* header */}
       <View
         style={{
@@ -243,10 +311,16 @@ export default function CreateScreen() {
 
         {step === 1 ? (
           <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20, alignItems: 'center' }}>
               {DAY_OPTIONS.map((d) => (
-                <Chip key={d} label={`${d}`} selected={totalDays === d} onPress={() => setTotalDays(d)} />
+                <Chip
+                  key={d}
+                  label={`${d}`}
+                  selected={totalDays === d && !daysText}
+                  onPress={() => pickPresetDays(d)}
+                />
               ))}
+              <DayInput value={daysText} onChangeText={changeCustomDays} selected={!!daysText} />
             </View>
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 8 }}>
               Başlangıç
@@ -386,6 +460,7 @@ export default function CreateScreen() {
           disabled={creating || (step === 0 && (!title.trim() || !action.trim()))}
         />
       </View>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }

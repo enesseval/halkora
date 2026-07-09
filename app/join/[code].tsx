@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useJoinPreview, useJoin } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
+import { errMessage } from '@/lib/errors';
 import { AppText, AvatarStack, Button, IconButton, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StakeBadge } from '@/components/StakeBadge';
@@ -47,8 +48,7 @@ export default function JoinScreen() {
       const id = await join(code ?? '', name.trim());
       router.replace(`/challenge/${id}`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErr(msg || 'Katılamadık. Kodu kontrol edip tekrar dene.');
+      setErr(errMessage(e) || 'Katılamadık. Kodu kontrol edip tekrar dene.');
       setJoining(false);
     }
   };
@@ -80,6 +80,7 @@ export default function JoinScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {closeButton}
       <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center', marginTop: 12 }}>
         Bir davete katılıyorsun
@@ -165,6 +166,7 @@ export default function JoinScreen() {
         ) : null}
         <Button label={joining ? 'Katılıyor…' : 'Katıl'} onPress={submit} disabled={joining} />
       </View>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }

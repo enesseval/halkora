@@ -96,7 +96,7 @@ export default function HomeScreen() {
           {/* upcoming — faint */}
           {upcoming.length > 0 ? (
             <View style={{ marginTop: spacing.section }}>
-              <SectionLabel>Yarın Başlıyor</SectionLabel>
+              <SectionLabel>Yakında</SectionLabel>
               <View style={{ marginTop: 4 }}>
                 {upcoming.map((c) => (
                   <UpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />

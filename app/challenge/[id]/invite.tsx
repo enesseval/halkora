@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Pressable, Share, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
+import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useChallenge, INVITE_JOINERS } from '@/hooks';
-import { AppText, Avatar, Button, IconButton, Screen } from '@/components/ui';
+import { AppText, Avatar, IconButton, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StakeBadge } from '@/components/StakeBadge';
+import { InviteShare } from '@/components/InviteShare';
 
 export default function InviteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const challenge = useChallenge(id);
   const [joined, setJoined] = useState(0);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (joined >= INVITE_JOINERS.length) return;
@@ -23,11 +23,6 @@ export default function InviteScreen() {
   }, [joined]);
 
   if (!challenge) return null;
-  const link = `thechallenge.app/j/${challenge.inviteCode}`;
-
-  const share = () => {
-    Share.share({ message: `"${challenge.title}" challenge'ına katıl: ${link}` }).catch(() => {});
-  };
 
   return (
     <Screen edges={['top', 'bottom']}>
@@ -41,7 +36,7 @@ export default function InviteScreen() {
         Hazır. Şimdi grubunu çağır.
       </AppText>
       <AppText variant="secondary" style={{ marginTop: 8 }}>
-        Challenge {challenge.startsWhen}'da başlıyor.
+        Challenge {challenge.startsWhen}.
       </AppText>
 
       {/* summary card */}
@@ -79,32 +74,8 @@ export default function InviteScreen() {
       </Pressable>
 
       <View style={{ marginTop: 24 }}>
-        <Button label="Daveti paylaş" onPress={share} icon={<Feather name="share" size={18} color={colors.bgBase} />} />
+        <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
       </View>
-
-      {/* copy row */}
-      <Pressable
-        onPress={() => setCopied(true)}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: colors.bgSurface,
-          borderRadius: radius.badge,
-          borderWidth: hairline,
-          borderColor: colors.strokeSubtle,
-          paddingHorizontal: 16,
-          height: 50,
-          marginTop: 12,
-        }}
-      >
-        <AppText variant="secondary" color={colors.textSecondary}>
-          {link}
-        </AppText>
-        <AppText variant="secondary" color={colors.ember} style={{ fontFamily: type.bodyMedium.fontFamily }}>
-          {copied ? 'Kopyalandı ✓' : 'Kopyala'}
-        </AppText>
-      </Pressable>
 
       {/* live joiners */}
       <AppText

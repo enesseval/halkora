@@ -51,8 +51,23 @@ export function useAuthInit(): void {
 
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
-      useAuthStore.setState({ session: data.session });
-      await loadProfileName(data.session);
+      let session = data.session;
+      if (session) {
+        // getSession() only reads the locally cached JWT — it does not confirm
+        // the user still exists server-side. If the project's data was ever
+        // wiped (e.g. while resetting test data), a device can be left holding
+        // a session for a user row that's gone, which then surfaces later as a
+        // cryptic FK error (e.g. "participants_user_id_fkey") instead of a
+        // clean "please sign in again". Validate against the server up front.
+        const { error } = await supabase.auth.getUser();
+        if (error) {
+          await supabase.auth.signOut();
+          session = null;
+        }
+      }
+      if (!active) return;
+      useAuthStore.setState({ session });
+      await loadProfileName(session);
       if (active) useAuthStore.setState({ ready: true });
     });
 
