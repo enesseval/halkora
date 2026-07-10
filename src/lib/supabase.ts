@@ -15,12 +15,25 @@ const anonKey =
  */
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
-export const supabase = createClient(url, anonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    // RN has no URL-based session; disable web-only detection.
-    detectSessionInUrl: false,
+// `createClient('', '')` THROWS SYNCHRONOUSLY ("supabaseUrl is required.") —
+// and this file runs at module-import time, before React even mounts, so
+// that throw crashes the whole app on launch with no error boundary able to
+// catch it. This bit the EAS/TestFlight build specifically: `.env` is (and
+// should stay) gitignored, so EAS Build's cloud checkout never has the real
+// EXPO_PUBLIC_SUPABASE_* values unless they're set as EAS env vars — see
+// docs/PHASE2-SUPABASE.md "Ek H". Fall back to harmless placeholders so the
+// client always constructs; every real call site is already gated behind
+// `isSupabaseConfigured`, so a placeholder client is simply never used.
+export const supabase = createClient(
+  url || 'https://placeholder.supabase.co',
+  anonKey || 'placeholder-anon-key',
+  {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      // RN has no URL-based session; disable web-only detection.
+      detectSessionInUrl: false,
+    },
   },
-});
+);

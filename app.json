@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "theChallange",
-    "slug": "theChallange",
+    "name": "Halkora",
+    "slug": "halkora",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "thechallenge",
+    "scheme": "halkora",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0D0E11",
     "ios": {
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0D0E11",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

@@ -9,6 +9,7 @@ import type { Challenge } from '@/hooks';
 import { AppText, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
+import { HomeSkeleton } from '@/components/HomeSkeleton';
 
 function PendingCardWithCheckIn({
   challenge,
@@ -23,7 +24,7 @@ function PendingCardWithCheckIn({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { dateLabel, pending, done, upcoming } = useTodayStatus();
+  const { dateLabel, pending, done, upcoming, loading } = useTodayStatus();
   const { refreshing, refresh } = useRefreshChallenges();
   const [showStart, setShowStart] = useState(false);
 
@@ -65,45 +66,53 @@ export default function HomeScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
           }
         >
-          {/* pending — big cards */}
-          <View style={{ gap: 12 }}>
-            {pending.map((c) => (
-              <Animated.View
-                key={c.id}
-                layout={LinearTransition}
-                entering={FadeIn}
-                exiting={FadeOut.duration(200)}
-              >
-                <PendingCardWithCheckIn challenge={c} onPress={() => goDetail(c.id)} />
-              </Animated.View>
-            ))}
-          </View>
-
-          {/* completed — calm */}
-          {done.length > 0 ? (
-            <View style={{ marginTop: 16 }}>
-              <SectionLabel>Tamamlandı</SectionLabel>
-              <View style={{ gap: 10, marginTop: 12 }}>
-                {done.map((c) => (
-                  <Animated.View key={c.id} layout={LinearTransition} entering={FadeIn}>
-                    <CompletedCard challenge={c} onPress={() => goDetail(c.id)} />
+          {loading ? (
+            // First real Supabase fetch still in flight — show placeholders
+            // instead of letting the Phase-1 mock seed data flash on screen.
+            <HomeSkeleton />
+          ) : (
+            <>
+              {/* pending — big cards */}
+              <View style={{ gap: 12 }}>
+                {pending.map((c) => (
+                  <Animated.View
+                    key={c.id}
+                    layout={LinearTransition}
+                    entering={FadeIn}
+                    exiting={FadeOut.duration(200)}
+                  >
+                    <PendingCardWithCheckIn challenge={c} onPress={() => goDetail(c.id)} />
                   </Animated.View>
                 ))}
               </View>
-            </View>
-          ) : null}
 
-          {/* upcoming — faint */}
-          {upcoming.length > 0 ? (
-            <View style={{ marginTop: spacing.section }}>
-              <SectionLabel>Yakında</SectionLabel>
-              <View style={{ marginTop: 4 }}>
-                {upcoming.map((c) => (
-                  <UpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />
-                ))}
-              </View>
-            </View>
-          ) : null}
+              {/* completed — calm */}
+              {done.length > 0 ? (
+                <View style={{ marginTop: 16 }}>
+                  <SectionLabel>Tamamlandı</SectionLabel>
+                  <View style={{ gap: 10, marginTop: 12 }}>
+                    {done.map((c) => (
+                      <Animated.View key={c.id} layout={LinearTransition} entering={FadeIn}>
+                        <CompletedCard challenge={c} onPress={() => goDetail(c.id)} />
+                      </Animated.View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {/* upcoming — faint */}
+              {upcoming.length > 0 ? (
+                <View style={{ marginTop: spacing.section }}>
+                  <SectionLabel>Yakında</SectionLabel>
+                  <View style={{ marginTop: 4 }}>
+                    {upcoming.map((c) => (
+                      <UpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </>
+          )}
         </ScrollView>
       </Screen>
 

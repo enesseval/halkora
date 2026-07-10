@@ -528,3 +528,50 @@ grant execute on function public.end_challenge_early(uuid) to authenticated;
 > tamamlama %) ve katılımcı sıralaması hâlâ yalnızca **mock arşiv verisinde**
 > (`archive1`) dolu geliyor — gerçek bir challenge'ı `endEarly` ile bitirince o
 > istatistikler henüz `check_ins`'ten hesaplanmıyor. Ayrı bir iş olarak bırakıldı.
+
+## Ek H — EAS Build çökme sorunu (ZORUNLU — TestFlight için)
+
+**Neydi:** `.env` doğru şekilde git'e dahil değil (bu doğru — sırlar commit'lenmemeli).
+Ama EAS Build bulutta senin repo'nun **git kopyasını** kullanıyor; `.env` orada hiç yok.
+Sonuç: `EXPO_PUBLIC_SUPABASE_URL`/`KEY` build sırasında boş string olarak geliyordu,
+`createClient('', '')` de **senkron olarak fırlıyordu** (`"supabaseUrl is required."`).
+Bu, `src/lib/supabase.ts` modül yüklenirken (React hiç mount olmadan) çalıştığı için
+uygulama açılışta anında çöküyordu — TestFlight'ta gördüğün tam olarak buydu.
+
+**Kod tarafında ne yapıldı (zaten yapıldı, senin bir şey yapmana gerek yok):**
+`src/lib/supabase.ts`, gerçek env değişkenleri yoksa artık zararsız bir placeholder
+URL/key kullanıyor — `createClient` asla fırlamıyor. Uygulama artık **hiçbir zaman**
+bu yüzden çökmeyecek; env değişkenleri eksikse sadece mock moda düşecek (`isSupabaseConfigured=false`).
+`eas.json` da repoya eklendi (development/preview/production build profilleri, her biri
+kendi EAS "environment"ına bağlı).
+
+### Senin yapman gereken (gerçek Supabase'e bağlı bir build için ZORUNLU)
+
+Çökme artık imkansız, ama **gerçek veriyle çalışan bir TestFlight build'i** istiyorsan
+Supabase URL/key'in EAS'a da tanıtılması lazım — yoksa uygulama sessizce mock modda çalışır
+(çökmez ama Supabase'e hiç bağlanmaz). İki değişkeni EAS'a ekle:
+
+```powershell
+npx eas-cli env:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "https://hyzowqwjqoxuqvzwxmml.supabase.co" --visibility plaintext --environment production
+npx eas-cli env:create --scope project --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "sb_publishable_..." --visibility plaintext --environment production
+```
+
+- `--environment production` → `eas.json`'daki `build.production.environment` ile eşleşiyor.
+  `preview`/`development` profillerini de kullanacaksan aynı komutları `--environment preview`
+  ve `--environment development` ile de çalıştır (ya da `eas env:create` sırasında "hangi
+  environment'lar" diye soran interaktif moda "hepsi" de).
+- Değerleri Supabase Dashboard → Project Settings → API'den al (Project URL + Publishable/anon key)
+  — bunlar zaten `.env` dosyanda var, oradan kopyalayabilirsin.
+- `--visibility plaintext` yeterli, bunlar **public** anahtarlar (RLS zaten gerçek korumayı sağlıyor) —
+  service role key'i **asla** buraya veya istemci koduna koyma.
+
+Ekledikten sonra tekrar build al:
+```powershell
+npx eas-cli build --platform ios --profile production
+```
+
+Yeni build'de uygulama artık gerçek Supabase'e bağlanacak. Doğrulamak için: build bitince
+cihazda aç, Welcome → giriş → onboarding akışının çalıştığını gör (mock modda kalsaydı da
+UI aynı görünürdü, ama `git ls-files` ile göremeyeceğin şekilde arka planda gerçek ağ
+isteği gitmiyor olurdu — emin olmak istersen cihazı Mac'e bağlayıp Safari Web Inspector'dan
+ya da Xcode Console'dan ağ loglarına bakabilirsin).
