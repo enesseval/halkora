@@ -3,6 +3,7 @@ import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-nat
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
 import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
@@ -40,7 +41,14 @@ function Row({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={
+        onPress
+          ? () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              onPress();
+            }
+          : undefined
+      }
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -113,6 +121,7 @@ export default function SettingsScreen() {
   };
 
   const logout = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (configured) {
       await signOut(); // guard routes to /welcome
     } else {
@@ -133,6 +142,7 @@ export default function SettingsScreen() {
 
   const confirmDelete = () => {
     if (deleting) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     Alert.alert(
       'Hesabını sil?',
       'Bu geri alınamaz. Katılımcılığın, check-in\'lerin, mesajların kalıcı olarak silinir. Kurduğun challenge\'lar grubun diğer üyeleri için kalmaya devam eder.',

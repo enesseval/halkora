@@ -751,8 +751,13 @@ tekrar kursan bile aynı challenge'lar geri gelir (artık anonim değilsin).
 
 **İstemci tarafı (kod, zaten yapıldı):** `src/data/chat.ts`'teki `insertNudge`
 artık `23505` (unique violation) hatasını `insertReaction`le aynı şekilde
-sessizce yutuyor — DB'nin günlük limiti tetiklendiğinde kullanıcıya hata
-göstermiyor (UI zaten optimistic olarak "Sallandı ✓" gösteriyor).
+sessizce yutuyor. Daha da önemlisi: `fetchMyChallenges` artık `nudges`
+tablosundan "bugün kimi dürttüm" bilgisini de çekip `participant.nudged`'a
+gerçek sunucu durumunu yazıyor (önceden bu yalnızca optimistic/geçici bir
+bayraktı, her 5sn'lik poll'da sıfırlanıyordu). `ParticipantRow`'daki "El
+salla" butonu artık hiç devre dışı bırakılmıyor — zaten dürtülmüş birine
+tekrar dokunursan buton titreşiyor + uyarı haptiği veriyor, sessizce hiçbir
+şey olmuyormuş gibi durmuyor.
 
 Geriye şu iki SQL migration'ı SQL Editor'de çalıştırman kalıyor:
 

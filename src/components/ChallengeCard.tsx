@@ -22,7 +22,10 @@ export function PendingCard({ challenge, onPress, onCheckIn }: Props) {
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
       style={({ pressed }) => ({
         backgroundColor: colors.bgSurface,
         borderRadius: radius.card,
@@ -139,7 +142,10 @@ export function CompletedCard({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -193,7 +199,10 @@ export function UpcomingRow({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

@@ -87,6 +87,17 @@ interface StakeRow {
   text: string | null;
 }
 
+interface NudgeRow {
+  to_user: string;
+  created_at: string;
+}
+
+/** "2026-07-11T14:23:00+00:00" -> "2026-07-11" — matches the DB's UTC-day
+ * uniqueness window (docs/PHASE2-SUPABASE.md "Ek K") exactly. */
+function utcDateOf(iso: string): string {
+  return iso.slice(0, 10);
+}
+
 /** Whole days from `startISO` (local midnight) to today. 0 === starts today. */
 function daysSinceStart(startISO: string): number {
   const start = new Date(`${startISO}T00:00:00`);
@@ -106,6 +117,7 @@ function mapRow(
   profMap: Map<string, { name?: string; initials?: string }>,
   checkIns: CheckInRow[],
   myUserId: string,
+  nudgedToday: Set<string>,
   stake?: StakeRow,
 ): Challenge {
   const diff = daysSinceStart(row.start_date);
@@ -175,6 +187,10 @@ function mapRow(
       checkedInToday: !!todayCi,
       checkinTime: todayCi ? hhmm(todayCi.created_at) : undefined,
       completedDays,
+      // Reflects the DB's real "one nudge per person per day" state (Ek K) —
+      // not just an ephemeral optimistic flag — so it survives a refetch and
+      // the UI can tell a genuine re-attempt apart from a fresh nudge.
+      nudged: nudgedToday.has(p.user_id),
     };
   });
 
@@ -236,6 +252,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
     { data: allParts, error: e3 },
     { data: checkIns, error: e4 },
     { data: stakes, error: e5 },
+    { data: myNudges, error: e6 },
   ] = await Promise.all([
     supabase
       .from('challenges')
@@ -247,11 +264,23 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
       .select('participant_id, challenge_id, day_number, type, created_at')
       .in('challenge_id', ids),
     supabase.from('stakes').select('challenge_id, mode, text').in('challenge_id', ids),
+    // "Have I already nudged this person today?" — the DB only allows one
+    // nudge per (from_user, to_user) per UTC day regardless of challenge
+    // (Ek K), so this is intentionally not scoped to `ids`.
+    supabase.from('nudges').select('to_user, created_at').eq('from_user', user.id),
   ]);
   if (e2) throw e2;
   if (e3) throw e3;
   if (e4) throw e4;
   if (e5) throw e5;
+  if (e6) throw e6;
+
+  const todayUTC = new Date().toISOString().slice(0, 10);
+  const nudgedToday = new Set(
+    ((myNudges ?? []) as NudgeRow[])
+      .filter((n) => utcDateOf(n.created_at) === todayUTC)
+      .map((n) => n.to_user),
+  );
 
   const parts = (allParts ?? []) as ParticipantRow[];
   const userIds = Array.from(new Set(parts.map((p) => p.user_id)));
@@ -288,6 +317,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
       profMap,
       checkInsByChallenge.get(row.id) ?? [],
       user.id,
+      nudgedToday,
       stakeByChallenge.get(row.id),
     );
   });

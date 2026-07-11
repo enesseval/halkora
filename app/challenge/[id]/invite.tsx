@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useChallenge, useChallengesQuery, INVITE_JOINERS } from '@/hooks';
@@ -69,7 +70,10 @@ export default function InviteScreen() {
 
       {/* summary card */}
       <Pressable
-        onPress={() => router.replace(`/challenge/${challenge.id}`)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          router.replace(`/challenge/${challenge.id}`);
+        }}
         style={{
           flexDirection: 'row',
           alignItems: 'center',

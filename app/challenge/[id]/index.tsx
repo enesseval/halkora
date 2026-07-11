@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { FlashList } from '@shopify/flash-list';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -360,6 +361,7 @@ export default function DetailScreen() {
               onPress={async () => {
                 const t = draft.trim();
                 if (!t) return;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDraft('');
                 const sent = await actions.sendMessage(t);
                 if (sent) Keyboard.dismiss();
