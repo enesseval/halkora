@@ -1,14 +1,16 @@
-import { useEffect } from 'react';
-import { View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { colors } from '@/theme/tokens';
-import { useAuth, useAuthInit } from '@/hooks/useAuth';
+import { useAuth, useAuthInit, useSyncPushToken } from '@/hooks/useAuth';
+import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -25,30 +27,86 @@ const queryClient = new QueryClient();
 function useProtectedRoute() {
   const { ready, configured, isSignedIn, needsOnboarding } = useAuth();
   const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     if (!ready || !configured) return;
     const inAuthGroup = segments[0] === '(auth)';
     const atOnboarding = segments.some((s) => s === 'onboarding');
+    // A deep link to /join/{code} (or the short public /j/{code} form) hit
+    // while signed out or mid-onboarding is about to get redirected away —
+    // stash the code so it isn't lost (see src/lib/pendingInvite.ts;
+    // consumed at the end of onboarding).
+    const joinMatch = pathname.match(/^\/(?:join|j)\/(.+)$/);
 
     if (!isSignedIn) {
-      if (!inAuthGroup) router.replace('/welcome');
+      if (!inAuthGroup) {
+        if (joinMatch) stashPendingInviteCode(joinMatch[1]);
+        router.replace('/welcome');
+      }
     } else if (needsOnboarding) {
-      if (!atOnboarding) router.replace('/onboarding');
+      if (!atOnboarding) {
+        if (joinMatch) stashPendingInviteCode(joinMatch[1]);
+        router.replace('/onboarding');
+      }
     } else {
       // Signed in + has a name. Leave the O5 "start" fork reachable, but never
       // strand the user on the welcome/name gates.
       const onGate = segments.some((s) => s === 'welcome' || s === 'onboarding');
-      if (onGate) router.replace('/');
+      if (onGate) {
+        // Someone who re-authenticates from Welcome (e.g. reinstalled and
+        // signed back into an Apple account that already has a name) skips
+        // onboarding entirely — onboarding.tsx's own pending-code consumption
+        // never runs for them, so it has to happen here too, or their
+        // /join/{code} deep link (stashed before this redirect) is lost.
+        takePendingInviteCode().then((pendingCode) => {
+          router.replace(pendingCode ? `/join/${pendingCode}` : '/');
+        });
+      }
     }
-  }, [ready, configured, isSignedIn, needsOnboarding, segments, router]);
+  }, [ready, configured, isSignedIn, needsOnboarding, segments, pathname, router]);
+}
+
+/**
+ * Tapping a push notification (cold-start or from the background) routes
+ * straight to the challenge it's about — `data.challengeId` is set by the
+ * `notify` Edge Function (docs/PHASE2-SUPABASE.md "Ek I").
+ */
+function useNotificationDeepLink(ready: boolean) {
+  const router = useRouter();
+  const handled = useRef(false);
+
+  useEffect(() => {
+    // Native-only: expo-notifications' web shim doesn't implement
+    // getLastNotificationResponseAsync and throws if called.
+    if (!ready || Platform.OS === 'web') return;
+
+    const go = (data: unknown) => {
+      const challengeId = (data as { challengeId?: string } | undefined)?.challengeId;
+      if (challengeId) router.push(`/challenge/${challengeId}`);
+    };
+
+    if (!handled.current) {
+      handled.current = true;
+      Notifications.getLastNotificationResponseAsync().then((response) => {
+        if (response) go(response.notification.request.content.data);
+      });
+    }
+
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      go(response.notification.request.content.data);
+    });
+    return () => sub.remove();
+  }, [ready, router]);
 }
 
 function RootNavigator() {
   const { ready, configured } = useAuth();
   useAuthInit();
   useProtectedRoute();
+  useSyncPushToken();
+  useNotificationDeepLink(ready);
 
   // Avoid a flash of Home before the persisted session is restored.
   if (configured && !ready) {
@@ -76,6 +134,7 @@ function RootNavigator() {
       <Stack.Screen name="challenge/[id]/invite" />
       <Stack.Screen name="challenge/[id]/complete" />
       <Stack.Screen name="join/[code]" options={{ animation: 'fade' }} />
+      <Stack.Screen name="j/[code]" options={{ animation: 'none' }} />
     </Stack>
   );
 }

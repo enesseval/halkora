@@ -38,57 +38,172 @@ Sırayla — her biri bir öncekinin değerini katlıyor:
 
 Grup uygulamasında sosyal döngü bildirimsiz çalışmaz. Üç bildirim tipi:
 
-- [ ] 🧑‍💻 `expo-notifications` kurulumu + izin akışı (onboarding sonrası,
+- [x] 🧑‍💻 `expo-notifications` kurulumu + izin akışı (onboarding sonrası,
       "grubun seni dürtebilsin" dilinde — iznin *neden* istendiği anlatılarak).
-- [ ] 🧑‍💻 Push token'ı `profiles` tablosuna yazma (`push_token` kolonu + migration).
-- [ ] 🧑‍💻 Supabase Edge Function `notify`: check_ins/messages/nudges insert'lerinde
+- [x] 🧑‍💻 Push token'ı `profiles` tablosuna yazma (`push_token` kolonu + migration
+      SQL: `docs/PHASE2-SUPABASE.md` "Ek I" — SQL Editor'de çalıştırman gerekiyor).
+- [x] 🧑‍💻 Supabase Edge Function `notify`: check_ins/messages/nudges insert'lerinde
       DB webhook → ilgili katılımcılara Expo Push API üzerinden gönderim.
   - "Zeynep tamamladı ✓" (check-in olunca gruba)
-  - "El salla 👋 aldın" (nudge alıcıya — şu an nudge yazılıyor ama alıcı hiç görmüyor!)
-  - Akşam hatırlatması: "Halkan bekliyor" (pg_cron ile saatli tarama, check-in
-    yapmamışlara)
+  - "El salla 👋 aldın" (nudge alıcıya — artık gerçekten bildirim gidiyor)
+  - Akşam hatırlatması: "Halkan bekliyor" (`evening-reminder` fonksiyonu +
+    pg_cron/pg_net saatli tarama, check-in yapmamışlara) — "Ek I"
 - [ ] 🔑 Apple Developer'da Push capability + APNs key → Expo push credential
       (prebuild kullandığın için Xcode'da Push Notifications capability'sini
-      Signing & Capabilities'ten eklemen gerekiyor).
-- [ ] 🧑‍💻 Bildirime dokununca doğru ekrana gitme (`halkora://challenge/{id}`).
+      Signing & Capabilities'ten eklemen gerekiyor) — deploy + dashboard adımları
+      `docs/PHASE2-SUPABASE.md` "Ek I"'de.
+- [x] 🧑‍💻 Bildirime dokununca doğru ekrana gitme (`halkora://challenge/{id}`).
 
 ### 2. Universal Links + Deep Link testi
 
 Davet döngüsü şu an kopuk — link tıklanabilir değil:
 
 - [ ] 🧑‍💻 `halkora://join/{kod}` custom scheme'in gerçek cihazda test edilmesi
-      (hiç test edilmedi; scheme artık `halkora`).
+      (kod tarafı hazır — web smoke test'te davet linki üretimi + create→invite
+      akışı doğrulandı, ama gerçek cihaz/Universal Link testi yapılamadı, bunu
+      sen yapmalısın).
 - [ ] 🔑 `halkora.app` domain'ine `apple-app-site-association` dosyası koymak
-      (statik hosting yeter — Cloudflare Pages ücretsiz).
-- [ ] 🧑‍💻 `app.json`'a `associatedDomains: ["applinks:halkora.app"]` + Xcode'da
-      Associated Domains capability.
-- [ ] 🧑‍💻 Oturumsuz kullanıcı davet linkine tıklarsa: kodu sakla → auth/onboarding
-      → sonra `join/{kod}`a düşür (şu an kod kayboluyor, PHASE2 Ek C'de notluydu).
-- [ ] 🧑‍💻 `halkora.app/j/{kod}` web fallback sayfası: uygulama yoksa App Store'a
-      yönlendiren tek sayfalık landing.
+      (statik hosting yeter — Cloudflare Pages ücretsiz; domain'in Faz 0'da
+      henüz alınmadı, önce o gerekiyor).
+- [x] 🧑‍💻 `app.json`'a `associatedDomains: ["applinks:halkora.app"]` eklendi +
+      Android `intentFilters` (`/j/*`). 🔑 kalan: domain alındıktan + AASA
+      hostlandıktan sonra bir prebuild+build alıp Xcode'da Associated Domains
+      capability'sinin göründüğünü doğrula.
+- [x] 🧑‍💻 Oturumsuz kullanıcı davet linkine tıklarsa: kodu sakla → auth/onboarding
+      → sonra `join/{kod}`a düşür (`src/lib/pendingInvite.ts` +
+      `app/_layout.tsx`'teki `useProtectedRoute()`).
+- [x] 🧑‍💻 `halkora.app/j/{kod}` web fallback sayfası: `web/j/index.html` +
+      `web/_redirects` (Cloudflare Pages'e deploy etmek 🔑 — domain lazım).
 
 ### 3. Apple Sign-In + anonim hesap bağlama
 
 Anonim hesap kırılgan (uygulama silinirse her şey gider):
 
 - [ ] 🔑 Apple Developer: App ID'ye "Sign in with Apple" capability + Service ID
-      + Key → Supabase Auth → Apple provider ayarları.
-- [ ] 🧑‍💻 `expo-apple-authentication` + E1'de gerçek Apple butonu
-      (`signInWithIdToken`).
-- [ ] 🧑‍💻 **Anonim → Apple yükseltme:** mevcut anonim kullanıcının verisini
-      kaybettirmeden bağlama (`linkIdentity`). Ayarlar'a "Hesabını güvenceye al"
-      satırı.
-- [ ] 🧑‍💻 Google girişi butonunun kaderi: ya gerçek Google OAuth bağla ya da
-      butonu kaldır (şu an ikisi de anonim giriş yapıyor — yanıltıcı).
+      + Key → Supabase Auth → Apple provider ayarları + "Allow manual linking"
+      (adım adım: `docs/PHASE2-SUPABASE.md` "Ek J").
+- [x] 🧑‍💻 `expo-apple-authentication` + E1'de gerçek Apple butonu
+      (`signInWithIdToken`) — capability kurulana kadar Android/simülatörde
+      sessizce anonim girişe düşüyor, çökme yok.
+- [x] 🧑‍💻 **Anonim → Apple yükseltme:** mevcut anonim kullanıcının verisini
+      kaybettirmeden bağlama (`linkIdentity`). Ayarlar'a "Hesap" satırı eklendi
+      (anonimken dokununca bağlanıyor).
+- [x] 🧑‍💻 Google girişi butonunun kaderi: kaldırıldı (gerçekte anonim giriş
+      yapıp Google gibi görünüyordu — yanıltıcıydı).
 
 ### 4. Küçük ama kritik rötuşlar
 
-- [ ] 🧑‍💻 **Boş Home durumu:** hiç challenge yokken Home'da yönlendirici boş
+- [x] 🧑‍💻 **Boş Home durumu:** hiç challenge yokken Home'da yönlendirici boş
       durum ekranı (halka illüstrasyonu + "İlk halkanı kur" CTA → QuickStartSheet).
 - [ ] 🧑‍💻 `mockStore`/`mock.ts` temizliği: Supabase artık her akışı karşılıyor;
       mock katmanını incelt (optimistic cache olarak kalan kısmı ayrıştır).
-- [ ] 🧑‍💻 Ayarlar'daki sahte satırları gerçeğe bağla veya kaldır
-      (Bildirimler/Hesap/Dil şu an dekor; "Demo" bölümü yayında gizlenmeli).
+      **Kısmen yapıldı** — kök sorun (store, Supabase configured'ken bile sahte
+      seed veriyle başlıyordu) düzeltildi + Home/Detay/Davet/Bitiş ekranlarına
+      gerçek loading/error state'leri eklendi (mock veri artık hiçbir yerde
+      "gerçekmiş gibi" sessizce gösterilmiyor — bkz. aşağıdaki inceleme
+      bulgusu "Invite ekranı" hariç, o da bu turda düzeltildi). Tam
+      `mockStore`/`mock.ts` inceltmesi hâlâ ayrı, dikkatli bir geçiş olarak
+      bekliyor — cihazda test edemeden merkezi state katmanını büyük çaplı
+      refactor etmek riske değmez.
+- [x] 🧑‍💻 Ayarlar'daki sahte satırları gerçeğe bağla veya kaldır
+      (Bildirimler artık gerçek izin durumunu gösteriyor, Hesap gerçek
+      anonim/Apple durumunu gösteriyor, Dil kaldırıldı — gerçek i18n yoktu;
+      "Demo" bölümü artık yalnızca mock modda (`!configured`) görünüyor).
+
+---
+
+## 🔍 Kod incelemesi bulguları (Faz 3A sonrası bağımsız tarama)
+
+Push/Universal Links/Apple Sign-In/veri-yükleme çalışmasından sonra yapılan
+ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
+🔴 kritik (hemen) → 🟠 güvenlik (yakın vade) → 🟡 tutarlılık → 🟢 performans
+→ 💡 özellik önerisi.
+
+### 🔴 Kritik — hemen düzeltilmeli
+
+- [x] 🧑‍💻 **`web/j/index.html` XSS açığı:** davet kodu URL'den alınıp
+      `innerHTML` ile basılıyordu, sanitize edilmemişti — kötü niyetli bir
+      link paylaşan biri tıklayanın tarayıcısında script çalıştırabilirdi.
+      Düzeltildi: `textContent` + kod formatı doğrulaması (`[A-Za-z0-9-]{3,32}`).
+- [x] 🧑‍💻 **`notify` / `evening-reminder` Edge Function'ları kimliksizdi:**
+      `--no-verify-jwt` ile deploy edildikleri için URL'i bilen herkes sahte
+      payload'la kullanıcılara sınırsız push gönderebilirdi. Paylaşılan bir
+      `WEBHOOK_SECRET` header'ıyla korumaya alındı — bkz.
+      `docs/PHASE2-SUPABASE.md` "Ek I" (deploy etmen ve dashboard'a header'ı
+      eklemen gerekiyor, 🔑).
+- [x] 🧑‍💻 **`profiles.push_token` diğer katılımcılara açıktı:**
+      "co-participant profiles" RLS politikası (Ek E) satırın TÜM kolonlarını
+      okutuyordu. Token artık ayrı, yalnızca sahibinin okuyup yazabildiği
+      `push_tokens` tablosunda (`docs/PHASE2-SUPABASE.md` "Ek I" — eski
+      `profiles.push_token` kolonunu SQL Editor'de silmen gerekiyor).
+- [x] 🧑‍💻 **Invite ekranında gerçek modda bile sahte katılımcılar
+      gösteriliyordu:** `INVITE_JOINERS` mock listesi `isSupabaseConfigured`
+      kontrolü olmadan her zaman animasyonla oynatılıyordu. Gerçek modda artık
+      `challenge.participants` gösteriliyor, mock demo yalnızca `!configured`'da.
+- [x] 🧑‍💻 **Zaten onboarding'i bitirmiş kullanıcı davet kodunu
+      kaybedebiliyordu:** `_layout.tsx`'in "signed in + has name" dalı, welcome
+      ekranından yeniden kimlik doğrulayan (ör. cihazı sıfırlayıp Apple ile
+      tekrar giren) bir kullanıcıyı saklanan davet koduna bakmadan direkt
+      Home'a atıyordu. Düzeltildi.
+
+### 🟠 Güvenlik — orta vadeli
+
+- [x] 🧑‍💻 **Nudge spam'i:** `insertNudge`'da hız sınırı yoktu; push tetiklediği
+      için biri aynı kişiye dakikada onlarca "El salla 👋" bildirimi
+      gönderebilirdi. Sunucu tarafında "aynı kişiye günde 1 nudge" kısıtı
+      eklendi (unique index — `docs/PHASE2-SUPABASE.md` "Ek K", SQL Editor'de
+      çalıştırman gerekiyor).
+- [ ] 🔑 **Davet kodu brute-force riski:** `get_challenge_preview` herkese
+      açık bir RPC. Kod uzunluğu 6 hex karakterden 10'a çıkarıldı (Ek K —
+      SQL Editor'de çalıştırman gerekiyor), ayrıca Supabase Dashboard'da API
+      rate limit ayarlarının açık olduğunu doğrulaman gerekiyor.
+- [x] 🧑‍💻 **Çıkışta push token temizlenmiyordu:** `signOut()` artık çıkıştan
+      önce `push_tokens` satırını siliyor — kullanıcı çıkış yaptığında cihaz o
+      hesabın bildirimlerini almayı bırakıyor (push_token tablosu taşınırken
+      bonus olarak düzeltildi).
+- [x] 🧑‍💻 **Hesap silme akışı yoktu:** App Store, hesap oluşturma varsa
+      uygulama-içi hesap silmeyi zorunlu kılıyor. `supabase/functions/delete-account`
+      + Ayarlar'da "Hesabı sil" satırı eklendi — kendi verini siliyor, başkalarının
+      hâlâ katıldığı kurduğun challenge'lar grup için kalmaya devam ediyor
+      (`docs/PHASE2-SUPABASE.md` "Ek L" — deploy etmen gerekiyor, 🔑).
+
+### 🟡 Tutarlılık
+
+- [ ] 🧑‍💻 **Gün sınırı iki farklı yerde iki farklı şekilde hesaplanıyor:**
+      istemci (`daysSinceStart`) cihazın yerel gece yarısını, `check-in` Edge
+      Function ise challenge'ın `timezone` kolonunu kullanıyor; `insertChallenge`
+      ise timezone'u hiç yazmıyor (DB default'una kalıyor). Farklı saat
+      diliminde biri ekranda "bugün işaretlenebilir" görüp sunucudan ret
+      yiyebilir — tek doğruluk kaynağı seçilmeli.
+- [ ] 🧑‍💻 Mock `createChallenge` joker seçimini yok sayıyor
+      (`jokerRemaining: 1` sabit) — gerçek yol doğru, yalnızca mock modda tutarsız.
+- [ ] 🧑‍💻 Ayarlar'da "Sürüm 1.0.2" elle yazılmış, `app.json` 1.0.0 diyor —
+      `expo-constants`'tan (`Constants.expoConfig?.version`) okunmalı.
+- [ ] 🧑‍💻 Ayarlar'daki profil kartı + "İsim" satırı chevron'lu görünüyor ama
+      hiçbir aksiyon yok — ya isim düzenleme akışı bağlanmalı ya chevron kaldırılmalı.
+
+### 🟢 Performans
+
+- [ ] 🧑‍💻 **`fetchMyChallenges` her 5 saniyede TÜM check-in geçmişini
+      çekiyor** — challenge/katılımcı sayısı arttıkça sınırsız büyüyen bir
+      sorgu. Poll aralığını büyüt + uygulama arka plandayken durdur
+      (`AppState`), uzun vadede özet hesaplamayı bir SQL view/RPC'ye taşı.
+- [ ] 🧑‍💻 Sohbet 4 saniyede bir polling yapıyor — Realtime aboneliği
+      doğrulandıktan sonra bu yalnızca fallback'e (ör. 30sn) düşürülmeli.
+- [ ] 🧑‍💻 Özel gün sayısı 999'a kadar girilebiliyor, `ProgressRing` her gün
+      için ayrı SVG path çiziyor — makul bir üst sınır (ör. 100) konmalı.
+
+### 💡 Özellik önerileri
+
+- [ ] 🧑‍💻 **Bildirim tercihleri:** check-in/akşam hatırlatması/nudge için
+      ayrı aç-kapa (nudge hız sınırıyla birlikte düşünülebilir).
+- [ ] 🧑‍💻 **Çevrimdışı check-in kuyruğu:** check-in günlük bir ritüel;
+      internetsiz anda basılan check-in kaybolmamalı.
+- [ ] 🧑‍💻 **Davet önizlemesinde "zaten üyesin" durumu:** kendi challenge'ının
+      linkine tıklayan kullanıcı şu an tekrar "Katıl" ekranı görüyor.
+- [ ] 🧑‍💻 **Bildirim gruplama:** 8 kişilik grupta herkes check-in yapınca 7
+      ayrı push geliyor — Expo push `collapseId` ile "3 kişi tamamladı"
+      şeklinde birleştirmek bildirim yorgunluğunu azaltır.
 
 ---
 

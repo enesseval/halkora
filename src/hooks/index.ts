@@ -41,14 +41,26 @@ export function useChallenge(id: string | undefined): Challenge | undefined {
 /** Query key for the current user's challenge list. */
 export const MY_CHALLENGES_KEY = ['challenges', 'mine'] as const;
 
-/** Home aggregation: date header + the three card buckets. */
-export function useTodayStatus() {
-  const challenges = useMockStore((s) => s.challenges);
+/**
+ * Shared fetch of "my challenges". Every screen that needs real data (Home,
+ * Detail, Invite, Complete) calls this — react-query dedupes by queryKey, so
+ * mounting it from several screens at once is safe/cheap, and it means the
+ * fetch starts the moment ANY of them mounts (e.g. a deep link straight into
+ * Detail, with Home never mounted this session).
+ *
+ * Distinguishes three states so a screen never has to guess:
+ *  - `loading`: first fetch in flight, nothing to show yet.
+ *  - `firstLoadError`: it failed and we have never seen real data — show a
+ *    real error, never mock/stale data pretending to be current.
+ *  - `backgroundError`: it failed but we already have last-known-good data
+ *    (a poll or pull-to-refresh went offline) — keep showing what we have,
+ *    the caller decides how to mention it (e.g. a one-off Alert).
+ */
+export function useChallengesQuery() {
   const setChallenges = useMockStore((s) => s.setChallenges);
+  const everHadData = useRef(false);
 
-  // When Supabase is configured, hydrate the store from the real list so every
-  // screen (Home + detail) reads the same, real data.
-  const { data, isLoading } = useQuery({
+  const query = useQuery({
     queryKey: MY_CHALLENGES_KEY,
     queryFn: fetchMyChallenges,
     enabled: isSupabaseConfigured,
@@ -57,9 +69,27 @@ export function useTodayStatus() {
     // project setup) isn't delivering events.
     refetchInterval: isSupabaseConfigured ? 5000 : false,
   });
+
   useEffect(() => {
-    if (isSupabaseConfigured && data) setChallenges(data);
-  }, [data, setChallenges]);
+    if (isSupabaseConfigured && query.data) {
+      everHadData.current = true;
+      setChallenges(query.data);
+    }
+  }, [query.data, setChallenges]);
+
+  return {
+    loading: isSupabaseConfigured && query.isLoading,
+    firstLoadError: isSupabaseConfigured && query.isError && !everHadData.current,
+    backgroundError: isSupabaseConfigured && query.isError && everHadData.current,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/** Home aggregation: date header + the three card buckets. */
+export function useTodayStatus() {
+  const challenges = useMockStore((s) => s.challenges);
+  const { loading, firstLoadError, backgroundError, error, refetch } = useChallengesQuery();
 
   const buckets = useMemo(() => {
     const active = challenges.filter((c) => c.status === 'active');
@@ -72,7 +102,11 @@ export function useTodayStatus() {
   return {
     dateLabel: formatLongDate(new Date()),
     ...buckets,
-    loading: isSupabaseConfigured && isLoading,
+    loading,
+    firstLoadError,
+    backgroundError,
+    error,
+    retry: refetch,
   };
 }
 
@@ -110,7 +144,13 @@ export function useChallengeByCode(code: string | undefined): Challenge | undefi
 
 export interface JoinPreview {
   loading: boolean;
+  /** The RPC succeeded and genuinely found no such invite — never true on a network/server error. */
   notFound: boolean;
+  /** A real fetch failure (network/RLS/etc.) — distinct from notFound so the screen never
+   * tells someone their invite doesn't exist just because a request blipped. */
+  isError: boolean;
+  error?: unknown;
+  retry: () => void;
   title: string;
   totalDays: number;
   scheduleSummary: string;
@@ -127,7 +167,7 @@ export interface JoinPreview {
 export function useJoinPreview(code: string | undefined): JoinPreview {
   const mock = useChallengeByCode(code);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['challenge-preview', code],
     queryFn: () => fetchChallengePreview(code as string),
     enabled: isSupabaseConfigured && !!code,
@@ -137,7 +177,12 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     if (!data) {
       return {
         loading: isLoading,
-        notFound: !isLoading,
+        // Only a genuinely-empty successful response counts as "not found" —
+        // a thrown error must never be presented as "this invite doesn't exist".
+        notFound: !isLoading && !isError,
+        isError,
+        error,
+        retry: refetch,
         title: '',
         totalDays: 0,
         scheduleSummary: '',
@@ -148,6 +193,8 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     return {
       loading: false,
       notFound: false,
+      isError: false,
+      retry: refetch,
       title: data.title,
       totalDays: data.totalDays,
       scheduleSummary: `${data.dailyAction} · ${data.totalDays} gün`,
@@ -165,6 +212,8 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     return {
       loading: false,
       notFound: true,
+      isError: false,
+      retry: () => {},
       title: '',
       totalDays: 0,
       scheduleSummary: '',
@@ -175,6 +224,8 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
   return {
     loading: false,
     notFound: false,
+    isError: false,
+    retry: () => {},
     title: mock.title,
     totalDays: mock.totalDays,
     scheduleSummary: mock.scheduleSummary,
@@ -246,7 +297,8 @@ export function messagesKey(id: string) {
  */
 export function useChallengeMessages(id: string | undefined) {
   const setMessages = useMockStore((s) => s.setChallengeMessages);
-  const { data } = useQuery({
+  const everHadData = useRef(false);
+  const { data, isError, error, refetch } = useQuery({
     queryKey: messagesKey(id ?? ''),
     queryFn: () => fetchMessages(id as string),
     enabled: isSupabaseConfigured && !!id,
@@ -257,6 +309,7 @@ export function useChallengeMessages(id: string | undefined) {
   });
   useEffect(() => {
     if (!isSupabaseConfigured || !id || !data) return;
+    everHadData.current = true;
     // Guard against a stale in-flight fetch (started before a send) resolving
     // *after* an optimistic local append and wiping it out — only apply
     // server data when it's not behind what's already showing locally.
@@ -264,6 +317,14 @@ export function useChallengeMessages(id: string | undefined) {
     if (current && data.length < current.messages.length) return;
     setMessages(id, data);
   }, [data, id, setMessages]);
+
+  return {
+    // Only surface this the first time — if we already have messages showing,
+    // a background poll failing shouldn't nag every 4s.
+    firstLoadError: isSupabaseConfigured && isError && !everHadData.current,
+    error,
+    retry: refetch,
+  };
 }
 
 /**

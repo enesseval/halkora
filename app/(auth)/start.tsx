@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'reac
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { extractCode } from '@/lib/invite';
@@ -23,7 +24,10 @@ function OptionCard({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -143,7 +147,10 @@ export default function StartScreen() {
               Detay ve katılımcıları bir sonraki ekranda görürsün.
             </AppText>
             <Pressable
-              onPress={join}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                join();
+              }}
               style={({ pressed }) => ({
                 marginTop: 16,
                 height: 52,
@@ -182,7 +189,7 @@ export default function StartScreen() {
             emberIcon
             title="Challenge başlat"
             subtitle="Hedefi sen koy, grubunu çağır. 2 dakika sürer."
-            onPress={() => router.push('/create')}
+            onPress={() => router.replace('/create')}
           />
           <OptionCard
             icon="link-2"

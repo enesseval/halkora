@@ -22,17 +22,28 @@ interface AppTextProps extends TextProps {
   tabular?: boolean;
 }
 
-/** All text goes through here so nothing renders in the system font. */
+/** All text goes through here so nothing renders in the system font. Text used
+ * as a tap target (onPress, e.g. "Atla" / "Tekrar dene" links) gets the same
+ * light haptic as Button/Chip/IconButton below — a text link is still a tap. */
 export function AppText({
   variant = 'body',
   color,
   tabular,
   style,
+  onPress,
   ...rest
 }: AppTextProps) {
   return (
     <Text
       {...rest}
+      onPress={
+        onPress
+          ? (e) => {
+              haptic();
+              onPress(e);
+            }
+          : undefined
+      }
       style={[
         type[variant],
         color ? { color } : null,

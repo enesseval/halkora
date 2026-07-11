@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -30,7 +31,10 @@ function DatePill({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
       style={({ pressed }) => ({
         flex: 1,
         backgroundColor: selected ? colors.emberSoft : colors.bgElevated,
@@ -253,7 +257,17 @@ export default function CreateScreen() {
   };
 
   const next = () => (step < 3 ? setStep(step + 1) : finish());
-  const back = () => (step > 0 ? setStep(step - 1) : router.back());
+  // Reached either by pushing from Home's "+" (canGoBack -> reveal Home) or by
+  // replacing the onboarding fork screen (no history left -> back to "/start"
+  // explicitly, same fallback pattern as join/[code].tsx's goBack()).
+  const back = () => {
+    if (step > 0) {
+      setStep(step - 1);
+      return;
+    }
+    if (router.canGoBack()) router.back();
+    else router.replace('/start');
+  };
 
   return (
     <Screen edges={['top', 'bottom']}>

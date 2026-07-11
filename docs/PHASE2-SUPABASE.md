@@ -575,3 +575,265 @@ cihazda aç, Welcome → giriş → onboarding akışının çalıştığını g
 UI aynı görünürdü, ama `git ls-files` ile göremeyeceğin şekilde arka planda gerçek ağ
 isteği gitmiyor olurdu — emin olmak istersen cihazı Mac'e bağlayıp Safari Web Inspector'dan
 ya da Xcode Console'dan ağ loglarına bakabilirsin).
+
+## Ek I — Push Bildirimleri (Faz 3A-1)
+
+**İstemci tarafı (kod, zaten yapıldı):** `expo-notifications` kuruldu, onboarding'e
+bir izin adımı eklendi (O5 "Grubun seni dürtebilsin"), `useSyncPushToken()`
+(`src/hooks/useAuth.ts`) her açılışta token'ı tazeleyip `profiles.push_token`'a
+yazıyor, ve bildirime dokununca `app/_layout.tsx`'teki `useNotificationDeepLink()`
+`halkora://challenge/{id}`'ye yönlendiriyor. Geriye şunlar kalıyor:
+
+### 1. Şema
+
+`push_token` **`profiles`'ta değil ayrı bir tabloda** — "co-participant
+profiles" politikası (Ek E) satırın TÜM kolonlarını okutuyor, yani token
+`profiles`'ta kalsaydı aynı challenge'ı paylaştığın herkes onu okuyup senin
+adına push gönderebilirdi. Sadece sahibinin okuyup yazabildiği ayrı bir
+tabloya taşındı:
+
+```sql
+create table if not exists push_tokens (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  token text not null,
+  updated_at timestamptz not null default now()
+);
+alter table push_tokens enable row level security;
+create policy "own push token" on push_tokens
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table profiles add column if not exists last_reminder_date date;
+```
+
+> ⚠️ Daha önce `profiles.push_token` kolonunu eklediysen (bu dokümanın önceki
+> bir sürümünde önerilmişti): `alter table profiles drop column if exists push_token;`
+> ile kaldır — istemci ve Edge Function'lar artık ona hiç yazmıyor/okumuyor.
+
+`last_reminder_date` hassas değil (sadece bir tarih), `profiles`'ta kalması
+zararsız — mevcut "own profile" politikası zaten kendi satırını güncellemene
+izin veriyor.
+
+### 2. Edge Function'ları deploy et + gizli anahtarı ayarla
+
+İki fonksiyon var, ikisi de repoda hazır:
+[`supabase/functions/notify`](../supabase/functions/notify/index.ts) (anlık —
+check-in/mesaj/nudge) ve
+[`supabase/functions/evening-reminder`](../supabase/functions/evening-reminder/index.ts)
+(saatlik cron — "Halkan bekliyor"). İkisi de artık bir **paylaşılan sırla**
+korunuyor — `--no-verify-jwt` ile deploy edildikleri için (çağıran taraf bir
+kullanıcı değil, Supabase'in kendisi) bu olmadan URL'i bilen HERKES sahte
+payload'la kullanıcılara push gönderebilirdi.
+
+```powershell
+# Rastgele, uzun bir sır üret (bir kere) ve HER İKİ fonksiyona da tanımla:
+supabase secrets set WEBHOOK_SECRET=<uzun-rastgele-bir-değer>
+
+supabase functions deploy notify --no-verify-jwt
+supabase functions deploy evening-reminder --no-verify-jwt
+```
+
+Aşağıdaki DB Webhook'larda ve pg_net cron çağrısında **aynı** `WEBHOOK_SECRET`
+değerini `x-webhook-secret` header'ı olarak eklemen gerekiyor — yoksa fonksiyon
+her isteği 401 ile geri çevirir (bilerek "kapalı başlıyor": sır yoksa hiçbir
+çağrıya güvenilmiyor).
+
+### 3. `notify`'ı DB Webhook'larıyla bağla (Dashboard → Database → Webhooks)
+
+Üç webhook oluştur, üçü de `notify` fonksiyonuna INSERT'te POST etsin:
+
+| Webhook adı | Tablo | Event | URL |
+|---|---|---|---|
+| notify-checkin | `check_ins` | INSERT | `https://<PROJECT_REF>.supabase.co/functions/v1/notify` |
+| notify-message | `messages` | INSERT | aynı URL |
+| notify-nudge | `nudges` | INSERT | aynı URL |
+
+Header olarak ikisini ekle:
+- `Authorization: Bearer <SERVICE_ROLE_KEY>` (Dashboard'un webhook formu bunu zaten önerir)
+- `x-webhook-secret: <WEBHOOK_SECRET>` (yukarıda `supabase secrets set` ile ayarladığın değer — **aynısı**)
+
+`record` payload'ı otomatik gönderilir — kod tarafında ekstra bir şey ayarlamana gerek yok.
+
+### 4. `evening-reminder`'ı saatlik çalıştır (pg_cron + pg_net)
+
+Database → Extensions'tan `pg_cron` ve `pg_net`'i aç, sonra SQL Editor'de
+(kendi project ref + service role key + `WEBHOOK_SECRET`'inle):
+
+```sql
+select cron.schedule(
+  'evening-reminder-hourly',
+  '0 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/evening-reminder',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer <SERVICE_ROLE_KEY>',
+      'x-webhook-secret', '<WEBHOOK_SECRET>',
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Fonksiyon kendi içinde her challenge'ın kendi timezone'una göre "şu an 20:00 mi"
+kontrolü yapıyor, saatte bir tetiklenmesi yeterli — 20:00'i kaçıran timezone
+olmuyor. `profiles.last_reminder_date` aynı gün içinde ikinci bir hatırlatmayı
+engelliyor.
+
+### 5. 🔑 Apple Developer — Push capability + APNs key (ZORUNLU, cihazda görmek için)
+
+Kod ve backend hazır olsa da, gerçek bir cihazda bildirim **görünmesi** için:
+
+1. Apple Developer → Certificates, IDs & Profiles → senin App ID'nde
+   **Push Notifications** capability'sini aç.
+2. Keys'ten yeni bir **APNs Auth Key** (.p8) oluştur, indir (bir kere indirilir).
+3. `npx eas-cli credentials` → iOS → Push Notifications → bu key'i EAS'a yükle
+   (EAS, Expo push servisinin arkasında bu key'i kullanarak APNs'e konuşuyor —
+   ayrı bir push sunucusu kurmana gerek yok).
+4. `expo prebuild` kullandığın için Xcode projesi yerelde üretiliyor — prebuild
+   sonrası Xcode'da **Signing & Capabilities**'te Push Notifications'ın
+   göründüğünü doğrula (app.json'daki `expo-notifications` plugin'i bunu
+   otomatik ekliyor olması gerekir, ama bir build alıp kontrol et).
+5. Yeni bir production build al (`npx eas-cli build --platform ios --profile production`) —
+   Push capability'siz eski bir build'de bildirim **asla** gelmez.
+
+> Not: Simülatörde push token asla alınamaz (`registerForPushToken()` bunu
+> sessizce `null` döndürüp yutuyor) — gerçek cihazda test et.
+
+## Ek J — Apple Sign-In + anonim hesap yükseltme (Faz 3A-3)
+
+**İstemci tarafı (kod, zaten yapıldı):** `expo-apple-authentication` kuruldu,
+`src/hooks/useAuth.ts`'teki `signInWithApple()` artık gerçek native Apple
+girişini deniyor (iOS + capability yoksa/Android'de sessizce anonim girişe
+düşüyor), `linkAppleIdentity()` mevcut anonim kullanıcıyı **aynı** user id'yi
+koruyarak Apple'a bağlıyor (Ayarlar → "Hesap" satırı → `secureAccount()`).
+Google butonu kaldırıldı — gerçekte anonim giriş yapıp Google gibi görünüyordu,
+yanıltıcıydı (`docs/ROADMAP.md` Faz 3A-3'ün izin verdiği iki seçenekten biri).
+
+Geriye şunlar kalıyor, hepsi 🔑 (senin hesap/dashboard işin):
+
+### 1. Apple Developer
+
+1. Certificates, IDs & Profiles → App ID'nde **"Sign in with Apple"**
+   capability'sini aç.
+2. Identifiers → Services IDs → yeni bir Service ID oluştur (Supabase'in Apple
+   provider ayarında "Client ID" olarak bunu kullanacaksın).
+3. Keys → yeni bir **Sign in with Apple key** (.p8) oluştur, indir (bir kere
+   indirilir) — Supabase'e "Client Secret" üretmek için lazım.
+
+### 2. Supabase Dashboard → Authentication → Providers → Apple
+
+- Yukarıdaki Service ID + Key ile Apple provider'ı etkinleştir (Supabase'in
+  kendi Apple provider ekranı hangi alanları isteyeceğini adım adım gösteriyor:
+  Team ID, Key ID, Service ID, .p8 içeriği).
+- **Authentication → Settings → "Allow manual linking"**'i aç — `linkIdentity()`
+  bu ayar kapalıyken hata döner, anonim→Apple yükseltmesi bu yüzden şart.
+
+### 3. `app.json` / native
+
+- `expo-apple-authentication` kendi config plugin'ini otomatik uyguluyor
+  (Sign in with Apple entitlement'ı prebuild sırasında ekleniyor) — elle bir
+  şey eklemen gerekmiyor.
+- Yeni bir production build al; eski bir build'de capability yoksa
+  `AppleAuthentication.isAvailableAsync()` `false` döner ve kod otomatik
+  anonim girişe düşer (çökme yok, ama gerçek Apple girişi de olmaz).
+
+### 4. Doğrulama
+
+Gerçek cihazda: Welcome → "Apple ile devam et" → sistem Apple sheet'i açılmalı
+(simülatörde de açılır ama gerçek bir Apple ID gerektirir). Ayarlar → "Hesap"
+satırında anonim bir kullanıcı için "Güvence yok" görünür ve dokununca aynı
+sheet açılıp bağlandıktan sonra "Apple ile bağlı"ya döner — uygulamayı silip
+tekrar kursan bile aynı challenge'lar geri gelir (artık anonim değilsin).
+
+## Ek K — Nudge hız sınırı + davet kodu entropisi (kod incelemesi 🟠)
+
+**İstemci tarafı (kod, zaten yapıldı):** `src/data/chat.ts`'teki `insertNudge`
+artık `23505` (unique violation) hatasını `insertReaction`le aynı şekilde
+sessizce yutuyor. Daha da önemlisi: `fetchMyChallenges` artık `nudges`
+tablosundan "bugün kimi dürttüm" bilgisini de çekip `participant.nudged`'a
+gerçek sunucu durumunu yazıyor (önceden bu yalnızca optimistic/geçici bir
+bayraktı, her 5sn'lik poll'da sıfırlanıyordu). `ParticipantRow`'daki "El
+salla" butonu artık hiç devre dışı bırakılmıyor — zaten dürtülmüş birine
+tekrar dokunursan buton titreşiyor + uyarı haptiği veriyor, sessizce hiçbir
+şey olmuyormuş gibi durmuyor.
+
+Geriye şu iki SQL migration'ı SQL Editor'de çalıştırman kalıyor:
+
+### 1. Nudge'ı günde bir kişiye bir kere ile sınırla
+
+```sql
+create unique index if not exists nudges_one_per_recipient_per_day
+  on nudges (from_user, to_user, ((created_at at time zone 'utc')::date));
+```
+
+Bu olmadan `insertNudge`'a hiçbir hız sınırı yok — push artık gerçekten
+gittiği için biri aynı kişiye dakikada onlarca "El salla 👋" bildirimi
+gönderebilirdi. `(created_at at time zone 'utc')::date` kullanmak zorunludur
+(`date_trunc` gibi session-timezone'a bağlı ifadeler Postgres'te index
+expression'ı olarak IMMUTABLE sayılmıyor, bu explicit UTC dönüşümü sayılıyor).
+
+### 2. Davet kodunu güçlendir (brute-force riski)
+
+Şu anki varsayılan (Ek A) `substr(md5(random()::text),1,6)` — yalnızca 6 hex
+karakter, ~16.7 milyon olası kombinasyon. `get_challenge_preview` ve
+`join_challenge_by_code` herkese açık RPC'ler olduğu için bu, otomatik bir
+scriptle taranabilecek kadar küçük bir alan — biri rastgele kodlar deneyip
+başkalarının challenge'ına (ve o challenge'ın check-in geçmişi, katılımcı
+isimleri, sohbeti gibi verilerine) katılabilir.
+
+```sql
+-- Yeni challenge'lar için varsayılanı büyüt (10 hex karakter, ~1 trilyon kombinasyon):
+alter table challenges
+  alter column invite_code set default substr(md5(random()::text || clock_timestamp()::text), 1, 10);
+```
+
+> Mevcut challenge'ların kodları **değişmiyor** (yalnızca yeni oluşturulanlar
+> için varsayılan büyüyor) — istersen ayrıca eskilerini de
+> `update challenges set invite_code = substr(md5(random()::text || id::text), 1, 10);`
+> ile yenileyebilirsin, ama bu paylaşılmış eski davet linklerini kıracağı için
+> zorunlu değil.
+
+- [ ] 🔑 **Ayrıca doğrula:** Supabase Dashboard → Settings → API'de rate
+      limiting'in açık olduğunu kontrol et — kod alanı büyüse de sınırsız
+      istek atılabiliyorsa brute-force yine de (çok daha yavaş) mümkün kalır.
+
+## Ek L — Hesap silme (App Store zorunluluğu)
+
+**Neden gerekli:** App Store Review Guideline 5.1.1(v) — uygulamada hesap
+oluşturma varsa (bizde var: Apple/anonim giriş), uygulama **içinde** hesabı
+silme yolu da olmalı. Bu olmadan review reddedilir.
+
+**Tasarım:** Bir kullanıcı hesabını silince onun **kendi** satırları (katılımcılık,
+check-in'leri, mesajları, tepkileri, nudge'ları, oy'ları, push token'ı)
+kalıcı olarak siliniyor. Ama başkalarının hâlâ katıldığı bir challenge'ı o
+kişi kurmuşsa, challenge'ın kendisi **silinmiyor** — `owner_id` `null`'a
+çekiliyor, grup için hiçbir şey kaybolmuyor. Silinen kullanıcı, kurduğu
+challenge'ın TEK katılımcısıysa (herkes zaten ayrılmışsa) o challenge da
+tamamen temizleniyor.
+
+Kod zaten repoda:
+[`supabase/functions/delete-account/index.ts`](../supabase/functions/delete-account/index.ts)
+(çağıranın kendi JWT'siyle kimliği doğrulanıyor — `check-in` fonksiyonuyla
+aynı desen), istemci tarafı `src/hooks/useAuth.ts`'teki `deleteAccount()` ve
+Ayarlar'daki "Hesabı sil" satırı (`app/(main)/settings.tsx`) da hazır.
+
+### Deploy
+
+```powershell
+supabase functions deploy delete-account
+```
+
+`--no-verify-jwt` **kullanma** — bu fonksiyonu yalnızca giriş yapmış
+kullanıcılar, kendi hesapları için çağırabilmeli;
+`supabase.functions.invoke('delete-account')` zaten aktif oturumun token'ını
+otomatik ekliyor.
+
+### Doğrulama
+
+Ayarlar → "Hesabı sil" → onay diyaloğu → hesap gerçekten silinir (Supabase
+Dashboard → Authentication → Users'ta artık görünmez), uygulama Welcome
+ekranına döner. Grup halindeki bir challenge'da SADECE hesabını silen
+kişinin katılımcılığı/check-in'leri/mesajları kayboluyor, diğer katılımcılar
+ve challenge'ın kendisi olduğu gibi kalıyor.

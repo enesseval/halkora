@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'reac
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { extractCode } from '@/lib/invite';
@@ -23,7 +24,10 @@ function Row({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -172,7 +176,14 @@ export function QuickStartSheet({
         ) : (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18 }}>
-              <Pressable onPress={() => setMode('choose')} hitSlop={8} style={{ padding: 4 }}>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setMode('choose');
+                }}
+                hitSlop={8}
+                style={{ padding: 4 }}
+              >
                 <Feather name="chevron-left" size={20} color={colors.textPrimary} />
               </Pressable>
               <AppText
@@ -217,7 +228,10 @@ export function QuickStartSheet({
                   </AppText>
                 </View>
                 <Pressable
-                  onPress={goJoin}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    goJoin();
+                  }}
                   style={({ pressed }) => ({
                     height: 52,
                     borderRadius: radius.pill,

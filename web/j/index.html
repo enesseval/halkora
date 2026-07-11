@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Halkora davet</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 32px 24px;
+    background: #0D0E11;
+    color: #F4F5F7;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    text-align: center;
+  }
+  .ring {
+    width: 72px; height: 72px;
+    border-radius: 999px;
+    border: 3px solid #262A33;
+    border-top-color: #FF6B47;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: 20px; margin: 0; }
+  p { color: #9AA0AC; margin: 0; max-width: 320px; line-height: 1.5; font-size: 15px; }
+  .card {
+    display: none;
+    width: 100%;
+    max-width: 360px;
+    background: #15171C;
+    border: 1px solid #262A33;
+    border-radius: 20px;
+    padding: 20px;
+    gap: 14px;
+    flex-direction: column;
+  }
+  .btn {
+    display: block;
+    text-decoration: none;
+    height: 52px;
+    border-radius: 999px;
+    background: #FF6B47;
+    color: #0D0E11;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 52px;
+  }
+  .btn.secondary {
+    background: transparent;
+    border: 1px solid #262A33;
+    color: #F4F5F7;
+    font-weight: 500;
+  }
+  code {
+    color: #FF6B47;
+    background: rgba(255,107,71,0.12);
+    padding: 2px 8px;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="ring" id="spinner"></div>
+  <h1 id="title">Halkora'ya bağlanıyor…</h1>
+  <p id="subtitle">Uygulaman zaten yüklüyse birazdan açılacak.</p>
+
+  <div class="card" id="card">
+    <a class="btn" id="openApp" href="#">Uygulamada aç</a>
+    <a class="btn secondary" id="storeLink" href="#">App Store'dan indir</a>
+  </div>
+
+  <script>
+    // Invite code comes from the path: halkora.app/j/{code}. Never trust it —
+    // validate against the same shape the app generates before using it
+    // anywhere (deep link href, or rendered as text) to rule out injection
+    // via a maliciously crafted /j/{payload} URL.
+    var raw = decodeURIComponent(location.pathname.replace(/^\/j\/?/, '').replace(/\/$/, ''));
+    var code = /^[A-Za-z0-9-]{3,32}$/.test(raw) ? raw : null;
+    var deepLink = code ? 'halkora://join/' + encodeURIComponent(code) : null;
+    // TODO(sen): App Store canlıya çıkınca gerçek App Store linkiyle değiştir.
+    var storeUrl = 'https://apps.apple.com/app/idXXXXXXXXXX';
+
+    document.getElementById('storeLink').href = storeUrl;
+
+    if (!code) {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('title').textContent = 'Bu davet bulunamadı.';
+      document.getElementById('subtitle').textContent = 'Link eksik ya da bozuk görünüyor.';
+    } else {
+      document.getElementById('openApp').href = deepLink;
+
+      // Try opening the app immediately. If it's installed, iOS/Android hands
+      // off before this tab is ever seen. If nothing happens within ~1.2s,
+      // assume it's not installed and show the fallback card instead.
+      var fallbackTimer = setTimeout(function () {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('title').textContent = 'Bir davete katılıyorsun';
+        var codeEl = document.createElement('code');
+        codeEl.textContent = code; // textContent, never innerHTML — code is untrusted input
+        var subtitle = document.getElementById('subtitle');
+        subtitle.textContent = 'Kod: ';
+        subtitle.appendChild(codeEl);
+        document.getElementById('card').style.display = 'flex';
+      }, 1200);
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) clearTimeout(fallbackTimer); // app opened — tab backgrounded
+      });
+
+      location.href = deepLink;
+    }
+  </script>
+</body>
+</html>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Share, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, type } from '@/theme/tokens';
 import { AppText, Button } from './ui';
 
@@ -17,6 +18,7 @@ export function InviteShare({ inviteCode, title }: { inviteCode: string; title: 
   const copy = async () => {
     try {
       await Clipboard.setStringAsync(link);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {

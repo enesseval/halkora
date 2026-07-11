@@ -1,5 +1,5 @@
-import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { edgeFunctionError } from '@/lib/errors';
 
 export type CheckInType = 'done' | 'joker';
 
@@ -12,19 +12,6 @@ async function myParticipantId(challengeId: string, userId: string): Promise<str
     .single();
   if (error) throw error;
   return data.id as string;
-}
-
-/** Pull the real `{ error }` JSON body out of a failed Edge Function call. */
-async function edgeFunctionError(e: unknown): Promise<Error> {
-  if (e instanceof FunctionsHttpError) {
-    try {
-      const body = await e.context.json();
-      if (body?.error) return new Error(body.error as string);
-    } catch {
-      // fall through to the generic message below
-    }
-  }
-  return e instanceof Error ? e : new Error(String(e));
 }
 
 /**

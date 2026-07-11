@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { FlashList } from '@shopify/flash-list';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +10,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import {
   useChallenge,
+  useChallengesQuery,
   useCheckIn,
   useChallengeActions,
   useMomentumDemo,
@@ -19,6 +21,7 @@ import {
   waitingLine,
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
+import { errMessage } from '@/lib/errors';
 import { AppText, AvatarStack, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
@@ -27,10 +30,13 @@ import { InviteShare } from '@/components/InviteShare';
 import { ParticipantRow } from '@/components/ParticipantRow';
 import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
 import { MissedDaySheet, MomentumSheet } from '@/components/Sheets';
+import { RingScreenSkeleton } from '@/components/Skeleton';
+import { ErrorState } from '@/components/ErrorState';
 
 type Row =
   | { kind: 'participant'; p: Participant }
   | { kind: 'label'; id: string; text: string }
+  | { kind: 'chatError' }
   | { kind: 'chatDay'; day: number }
   | { kind: 'message'; m: Message }
   | { kind: 'system'; id: string; text: string };
@@ -39,11 +45,12 @@ export default function DetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const challenge = useChallenge(id);
+  const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const { checkIn, undo, meCheckedInToday, myOrder, myCheckinTime } = useCheckIn(id ?? '');
   const actions = useChallengeActions(id ?? '');
   const { momentumDemoId, close } = useMomentumDemo();
   const { refreshing, refresh } = useRefreshChallenges();
-  useChallengeMessages(id);
+  const { firstLoadError: chatError, error: chatErrorDetail, retry: retryChat } = useChallengeMessages(id);
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
 
@@ -52,8 +59,9 @@ export default function DetailScreen() {
     const out: Row[] = [];
     out.push({ kind: 'label', id: 'p', text: 'Katılımcılar' });
     challenge.participants.forEach((p) => out.push({ kind: 'participant', p }));
-    if (challenge.messages.length > 0) {
+    if (chatError || challenge.messages.length > 0) {
       out.push({ kind: 'label', id: 'c', text: 'Sohbet' });
+      if (chatError) out.push({ kind: 'chatError' });
       let lastDay = -1;
       challenge.messages.forEach((m) => {
         if (m.dayNumber !== lastDay) {
@@ -68,9 +76,42 @@ export default function DetailScreen() {
       });
     }
     return out;
-  }, [challenge]);
+  }, [challenge, chatError]);
 
   if (!challenge) {
+    // Not in the store yet — tell "still loading" and "genuinely failed" apart
+    // from an actual 404, instead of always showing the same blunt message
+    // (this matters most for a deep link straight into Detail, before any
+    // screen has fetched the challenge list yet).
+    const backButton = (
+      <View style={{ paddingTop: 6, paddingHorizontal: spacing.screenX }}>
+        <IconButton size={38} onPress={() => router.back()}>
+          <Feather name="chevron-left" size={20} color={colors.textPrimary} />
+        </IconButton>
+      </View>
+    );
+    if (loading) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase }} edges={['top']}>
+          {backButton}
+          <View style={{ paddingHorizontal: spacing.screenX }}>
+            <RingScreenSkeleton withList />
+          </View>
+        </SafeAreaView>
+      );
+    }
+    if (firstLoadError) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase }} edges={['top']}>
+          {backButton}
+          <ErrorState
+            message="Challenge yüklenemedi."
+            detail={errMessage(error)}
+            onRetry={refetch}
+          />
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase, alignItems: 'center', justifyContent: 'center' }}>
         <AppText color={colors.textSecondary}>Challenge bulunamadı.</AppText>
@@ -236,6 +277,25 @@ export default function DetailScreen() {
             onReact={(emoji) => actions.react(item.m.id, emoji)}
           />
         );
+      case 'chatError':
+        return (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              paddingVertical: 10,
+            }}
+          >
+            <AppText variant="meta" color={colors.textTertiary} style={{ flex: 1 }}>
+              Sohbet yüklenemedi{chatErrorDetail ? `: ${errMessage(chatErrorDetail)}` : '.'}
+            </AppText>
+            <AppText variant="meta" color={colors.ember} onPress={() => retryChat()}>
+              Tekrar dene
+            </AppText>
+          </View>
+        );
     }
   };
 
@@ -301,6 +361,7 @@ export default function DetailScreen() {
               onPress={async () => {
                 const t = draft.trim();
                 if (!t) return;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDraft('');
                 const sent = await actions.sendMessage(t);
                 if (sent) Keyboard.dismiss();
