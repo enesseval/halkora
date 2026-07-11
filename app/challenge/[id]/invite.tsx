@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useChallenge, useChallengesQuery, INVITE_JOINERS } from '@/hooks';
+import type { Participant } from '@/hooks';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -18,10 +20,13 @@ export default function InviteScreen() {
   const router = useRouter();
   const challenge = useChallenge(id);
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
+  // The animated INVITE_JOINERS list is a Phase-1 demo-only flourish — a real
+  // challenge shows its actual participants (already polled in by
+  // useChallengesQuery above), never fake people "joining" live.
   const [joined, setJoined] = useState(0);
 
   useEffect(() => {
-    if (joined >= INVITE_JOINERS.length) return;
+    if (isSupabaseConfigured || joined >= INVITE_JOINERS.length) return;
     const t = setTimeout(() => setJoined((n) => n + 1), 3000);
     return () => clearTimeout(t);
   }, [joined]);
@@ -101,6 +106,71 @@ export default function InviteScreen() {
       </View>
 
       {/* live joiners */}
+      {isSupabaseConfigured ? (
+        <RealJoiners participants={challenge.participants} />
+      ) : (
+        <MockJoiners joined={joined} />
+      )}
+    </Screen>
+  );
+}
+
+/** Real mode: the challenge's actual participants (excluding the owner/self),
+ * kept live by useChallengesQuery's polling — never fake people. */
+function RealJoiners({ participants }: { participants: Participant[] }) {
+  const others = participants.filter((p) => !p.isMe);
+  return (
+    <>
+      <AppText
+        variant="meta"
+        color={colors.textTertiary}
+        tabular
+        style={{ textTransform: 'uppercase', letterSpacing: 1.2, marginTop: spacing.section, marginBottom: 8 }}
+      >
+        Katılanlar · {others.length}
+      </AppText>
+      <View>
+        {others.map((p) => (
+          <View
+            key={p.id}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              paddingVertical: 10,
+              borderBottomWidth: hairline,
+              borderBottomColor: colors.strokeSubtle,
+            }}
+          >
+            <Avatar initials={p.initials} size={32} tint />
+            <AppText variant="bodyMedium" style={{ flex: 1 }}>
+              {p.name} <AppText color={colors.ember}>✓</AppText>
+            </AppText>
+          </View>
+        ))}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              borderWidth: hairline,
+              borderColor: colors.strokeSubtle,
+            }}
+          />
+          <AppText variant="secondary" color={colors.textTertiary}>
+            Davet linki açık...
+          </AppText>
+        </View>
+      </View>
+    </>
+  );
+}
+
+/** Phase-1 demo-only: animates in a few fake names so the empty screen isn't blank. */
+function MockJoiners({ joined }: { joined: number }) {
+  return (
+    <>
       <AppText
         variant="meta"
         color={colors.textTertiary}
@@ -149,6 +219,6 @@ export default function InviteScreen() {
           </View>
         ) : null}
       </View>
-    </Screen>
+    </>
   );
 }

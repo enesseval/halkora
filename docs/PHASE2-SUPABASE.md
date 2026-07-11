@@ -586,31 +586,56 @@ yazıyor, ve bildirime dokununca `app/_layout.tsx`'teki `useNotificationDeepLink
 
 ### 1. Şema
 
+`push_token` **`profiles`'ta değil ayrı bir tabloda** — "co-participant
+profiles" politikası (Ek E) satırın TÜM kolonlarını okutuyor, yani token
+`profiles`'ta kalsaydı aynı challenge'ı paylaştığın herkes onu okuyup senin
+adına push gönderebilirdi. Sadece sahibinin okuyup yazabildiği ayrı bir
+tabloya taşındı:
+
 ```sql
-alter table profiles add column if not exists push_token text;
+create table if not exists push_tokens (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  token text not null,
+  updated_at timestamptz not null default now()
+);
+alter table push_tokens enable row level security;
+create policy "own push token" on push_tokens
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 alter table profiles add column if not exists last_reminder_date date;
 ```
 
-Ek bir RLS politikası gerekmiyor — istemci zaten yalnızca **kendi** satırını
-güncelliyor (mevcut "own profile" politikası bunu zaten kapsıyor), Edge
-Function'lar da `service_role` ile çalışıp RLS'i tamamen bypass ediyor.
+> ⚠️ Daha önce `profiles.push_token` kolonunu eklediysen (bu dokümanın önceki
+> bir sürümünde önerilmişti): `alter table profiles drop column if exists push_token;`
+> ile kaldır — istemci ve Edge Function'lar artık ona hiç yazmıyor/okumuyor.
 
-### 2. Edge Function'ları deploy et
+`last_reminder_date` hassas değil (sadece bir tarih), `profiles`'ta kalması
+zararsız — mevcut "own profile" politikası zaten kendi satırını güncellemene
+izin veriyor.
+
+### 2. Edge Function'ları deploy et + gizli anahtarı ayarla
 
 İki fonksiyon var, ikisi de repoda hazır:
 [`supabase/functions/notify`](../supabase/functions/notify/index.ts) (anlık —
 check-in/mesaj/nudge) ve
 [`supabase/functions/evening-reminder`](../supabase/functions/evening-reminder/index.ts)
-(saatlik cron — "Halkan bekliyor").
+(saatlik cron — "Halkan bekliyor"). İkisi de artık bir **paylaşılan sırla**
+korunuyor — `--no-verify-jwt` ile deploy edildikleri için (çağıran taraf bir
+kullanıcı değil, Supabase'in kendisi) bu olmadan URL'i bilen HERKES sahte
+payload'la kullanıcılara push gönderebilirdi.
 
 ```powershell
+# Rastgele, uzun bir sır üret (bir kere) ve HER İKİ fonksiyona da tanımla:
+supabase secrets set WEBHOOK_SECRET=<uzun-rastgele-bir-değer>
+
 supabase functions deploy notify --no-verify-jwt
 supabase functions deploy evening-reminder --no-verify-jwt
 ```
 
-`--no-verify-jwt` burada **gerekli** — bu ikisini çağıran taraf bir kullanıcı
-değil, Supabase'in kendisi (DB Webhook / pg_cron+pg_net), yani Authorization
-header'ında bir kullanıcı JWT'si olmayacak.
+Aşağıdaki DB Webhook'larda ve pg_net cron çağrısında **aynı** `WEBHOOK_SECRET`
+değerini `x-webhook-secret` header'ı olarak eklemen gerekiyor — yoksa fonksiyon
+her isteği 401 ile geri çevirir (bilerek "kapalı başlıyor": sır yoksa hiçbir
+çağrıya güvenilmiyor).
 
 ### 3. `notify`'ı DB Webhook'larıyla bağla (Dashboard → Database → Webhooks)
 
@@ -622,14 +647,16 @@ header'ında bir kullanıcı JWT'si olmayacak.
 | notify-message | `messages` | INSERT | aynı URL |
 | notify-nudge | `nudges` | INSERT | aynı URL |
 
-Header olarak `Authorization: Bearer <SERVICE_ROLE_KEY>` ekle (Dashboard'un
-webhook formu bunu zaten önerir). `record` payload'ı otomatik gönderilir —
-kod tarafında ekstra bir şey ayarlamana gerek yok.
+Header olarak ikisini ekle:
+- `Authorization: Bearer <SERVICE_ROLE_KEY>` (Dashboard'un webhook formu bunu zaten önerir)
+- `x-webhook-secret: <WEBHOOK_SECRET>` (yukarıda `supabase secrets set` ile ayarladığın değer — **aynısı**)
+
+`record` payload'ı otomatik gönderilir — kod tarafında ekstra bir şey ayarlamana gerek yok.
 
 ### 4. `evening-reminder`'ı saatlik çalıştır (pg_cron + pg_net)
 
 Database → Extensions'tan `pg_cron` ve `pg_net`'i aç, sonra SQL Editor'de
-(kendi project ref + service role key'inle):
+(kendi project ref + service role key + `WEBHOOK_SECRET`'inle):
 
 ```sql
 select cron.schedule(
@@ -640,6 +667,7 @@ select cron.schedule(
     url := 'https://<PROJECT_REF>.supabase.co/functions/v1/evening-reminder',
     headers := jsonb_build_object(
       'Authorization', 'Bearer <SERVICE_ROLE_KEY>',
+      'x-webhook-secret', '<WEBHOOK_SECRET>',
       'Content-Type', 'application/json'
     ),
     body := '{}'::jsonb

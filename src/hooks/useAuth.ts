@@ -6,7 +6,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { registerForPushToken } from '@/lib/push';
-import { savePushToken } from '@/data/profile';
+import { savePushToken, clearPushToken } from '@/data/profile';
 
 /** "Selin Nur" -> "SN" */
 export function initialsFrom(name: string): string {
@@ -211,6 +211,12 @@ async function saveName(name: string): Promise<void> {
 }
 
 async function signOut(): Promise<void> {
+  // Clear this device's push token BEFORE signing out — its RLS policy
+  // (own-row-only) needs the still-valid session to authorize the delete.
+  // A shared/reused device would otherwise keep getting this account's
+  // notifications after signing out of it.
+  const userId = useAuthStore.getState().session?.user.id;
+  if (userId) await clearPushToken(userId).catch(() => {});
   await supabase.auth.signOut();
   useAuthStore.setState({ session: null, name: null });
 }

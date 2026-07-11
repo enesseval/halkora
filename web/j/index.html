@@ -78,13 +78,16 @@
   </div>
 
   <script>
-    // Invite code comes from the path: halkora.app/j/{code}
-    var code = decodeURIComponent(location.pathname.replace(/^\/j\/?/, '').replace(/\/$/, ''));
-    var deepLink = 'halkora://join/' + code;
+    // Invite code comes from the path: halkora.app/j/{code}. Never trust it —
+    // validate against the same shape the app generates before using it
+    // anywhere (deep link href, or rendered as text) to rule out injection
+    // via a maliciously crafted /j/{payload} URL.
+    var raw = decodeURIComponent(location.pathname.replace(/^\/j\/?/, '').replace(/\/$/, ''));
+    var code = /^[A-Za-z0-9-]{3,32}$/.test(raw) ? raw : null;
+    var deepLink = code ? 'halkora://join/' + encodeURIComponent(code) : null;
     // TODO(sen): App Store canlıya çıkınca gerçek App Store linkiyle değiştir.
     var storeUrl = 'https://apps.apple.com/app/idXXXXXXXXXX';
 
-    document.getElementById('openApp').href = deepLink;
     document.getElementById('storeLink').href = storeUrl;
 
     if (!code) {
@@ -92,13 +95,19 @@
       document.getElementById('title').textContent = 'Bu davet bulunamadı.';
       document.getElementById('subtitle').textContent = 'Link eksik ya da bozuk görünüyor.';
     } else {
+      document.getElementById('openApp').href = deepLink;
+
       // Try opening the app immediately. If it's installed, iOS/Android hands
       // off before this tab is ever seen. If nothing happens within ~1.2s,
       // assume it's not installed and show the fallback card instead.
       var fallbackTimer = setTimeout(function () {
         document.getElementById('spinner').style.display = 'none';
         document.getElementById('title').textContent = 'Bir davete katılıyorsun';
-        document.getElementById('subtitle').innerHTML = 'Kod: <code>' + code + '</code>';
+        var codeEl = document.createElement('code');
+        codeEl.textContent = code; // textContent, never innerHTML — code is untrusted input
+        var subtitle = document.getElementById('subtitle');
+        subtitle.textContent = 'Kod: ';
+        subtitle.appendChild(codeEl);
         document.getElementById('card').style.display = 'flex';
       }, 1200);
 

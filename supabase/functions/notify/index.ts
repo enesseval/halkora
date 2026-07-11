@@ -1,11 +1,17 @@
 // Supabase Edge Function — pushes a notification to the OTHER participants of
 // a challenge whenever a check-in, chat message, or nudge is inserted.
 //
-// Deploy + wiring (DB Webhooks): see docs/PHASE2-SUPABASE.md "Ek I".
+// Deploy + wiring (DB Webhooks + the shared secret below): see
+// docs/PHASE2-SUPABASE.md "Ek I".
 //
 // Invoked by three Database Webhooks (one per table), each posting the
 // standard Supabase webhook payload:
 //   { type: 'INSERT', table: 'check_ins' | 'messages' | 'nudges', record: {...} }
+//
+// Deployed with --no-verify-jwt (the caller is Supabase's own webhook
+// dispatcher, not a signed-in user) — WEBHOOK_SECRET is what stands in for
+// auth here. Without it, anyone who finds this function's URL could POST a
+// fake payload and push arbitrary notifications to real users.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -15,6 +21,7 @@ const CORS_HEADERS = {
 };
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
 type WebhookPayload = {
   table: 'check_ins' | 'messages' | 'nudges';
@@ -28,8 +35,22 @@ function ok(body: Record<string, unknown> = { sent: 0 }): Response {
   });
 }
 
+function unauthorized(): Response {
+  return new Response(JSON.stringify({ error: 'unauthorized' }), {
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    status: 401,
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
+
+  // Fail closed: no secret configured means no calls are trusted, not "allow
+  // everything". Set WEBHOOK_SECRET (supabase secrets set) and the matching
+  // DB Webhook header before this function is useful.
+  if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+    return unauthorized();
+  }
 
   try {
     const payload = (await req.json().catch(() => null)) as WebhookPayload | null;
@@ -101,12 +122,11 @@ Deno.serve(async (req) => {
     }
     if (recipientIds.length === 0) return ok();
 
-    const { data: profiles } = await admin
-      .from('profiles')
-      .select('push_token')
-      .in('id', recipientIds)
-      .not('push_token', 'is', null);
-    const tokens = (profiles ?? []).map((p) => p.push_token as string).filter(Boolean);
+    const { data: tokenRows } = await admin
+      .from('push_tokens')
+      .select('token')
+      .in('user_id', recipientIds);
+    const tokens = (tokenRows ?? []).map((r) => r.token as string).filter(Boolean);
     if (tokens.length === 0) return ok();
 
     const messages = tokens.map((to) => ({

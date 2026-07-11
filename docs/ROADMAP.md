@@ -97,13 +97,109 @@ Anonim hesap kırılgan (uygulama silinirse her şey gider):
       durum ekranı (halka illüstrasyonu + "İlk halkanı kur" CTA → QuickStartSheet).
 - [ ] 🧑‍💻 `mockStore`/`mock.ts` temizliği: Supabase artık her akışı karşılıyor;
       mock katmanını incelt (optimistic cache olarak kalan kısmı ayrıştır).
-      **Bilerek ertelendi** — her ekranın okuduğu merkezi state katmanı, cihazda
-      test edemeden (bu oturumda yalnızca web smoke test mümkün) riske girmeye
-      değmez; ayrı, dikkatli bir geçiş olarak ele alınmalı.
+      **Kısmen yapıldı** — kök sorun (store, Supabase configured'ken bile sahte
+      seed veriyle başlıyordu) düzeltildi + Home/Detay/Davet/Bitiş ekranlarına
+      gerçek loading/error state'leri eklendi (mock veri artık hiçbir yerde
+      "gerçekmiş gibi" sessizce gösterilmiyor — bkz. aşağıdaki inceleme
+      bulgusu "Invite ekranı" hariç, o da bu turda düzeltildi). Tam
+      `mockStore`/`mock.ts` inceltmesi hâlâ ayrı, dikkatli bir geçiş olarak
+      bekliyor — cihazda test edemeden merkezi state katmanını büyük çaplı
+      refactor etmek riske değmez.
 - [x] 🧑‍💻 Ayarlar'daki sahte satırları gerçeğe bağla veya kaldır
       (Bildirimler artık gerçek izin durumunu gösteriyor, Hesap gerçek
       anonim/Apple durumunu gösteriyor, Dil kaldırıldı — gerçek i18n yoktu;
       "Demo" bölümü artık yalnızca mock modda (`!configured`) görünüyor).
+
+---
+
+## 🔍 Kod incelemesi bulguları (Faz 3A sonrası bağımsız tarama)
+
+Push/Universal Links/Apple Sign-In/veri-yükleme çalışmasından sonra yapılan
+ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
+🔴 kritik (hemen) → 🟠 güvenlik (yakın vade) → 🟡 tutarlılık → 🟢 performans
+→ 💡 özellik önerisi.
+
+### 🔴 Kritik — hemen düzeltilmeli
+
+- [x] 🧑‍💻 **`web/j/index.html` XSS açığı:** davet kodu URL'den alınıp
+      `innerHTML` ile basılıyordu, sanitize edilmemişti — kötü niyetli bir
+      link paylaşan biri tıklayanın tarayıcısında script çalıştırabilirdi.
+      Düzeltildi: `textContent` + kod formatı doğrulaması (`[A-Za-z0-9-]{3,32}`).
+- [x] 🧑‍💻 **`notify` / `evening-reminder` Edge Function'ları kimliksizdi:**
+      `--no-verify-jwt` ile deploy edildikleri için URL'i bilen herkes sahte
+      payload'la kullanıcılara sınırsız push gönderebilirdi. Paylaşılan bir
+      `WEBHOOK_SECRET` header'ıyla korumaya alındı — bkz.
+      `docs/PHASE2-SUPABASE.md` "Ek I" (deploy etmen ve dashboard'a header'ı
+      eklemen gerekiyor, 🔑).
+- [x] 🧑‍💻 **`profiles.push_token` diğer katılımcılara açıktı:**
+      "co-participant profiles" RLS politikası (Ek E) satırın TÜM kolonlarını
+      okutuyordu. Token artık ayrı, yalnızca sahibinin okuyup yazabildiği
+      `push_tokens` tablosunda (`docs/PHASE2-SUPABASE.md` "Ek I" — eski
+      `profiles.push_token` kolonunu SQL Editor'de silmen gerekiyor).
+- [x] 🧑‍💻 **Invite ekranında gerçek modda bile sahte katılımcılar
+      gösteriliyordu:** `INVITE_JOINERS` mock listesi `isSupabaseConfigured`
+      kontrolü olmadan her zaman animasyonla oynatılıyordu. Gerçek modda artık
+      `challenge.participants` gösteriliyor, mock demo yalnızca `!configured`'da.
+- [x] 🧑‍💻 **Zaten onboarding'i bitirmiş kullanıcı davet kodunu
+      kaybedebiliyordu:** `_layout.tsx`'in "signed in + has name" dalı, welcome
+      ekranından yeniden kimlik doğrulayan (ör. cihazı sıfırlayıp Apple ile
+      tekrar giren) bir kullanıcıyı saklanan davet koduna bakmadan direkt
+      Home'a atıyordu. Düzeltildi.
+
+### 🟠 Güvenlik — orta vadeli
+
+- [ ] 🧑‍💻 **Nudge spam'i:** `insertNudge`'da hız sınırı yok; push tetiklediği
+      için biri aynı kişiye dakikada onlarca "El salla 👋" bildirimi
+      gönderebilir. Sunucu tarafında "aynı kişiye günde 1 nudge" kısıtı
+      (unique index veya RPC kontrolü) gerekiyor.
+- [ ] 🔑 **Davet kodu brute-force riski:** `get_challenge_preview` herkese
+      açık bir RPC. Kod üretiminin yeterince rastgele olduğunu doğrula +
+      Supabase Dashboard'da API rate limit ayarlarının açık olduğundan emin ol.
+- [x] 🧑‍💻 **Çıkışta push token temizlenmiyordu:** `signOut()` artık çıkıştan
+      önce `push_tokens` satırını siliyor — kullanıcı çıkış yaptığında cihaz o
+      hesabın bildirimlerini almayı bırakıyor (push_token tablosu taşınırken
+      bonus olarak düzeltildi).
+- [ ] 🔑 **Hesap silme akışı yok:** App Store, hesap oluşturma varsa
+      uygulama-içi hesap silmeyi zorunlu kılıyor. Faz 5'ten önce eklenmeli
+      (Supabase'de `delete_account` RPC + auth kullanıcı silme).
+
+### 🟡 Tutarlılık
+
+- [ ] 🧑‍💻 **Gün sınırı iki farklı yerde iki farklı şekilde hesaplanıyor:**
+      istemci (`daysSinceStart`) cihazın yerel gece yarısını, `check-in` Edge
+      Function ise challenge'ın `timezone` kolonunu kullanıyor; `insertChallenge`
+      ise timezone'u hiç yazmıyor (DB default'una kalıyor). Farklı saat
+      diliminde biri ekranda "bugün işaretlenebilir" görüp sunucudan ret
+      yiyebilir — tek doğruluk kaynağı seçilmeli.
+- [ ] 🧑‍💻 Mock `createChallenge` joker seçimini yok sayıyor
+      (`jokerRemaining: 1` sabit) — gerçek yol doğru, yalnızca mock modda tutarsız.
+- [ ] 🧑‍💻 Ayarlar'da "Sürüm 1.0.2" elle yazılmış, `app.json` 1.0.0 diyor —
+      `expo-constants`'tan (`Constants.expoConfig?.version`) okunmalı.
+- [ ] 🧑‍💻 Ayarlar'daki profil kartı + "İsim" satırı chevron'lu görünüyor ama
+      hiçbir aksiyon yok — ya isim düzenleme akışı bağlanmalı ya chevron kaldırılmalı.
+
+### 🟢 Performans
+
+- [ ] 🧑‍💻 **`fetchMyChallenges` her 5 saniyede TÜM check-in geçmişini
+      çekiyor** — challenge/katılımcı sayısı arttıkça sınırsız büyüyen bir
+      sorgu. Poll aralığını büyüt + uygulama arka plandayken durdur
+      (`AppState`), uzun vadede özet hesaplamayı bir SQL view/RPC'ye taşı.
+- [ ] 🧑‍💻 Sohbet 4 saniyede bir polling yapıyor — Realtime aboneliği
+      doğrulandıktan sonra bu yalnızca fallback'e (ör. 30sn) düşürülmeli.
+- [ ] 🧑‍💻 Özel gün sayısı 999'a kadar girilebiliyor, `ProgressRing` her gün
+      için ayrı SVG path çiziyor — makul bir üst sınır (ör. 100) konmalı.
+
+### 💡 Özellik önerileri
+
+- [ ] 🧑‍💻 **Bildirim tercihleri:** check-in/akşam hatırlatması/nudge için
+      ayrı aç-kapa (nudge hız sınırıyla birlikte düşünülebilir).
+- [ ] 🧑‍💻 **Çevrimdışı check-in kuyruğu:** check-in günlük bir ritüel;
+      internetsiz anda basılan check-in kaybolmamalı.
+- [ ] 🧑‍💻 **Davet önizlemesinde "zaten üyesin" durumu:** kendi challenge'ının
+      linkine tıklayan kullanıcı şu an tekrar "Katıl" ekranı görüyor.
+- [ ] 🧑‍💻 **Bildirim gruplama:** 8 kişilik grupta herkes check-in yapınca 7
+      ayrı push geliyor — Expo push `collapseId` ile "3 kişi tamamladı"
+      şeklinde birleştirmek bildirim yorgunluğunu azaltır.
 
 ---
 

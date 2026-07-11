@@ -8,10 +8,16 @@
 // One push per person per day even if they're behind on several challenges —
 // the body lists how many are still waiting rather than spamming one per
 // challenge.
+//
+// Deployed with --no-verify-jwt (the caller is pg_cron/pg_net, not a
+// signed-in user) — WEBHOOK_SECRET stands in for auth. Without it, anyone
+// who finds this function's URL could trigger it on demand and spam every
+// pending participant.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
 function localHour(timeZone: string): number {
   return Number(
@@ -28,7 +34,12 @@ function localDateStr(timeZone: string): string {
   }).format(new Date());
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  // Fail closed: no secret configured means no calls are trusted.
+  if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
+  }
+
   try {
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -82,11 +93,11 @@ Deno.serve(async (_req) => {
     }
 
     const userIds = Array.from(pendingByUser.keys());
-    const { data: profiles } = await admin
-      .from('profiles')
-      .select('id, push_token, last_reminder_date')
-      .in('id', userIds)
-      .not('push_token', 'is', null);
+    const [{ data: profiles }, { data: tokenRows }] = await Promise.all([
+      admin.from('profiles').select('id, last_reminder_date').in('id', userIds),
+      admin.from('push_tokens').select('user_id, token').in('user_id', userIds),
+    ]);
+    const tokenByUser = new Map((tokenRows ?? []).map((r) => [r.user_id as string, r.token as string]));
 
     // A user can be in challenges across different timezones; dedupe against
     // *this device's* UTC date so a person is never reminded twice in one
@@ -99,11 +110,13 @@ Deno.serve(async (_req) => {
 
     for (const profile of profiles ?? []) {
       if (profile.last_reminder_date === nowUtcDate) continue;
+      const token = tokenByUser.get(profile.id as string);
+      if (!token) continue;
       const pending = pendingByUser.get(profile.id as string);
       if (!pending || pending.size === 0) continue;
       const [firstChallengeId] = pending;
       messages.push({
-        to: profile.push_token as string,
+        to: token,
         title: 'Halkan bekliyor',
         body:
           pending.size === 1

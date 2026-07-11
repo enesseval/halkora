@@ -10,7 +10,7 @@ import * as Notifications from 'expo-notifications';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { colors } from '@/theme/tokens';
 import { useAuth, useAuthInit, useSyncPushToken } from '@/hooks/useAuth';
-import { stashPendingInviteCode } from '@/lib/pendingInvite';
+import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -54,7 +54,16 @@ function useProtectedRoute() {
       // Signed in + has a name. Leave the O5 "start" fork reachable, but never
       // strand the user on the welcome/name gates.
       const onGate = segments.some((s) => s === 'welcome' || s === 'onboarding');
-      if (onGate) router.replace('/');
+      if (onGate) {
+        // Someone who re-authenticates from Welcome (e.g. reinstalled and
+        // signed back into an Apple account that already has a name) skips
+        // onboarding entirely — onboarding.tsx's own pending-code consumption
+        // never runs for them, so it has to happen here too, or their
+        // /join/{code} deep link (stashed before this redirect) is lost.
+        takePendingInviteCode().then((pendingCode) => {
+          router.replace(pendingCode ? `/join/${pendingCode}` : '/');
+        });
+      }
     }
   }, [ready, configured, isSignedIn, needsOnboarding, segments, pathname, router]);
 }
