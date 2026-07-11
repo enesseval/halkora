@@ -253,7 +253,17 @@ export default function CreateScreen() {
   };
 
   const next = () => (step < 3 ? setStep(step + 1) : finish());
-  const back = () => (step > 0 ? setStep(step - 1) : router.back());
+  // Reached either by pushing from Home's "+" (canGoBack -> reveal Home) or by
+  // replacing the onboarding fork screen (no history left -> back to "/start"
+  // explicitly, same fallback pattern as join/[code].tsx's goBack()).
+  const back = () => {
+    if (step > 0) {
+      setStep(step - 1);
+      return;
+    }
+    if (router.canGoBack()) router.back();
+    else router.replace('/start');
+  };
 
   return (
     <Screen edges={['top', 'bottom']}>

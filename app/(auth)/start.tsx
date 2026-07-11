@@ -182,7 +182,7 @@ export default function StartScreen() {
             emberIcon
             title="Challenge başlat"
             subtitle="Hedefi sen koy, grubunu çağır. 2 dakika sürer."
-            onPress={() => router.push('/create')}
+            onPress={() => router.replace('/create')}
           />
           <OptionCard
             icon="link-2"
