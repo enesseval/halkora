@@ -1,9 +1,12 @@
 import { ScrollView, Share, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { useChallenge } from '@/hooks';
+import { useChallenge, useChallengesQuery } from '@/hooks';
+import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, Button, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
+import { RingScreenSkeleton } from '@/components/Skeleton';
+import { ErrorState } from '@/components/ErrorState';
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
@@ -32,7 +35,21 @@ export default function CompleteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const challenge = useChallenge(id);
-  if (!challenge) return null;
+  const { loading, firstLoadError, error, refetch } = useChallengesQuery();
+
+  if (!challenge) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        {loading ? (
+          <RingScreenSkeleton />
+        ) : firstLoadError ? (
+          <ErrorState message="Yüklenemedi." detail={errMessage(error)} onRetry={refetch} />
+        ) : (
+          <ErrorState message="Challenge bulunamadı." />
+        )}
+      </Screen>
+    );
+  }
 
   const stats = challenge.finishStats;
   const finishers = [...challenge.participants].sort(

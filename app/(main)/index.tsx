@@ -1,16 +1,18 @@
-import { useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { colors, spacing } from '@/theme/tokens';
 import { useTodayStatus, useCheckIn, useRefreshChallenges } from '@/hooks';
 import type { Challenge, SegmentState } from '@/hooks';
+import { errMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
 import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
+import { ErrorState } from '@/components/ErrorState';
 
 const EMPTY_RING_DAYS: SegmentState[] = Array(12).fill('empty');
 
@@ -47,11 +49,24 @@ function PendingCardWithCheckIn({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { dateLabel, pending, done, upcoming, loading } = useTodayStatus();
+  const { dateLabel, pending, done, upcoming, loading, firstLoadError, backgroundError, error, retry } =
+    useTodayStatus();
   const { refreshing, refresh } = useRefreshChallenges();
   const [showStart, setShowStart] = useState(false);
 
   const goDetail = (id: string) => router.push(`/challenge/${id}`);
+
+  // A poll/pull-to-refresh failing after we already have real data shouldn't
+  // blank the list — just say so once per failure streak (not every 5s poll).
+  const alerted = useRef(false);
+  useEffect(() => {
+    if (backgroundError && !alerted.current) {
+      alerted.current = true;
+      Alert.alert('Güncellenemedi', errMessage(error) || 'Bağlantını kontrol et.');
+    } else if (!backgroundError) {
+      alerted.current = false;
+    }
+  }, [backgroundError, error]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
@@ -93,6 +108,12 @@ export default function HomeScreen() {
             // First real Supabase fetch still in flight — show placeholders
             // instead of letting the Phase-1 mock seed data flash on screen.
             <HomeSkeleton />
+          ) : firstLoadError ? (
+            <ErrorState
+              message="Challenge'ların yüklenemedi."
+              detail={errMessage(error)}
+              onRetry={retry}
+            />
           ) : pending.length === 0 && done.length === 0 && upcoming.length === 0 ? (
             <EmptyHome onStart={() => setShowStart(true)} />
           ) : (

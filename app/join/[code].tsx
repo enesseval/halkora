@@ -9,6 +9,8 @@ import { errMessage } from '@/lib/errors';
 import { AppText, AvatarStack, Button, IconButton, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StakeBadge } from '@/components/StakeBadge';
+import { CardSkeleton } from '@/components/Skeleton';
+import { ErrorState } from '@/components/ErrorState';
 
 export default function JoinScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
@@ -57,7 +59,22 @@ export default function JoinScreen() {
     return (
       <Screen edges={['top', 'bottom']}>
         {closeButton}
-        <View style={{ flex: 1 }} />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <CardSkeleton />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (preview.isError) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        {closeButton}
+        <ErrorState
+          message="Davet yüklenemedi."
+          detail={errMessage(preview.error)}
+          onRetry={preview.retry}
+        />
       </Screen>
     );
   }

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { buildDays, nowClock } from '@/lib/day';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import {
   MOCK_CHALLENGES,
   ME_ID,
@@ -57,12 +58,23 @@ function seed(): Challenge[] {
   return JSON.parse(JSON.stringify(MOCK_CHALLENGES)) as Challenge[];
 }
 
+/**
+ * Real backend configured => start EMPTY, not with fake demo data. Otherwise
+ * a slow/failed first fetch would silently show mock challenges as if they
+ * were the user's real ones (loading/error states now handle that instead —
+ * see useChallengesQuery in src/hooks/index.ts). Only the Phase-1 mock/demo
+ * mode (no Supabase env vars) still seeds the store.
+ */
+function initialChallenges(): Challenge[] {
+  return isSupabaseConfigured ? [] : seed();
+}
+
 function firstName(full: string): string {
   return full.split(' ')[0] ?? full;
 }
 
 export const useMockStore = create<MockState>((set, get) => ({
-  challenges: seed(),
+  challenges: initialChallenges(),
   momentumDemoId: null,
 
   checkIn: (id) =>

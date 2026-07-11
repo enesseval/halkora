@@ -4,16 +4,20 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
-import { useChallenge, INVITE_JOINERS } from '@/hooks';
+import { useChallenge, useChallengesQuery, INVITE_JOINERS } from '@/hooks';
+import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
+import { RingScreenSkeleton } from '@/components/Skeleton';
+import { ErrorState } from '@/components/ErrorState';
 
 export default function InviteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const challenge = useChallenge(id);
+  const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const [joined, setJoined] = useState(0);
 
   useEffect(() => {
@@ -22,7 +26,26 @@ export default function InviteScreen() {
     return () => clearTimeout(t);
   }, [joined]);
 
-  if (!challenge) return null;
+  if (!challenge) {
+    // Normally already cached from the create flow that landed here — this
+    // only matters for a stale/deep link opened before that data exists.
+    return (
+      <Screen edges={['top', 'bottom']}>
+        <View style={{ flexDirection: 'row', paddingVertical: 8 }}>
+          <IconButton size={38} onPress={() => router.replace('/')}>
+            <Feather name="x" size={18} color={colors.textPrimary} />
+          </IconButton>
+        </View>
+        {loading ? (
+          <RingScreenSkeleton />
+        ) : firstLoadError ? (
+          <ErrorState message="Challenge yüklenemedi." detail={errMessage(error)} onRetry={refetch} />
+        ) : (
+          <ErrorState message="Challenge bulunamadı." />
+        )}
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={['top', 'bottom']}>
