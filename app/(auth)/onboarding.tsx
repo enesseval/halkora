@@ -6,10 +6,13 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import type { SegmentState } from '@/hooks';
 import { ProgressRing } from '@/components/ProgressRing';
+import { registerForPushToken } from '@/lib/push';
+import { takePendingInviteCode } from '@/lib/pendingInvite';
 import { AppText, Avatar, AvatarStack, Button, Chip, Screen } from '@/components/ui';
 
 const O1_DAYS: SegmentState[] = [
@@ -190,15 +193,43 @@ function NameStep({
   );
 }
 
+/* O5 — push permission */
+function NotifStep() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center' }}>
+      <View
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 20,
+          backgroundColor: colors.emberSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 24,
+        }}
+      >
+        <Feather name="bell" size={26} color={colors.ember} />
+      </View>
+      <AppText variant="hero">Grubun seni{'\n'}dürtebilsin.</AppText>
+      <AppText variant="secondary" style={{ marginTop: 14, maxWidth: 320 }}>
+        Biri check-in yapınca, sana el sallayınca ya da akşam olup da halkan
+        seni bekliyorsa haber veririz. Başka hiçbir şey için değil.
+      </AppText>
+    </View>
+  );
+}
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const { saveName } = useAuth();
-  const [step, setStep] = useState(0); // 0,1,2 intro · 3 name
+  const [step, setStep] = useState(0); // 0,1,2 intro · 3 name · 4 notifications
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [askingPermission, setAskingPermission] = useState(false);
 
   const isName = step === 3;
+  const isNotif = step === 4;
   const canSubmitName = name.trim().length >= 2 && !saving;
 
   const submitName = async () => {
@@ -207,11 +238,24 @@ export default function OnboardingScreen() {
     setErr(null);
     try {
       await saveName(name);
-      router.replace('/start');
+      setStep(4);
     } catch {
       setErr('Kaydedilemedi. Bağlantını kontrol edip tekrar dene.');
       setSaving(false);
     }
+  };
+
+  const finishNotifStep = async (allow: boolean) => {
+    if (allow) {
+      setAskingPermission(true);
+      await registerForPushToken(); // fire-and-forget; useSyncPushToken() persists the token
+      setAskingPermission(false);
+    }
+    // A /join/{code} deep link tapped before signing in gets stashed by the
+    // root guard (src/lib/pendingInvite.ts) — resume it now instead of
+    // dropping the visitor on the generic fork screen.
+    const pendingCode = await takePendingInviteCode();
+    router.replace(pendingCode ? `/join/${pendingCode}` : '/start');
   };
 
   const advance = () => (step < 2 ? setStep(step + 1) : setStep(3));
@@ -224,7 +268,7 @@ export default function OnboardingScreen() {
       >
         {/* skip */}
         <View style={{ height: 28, justifyContent: 'center', alignItems: 'flex-end' }}>
-          {!isName ? (
+          {!isName && !isNotif ? (
             <AppText variant="secondary" color={colors.textSecondary} onPress={() => setStep(3)}>
               Atla
             </AppText>
@@ -235,6 +279,7 @@ export default function OnboardingScreen() {
         {step === 1 ? <Mechanic /> : null}
         {step === 2 ? <Stake /> : null}
         {isName ? <NameStep name={name} setName={setName} onSubmit={submitName} /> : null}
+        {isNotif ? <NotifStep /> : null}
 
         {err ? (
           <AppText variant="meta" color={colors.joker} style={{ marginBottom: 8 }}>
@@ -243,16 +288,34 @@ export default function OnboardingScreen() {
         ) : null}
 
         <View style={{ gap: 16, paddingBottom: spacing.section, paddingTop: 8 }}>
-          {!isName ? <Dots step={step} /> : null}
+          {!isName && !isNotif ? <Dots step={step} /> : null}
           {isName ? (
             <Button
               label={saving ? 'Kaydediliyor…' : 'Devam'}
               onPress={submitName}
               disabled={!canSubmitName}
             />
-          ) : (
+          ) : null}
+          {isNotif ? (
+            <>
+              <Button
+                label={askingPermission ? 'Soruluyor…' : 'Bildirimlere izin ver'}
+                onPress={() => finishNotifStep(true)}
+                disabled={askingPermission}
+              />
+              <AppText
+                variant="secondary"
+                color={colors.textSecondary}
+                onPress={() => (askingPermission ? undefined : finishNotifStep(false))}
+                style={{ textAlign: 'center' }}
+              >
+                Şimdi değil
+              </AppText>
+            </>
+          ) : null}
+          {!isName && !isNotif ? (
             <Button label={step === 2 ? 'Başlayalım' : 'Devam'} onPress={advance} />
-          )}
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </Screen>

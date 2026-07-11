@@ -1,0 +1,3 @@
+# Cloudflare Pages: any /j/{code} path serves the same static landing page,
+# which reads the code back out of location.pathname client-side.
+/j/*  /j/index.html  200

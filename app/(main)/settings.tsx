@@ -1,10 +1,29 @@
-import { Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
 import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
+import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
+
+/** null while the initial permission check is in flight. Push is native-only —
+ * expo-notifications' web shim doesn't fully implement this, so skip there. */
+function useNotificationStatus(): boolean | null {
+  const [granted, setGranted] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      setGranted(false);
+      return;
+    }
+    Notifications.getPermissionsAsync()
+      .then((p) => setGranted(p.status === 'granted'))
+      .catch(() => setGranted(false));
+  }, []);
+  return granted;
+}
 
 function Row({
   icon,
@@ -64,10 +83,24 @@ function Group({ children }: { children: React.ReactNode }) {
 export default function SettingsScreen() {
   const router = useRouter();
   const { open } = useMomentumDemo();
-  const { configured, name, signOut, resetOnboarding } = useAuth();
+  const { configured, name, isAnonymous, linkAppleIdentity, signOut, resetOnboarding } = useAuth();
+  const [linking, setLinking] = useState(false);
+  const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
   const displayInitials = name ? initialsFrom(name) : ME_INITIALS;
+
+  const secureAccount = async () => {
+    if (linking) return;
+    setLinking(true);
+    try {
+      await linkAppleIdentity();
+    } catch (e) {
+      Alert.alert('Bağlanamadı', errMessage(e));
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const goOnboarding = async () => {
     if (configured) {
@@ -115,9 +148,6 @@ export default function SettingsScreen() {
             <AppText variant="bodyMedium" style={{ fontSize: 18 }}>
               {displayName}
             </AppText>
-            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 2 }}>
-              selin@icloud.com
-            </AppText>
           </View>
           <Feather name="chevron-right" size={18} color={colors.textTertiary} />
         </Pressable>
@@ -126,47 +156,53 @@ export default function SettingsScreen() {
           <Group>
             <Row icon="user" label="İsim" value={displayName} />
             <Divider />
-            <Row icon="bell" label="Bildirimler" value="Akşam 20:00" />
+            <Row
+              icon="bell"
+              label="Bildirimler"
+              value={notifGranted === null ? '' : notifGranted ? 'Açık' : 'Kapalı'}
+              onPress={() => Linking.openSettings().catch(() => {})}
+            />
+            {configured ? (
+              <>
+                <Divider />
+                <Row
+                  icon="key"
+                  label="Hesap"
+                  value={linking ? 'Bağlanıyor…' : isAnonymous ? 'Güvence yok' : 'Apple ile bağlı'}
+                  tint={isAnonymous ? colors.ember : undefined}
+                  onPress={isAnonymous ? secureAccount : undefined}
+                />
+              </>
+            ) : null}
             <Divider />
-            <Row icon="key" label="Hesap" value="Apple ile" />
-            <Divider />
-            <Row icon="globe" label="Dil" value="Türkçe" />
+            <Row icon="rotate-ccw" label="Onboarding'i tekrar gör" onPress={goOnboarding} />
           </Group>
         </View>
 
-        {/* demo entries — reach E9 / E10 in the mock */}
-        <View style={{ marginTop: 24 }}>
-          <SectionLabel>Demo</SectionLabel>
-          <View style={{ marginTop: 10 }}>
-            <Group>
-              {!configured ? (
-                <>
-                  <Row
-                    icon="trending-down"
-                    label="Momentum düşüşü (E10)"
-                    onPress={() => {
-                      open('c1');
-                      router.push('/challenge/c1');
-                    }}
-                  />
-                  <Divider />
-                  <Row
-                    icon="flag"
-                    label="Bitiş & kutlama (E9)"
-                    onPress={() => router.push('/challenge/a1/complete')}
-                  />
-                  <Divider />
-                </>
-              ) : null}
-              <Row
-                icon="rotate-ccw"
-                label="Onboarding'i tekrar gör"
-                tint={colors.ember}
-                onPress={goOnboarding}
-              />
-            </Group>
+        {/* demo entries — mock-only, never shown against a real backend */}
+        {!configured ? (
+          <View style={{ marginTop: 24 }}>
+            <SectionLabel>Demo</SectionLabel>
+            <View style={{ marginTop: 10 }}>
+              <Group>
+                <Row
+                  icon="trending-down"
+                  label="Momentum düşüşü (E10)"
+                  onPress={() => {
+                    open('c1');
+                    router.push('/challenge/c1');
+                  }}
+                />
+                <Divider />
+                <Row
+                  icon="flag"
+                  label="Bitiş & kutlama (E9)"
+                  onPress={() => router.push('/challenge/a1/complete')}
+                />
+              </Group>
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* logout — faint, never red */}
         <Pressable

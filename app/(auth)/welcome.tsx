@@ -16,7 +16,7 @@ const LOGO_DAYS: SegmentState[] = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { configured, signInWithApple, signInAnonymously } = useAuth();
+  const { configured, signInWithApple } = useAuth();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -64,13 +64,11 @@ export default function WelcomeScreen() {
           textStyle={{ color: colors.bgBase }}
           icon={<FontAwesome name="apple" size={18} color={colors.bgBase} />}
         />
-        <Button
-          label="Google ile devam et"
-          variant="secondary"
-          onPress={() => run(signInAnonymously)}
-          disabled={busy}
-          icon={<FontAwesome name="google" size={16} color={colors.textPrimary} />}
-        />
+        {/* Android/web (or a not-yet-configured Apple provider) fall back to
+            anonymous sign-in inside signInWithApple() itself — there is no
+            separate "Google" button anymore since it never actually did real
+            Google OAuth, it silently signed in anonymously, which is
+            misleading (docs/ROADMAP.md Faz 3A-3). */}
         {err ? (
           <AppText variant="meta" color={colors.joker} style={{ textAlign: 'center' }}>
             {err}

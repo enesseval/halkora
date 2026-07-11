@@ -575,3 +575,146 @@ cihazda aç, Welcome → giriş → onboarding akışının çalıştığını g
 UI aynı görünürdü, ama `git ls-files` ile göremeyeceğin şekilde arka planda gerçek ağ
 isteği gitmiyor olurdu — emin olmak istersen cihazı Mac'e bağlayıp Safari Web Inspector'dan
 ya da Xcode Console'dan ağ loglarına bakabilirsin).
+
+## Ek I — Push Bildirimleri (Faz 3A-1)
+
+**İstemci tarafı (kod, zaten yapıldı):** `expo-notifications` kuruldu, onboarding'e
+bir izin adımı eklendi (O5 "Grubun seni dürtebilsin"), `useSyncPushToken()`
+(`src/hooks/useAuth.ts`) her açılışta token'ı tazeleyip `profiles.push_token`'a
+yazıyor, ve bildirime dokununca `app/_layout.tsx`'teki `useNotificationDeepLink()`
+`halkora://challenge/{id}`'ye yönlendiriyor. Geriye şunlar kalıyor:
+
+### 1. Şema
+
+```sql
+alter table profiles add column if not exists push_token text;
+alter table profiles add column if not exists last_reminder_date date;
+```
+
+Ek bir RLS politikası gerekmiyor — istemci zaten yalnızca **kendi** satırını
+güncelliyor (mevcut "own profile" politikası bunu zaten kapsıyor), Edge
+Function'lar da `service_role` ile çalışıp RLS'i tamamen bypass ediyor.
+
+### 2. Edge Function'ları deploy et
+
+İki fonksiyon var, ikisi de repoda hazır:
+[`supabase/functions/notify`](../supabase/functions/notify/index.ts) (anlık —
+check-in/mesaj/nudge) ve
+[`supabase/functions/evening-reminder`](../supabase/functions/evening-reminder/index.ts)
+(saatlik cron — "Halkan bekliyor").
+
+```powershell
+supabase functions deploy notify --no-verify-jwt
+supabase functions deploy evening-reminder --no-verify-jwt
+```
+
+`--no-verify-jwt` burada **gerekli** — bu ikisini çağıran taraf bir kullanıcı
+değil, Supabase'in kendisi (DB Webhook / pg_cron+pg_net), yani Authorization
+header'ında bir kullanıcı JWT'si olmayacak.
+
+### 3. `notify`'ı DB Webhook'larıyla bağla (Dashboard → Database → Webhooks)
+
+Üç webhook oluştur, üçü de `notify` fonksiyonuna INSERT'te POST etsin:
+
+| Webhook adı | Tablo | Event | URL |
+|---|---|---|---|
+| notify-checkin | `check_ins` | INSERT | `https://<PROJECT_REF>.supabase.co/functions/v1/notify` |
+| notify-message | `messages` | INSERT | aynı URL |
+| notify-nudge | `nudges` | INSERT | aynı URL |
+
+Header olarak `Authorization: Bearer <SERVICE_ROLE_KEY>` ekle (Dashboard'un
+webhook formu bunu zaten önerir). `record` payload'ı otomatik gönderilir —
+kod tarafında ekstra bir şey ayarlamana gerek yok.
+
+### 4. `evening-reminder`'ı saatlik çalıştır (pg_cron + pg_net)
+
+Database → Extensions'tan `pg_cron` ve `pg_net`'i aç, sonra SQL Editor'de
+(kendi project ref + service role key'inle):
+
+```sql
+select cron.schedule(
+  'evening-reminder-hourly',
+  '0 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/evening-reminder',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer <SERVICE_ROLE_KEY>',
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Fonksiyon kendi içinde her challenge'ın kendi timezone'una göre "şu an 20:00 mi"
+kontrolü yapıyor, saatte bir tetiklenmesi yeterli — 20:00'i kaçıran timezone
+olmuyor. `profiles.last_reminder_date` aynı gün içinde ikinci bir hatırlatmayı
+engelliyor.
+
+### 5. 🔑 Apple Developer — Push capability + APNs key (ZORUNLU, cihazda görmek için)
+
+Kod ve backend hazır olsa da, gerçek bir cihazda bildirim **görünmesi** için:
+
+1. Apple Developer → Certificates, IDs & Profiles → senin App ID'nde
+   **Push Notifications** capability'sini aç.
+2. Keys'ten yeni bir **APNs Auth Key** (.p8) oluştur, indir (bir kere indirilir).
+3. `npx eas-cli credentials` → iOS → Push Notifications → bu key'i EAS'a yükle
+   (EAS, Expo push servisinin arkasında bu key'i kullanarak APNs'e konuşuyor —
+   ayrı bir push sunucusu kurmana gerek yok).
+4. `expo prebuild` kullandığın için Xcode projesi yerelde üretiliyor — prebuild
+   sonrası Xcode'da **Signing & Capabilities**'te Push Notifications'ın
+   göründüğünü doğrula (app.json'daki `expo-notifications` plugin'i bunu
+   otomatik ekliyor olması gerekir, ama bir build alıp kontrol et).
+5. Yeni bir production build al (`npx eas-cli build --platform ios --profile production`) —
+   Push capability'siz eski bir build'de bildirim **asla** gelmez.
+
+> Not: Simülatörde push token asla alınamaz (`registerForPushToken()` bunu
+> sessizce `null` döndürüp yutuyor) — gerçek cihazda test et.
+
+## Ek J — Apple Sign-In + anonim hesap yükseltme (Faz 3A-3)
+
+**İstemci tarafı (kod, zaten yapıldı):** `expo-apple-authentication` kuruldu,
+`src/hooks/useAuth.ts`'teki `signInWithApple()` artık gerçek native Apple
+girişini deniyor (iOS + capability yoksa/Android'de sessizce anonim girişe
+düşüyor), `linkAppleIdentity()` mevcut anonim kullanıcıyı **aynı** user id'yi
+koruyarak Apple'a bağlıyor (Ayarlar → "Hesap" satırı → `secureAccount()`).
+Google butonu kaldırıldı — gerçekte anonim giriş yapıp Google gibi görünüyordu,
+yanıltıcıydı (`docs/ROADMAP.md` Faz 3A-3'ün izin verdiği iki seçenekten biri).
+
+Geriye şunlar kalıyor, hepsi 🔑 (senin hesap/dashboard işin):
+
+### 1. Apple Developer
+
+1. Certificates, IDs & Profiles → App ID'nde **"Sign in with Apple"**
+   capability'sini aç.
+2. Identifiers → Services IDs → yeni bir Service ID oluştur (Supabase'in Apple
+   provider ayarında "Client ID" olarak bunu kullanacaksın).
+3. Keys → yeni bir **Sign in with Apple key** (.p8) oluştur, indir (bir kere
+   indirilir) — Supabase'e "Client Secret" üretmek için lazım.
+
+### 2. Supabase Dashboard → Authentication → Providers → Apple
+
+- Yukarıdaki Service ID + Key ile Apple provider'ı etkinleştir (Supabase'in
+  kendi Apple provider ekranı hangi alanları isteyeceğini adım adım gösteriyor:
+  Team ID, Key ID, Service ID, .p8 içeriği).
+- **Authentication → Settings → "Allow manual linking"**'i aç — `linkIdentity()`
+  bu ayar kapalıyken hata döner, anonim→Apple yükseltmesi bu yüzden şart.
+
+### 3. `app.json` / native
+
+- `expo-apple-authentication` kendi config plugin'ini otomatik uyguluyor
+  (Sign in with Apple entitlement'ı prebuild sırasında ekleniyor) — elle bir
+  şey eklemen gerekmiyor.
+- Yeni bir production build al; eski bir build'de capability yoksa
+  `AppleAuthentication.isAvailableAsync()` `false` döner ve kod otomatik
+  anonim girişe düşer (çökme yok, ama gerçek Apple girişi de olmaz).
+
+### 4. Doğrulama
+
+Gerçek cihazda: Welcome → "Apple ile devam et" → sistem Apple sheet'i açılmalı
+(simülatörde de açılır ama gerçek bir Apple ID gerektirir). Ayarlar → "Hesap"
+satırında anonim bir kullanıcı için "Güvence yok" görünür ve dokununca aynı
+sheet açılıp bağlandıktan sonra "Apple ile bağlı"ya döner — uygulamayı silip
+tekrar kursan bile aynı challenge'lar geri gelir (artık anonim değilsin).

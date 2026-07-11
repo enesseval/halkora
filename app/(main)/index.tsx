@@ -5,11 +5,34 @@ import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { colors, spacing } from '@/theme/tokens';
 import { useTodayStatus, useCheckIn, useRefreshChallenges } from '@/hooks';
-import type { Challenge } from '@/hooks';
-import { AppText, IconButton, Screen, SectionLabel } from '@/components/ui';
+import type { Challenge, SegmentState } from '@/hooks';
+import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
+import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
+
+const EMPTY_RING_DAYS: SegmentState[] = Array(12).fill('empty');
+
+/** Shown when the visitor has zero challenges at all (never created, never joined). */
+function EmptyHome({ onStart }: { onStart: () => void }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 24 }}>
+      <ProgressRing totalDays={12} days={EMPTY_RING_DAYS} size="L" />
+      <View style={{ alignItems: 'center', gap: 8 }}>
+        <AppText variant="hero" style={{ textAlign: 'center' }}>
+          Henüz bir halkan yok.
+        </AppText>
+        <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 280 }}>
+          Bir challenge kur, grubunu çağır — ya da bir davetle katıl.
+        </AppText>
+      </View>
+      <View style={{ alignSelf: 'stretch' }}>
+        <Button label="İlk halkanı kur" onPress={onStart} />
+      </View>
+    </View>
+  );
+}
 
 function PendingCardWithCheckIn({
   challenge,
@@ -70,6 +93,8 @@ export default function HomeScreen() {
             // First real Supabase fetch still in flight — show placeholders
             // instead of letting the Phase-1 mock seed data flash on screen.
             <HomeSkeleton />
+          ) : pending.length === 0 && done.length === 0 && upcoming.length === 0 ? (
+            <EmptyHome onStart={() => setShowStart(true)} />
           ) : (
             <>
               {/* pending — big cards */}

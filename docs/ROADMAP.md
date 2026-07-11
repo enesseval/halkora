@@ -38,57 +38,72 @@ Sırayla — her biri bir öncekinin değerini katlıyor:
 
 Grup uygulamasında sosyal döngü bildirimsiz çalışmaz. Üç bildirim tipi:
 
-- [ ] 🧑‍💻 `expo-notifications` kurulumu + izin akışı (onboarding sonrası,
+- [x] 🧑‍💻 `expo-notifications` kurulumu + izin akışı (onboarding sonrası,
       "grubun seni dürtebilsin" dilinde — iznin *neden* istendiği anlatılarak).
-- [ ] 🧑‍💻 Push token'ı `profiles` tablosuna yazma (`push_token` kolonu + migration).
-- [ ] 🧑‍💻 Supabase Edge Function `notify`: check_ins/messages/nudges insert'lerinde
+- [x] 🧑‍💻 Push token'ı `profiles` tablosuna yazma (`push_token` kolonu + migration
+      SQL: `docs/PHASE2-SUPABASE.md` "Ek I" — SQL Editor'de çalıştırman gerekiyor).
+- [x] 🧑‍💻 Supabase Edge Function `notify`: check_ins/messages/nudges insert'lerinde
       DB webhook → ilgili katılımcılara Expo Push API üzerinden gönderim.
   - "Zeynep tamamladı ✓" (check-in olunca gruba)
-  - "El salla 👋 aldın" (nudge alıcıya — şu an nudge yazılıyor ama alıcı hiç görmüyor!)
-  - Akşam hatırlatması: "Halkan bekliyor" (pg_cron ile saatli tarama, check-in
-    yapmamışlara)
+  - "El salla 👋 aldın" (nudge alıcıya — artık gerçekten bildirim gidiyor)
+  - Akşam hatırlatması: "Halkan bekliyor" (`evening-reminder` fonksiyonu +
+    pg_cron/pg_net saatli tarama, check-in yapmamışlara) — "Ek I"
 - [ ] 🔑 Apple Developer'da Push capability + APNs key → Expo push credential
       (prebuild kullandığın için Xcode'da Push Notifications capability'sini
-      Signing & Capabilities'ten eklemen gerekiyor).
-- [ ] 🧑‍💻 Bildirime dokununca doğru ekrana gitme (`halkora://challenge/{id}`).
+      Signing & Capabilities'ten eklemen gerekiyor) — deploy + dashboard adımları
+      `docs/PHASE2-SUPABASE.md` "Ek I"'de.
+- [x] 🧑‍💻 Bildirime dokununca doğru ekrana gitme (`halkora://challenge/{id}`).
 
 ### 2. Universal Links + Deep Link testi
 
 Davet döngüsü şu an kopuk — link tıklanabilir değil:
 
 - [ ] 🧑‍💻 `halkora://join/{kod}` custom scheme'in gerçek cihazda test edilmesi
-      (hiç test edilmedi; scheme artık `halkora`).
+      (kod tarafı hazır — web smoke test'te davet linki üretimi + create→invite
+      akışı doğrulandı, ama gerçek cihaz/Universal Link testi yapılamadı, bunu
+      sen yapmalısın).
 - [ ] 🔑 `halkora.app` domain'ine `apple-app-site-association` dosyası koymak
-      (statik hosting yeter — Cloudflare Pages ücretsiz).
-- [ ] 🧑‍💻 `app.json`'a `associatedDomains: ["applinks:halkora.app"]` + Xcode'da
-      Associated Domains capability.
-- [ ] 🧑‍💻 Oturumsuz kullanıcı davet linkine tıklarsa: kodu sakla → auth/onboarding
-      → sonra `join/{kod}`a düşür (şu an kod kayboluyor, PHASE2 Ek C'de notluydu).
-- [ ] 🧑‍💻 `halkora.app/j/{kod}` web fallback sayfası: uygulama yoksa App Store'a
-      yönlendiren tek sayfalık landing.
+      (statik hosting yeter — Cloudflare Pages ücretsiz; domain'in Faz 0'da
+      henüz alınmadı, önce o gerekiyor).
+- [x] 🧑‍💻 `app.json`'a `associatedDomains: ["applinks:halkora.app"]` eklendi +
+      Android `intentFilters` (`/j/*`). 🔑 kalan: domain alındıktan + AASA
+      hostlandıktan sonra bir prebuild+build alıp Xcode'da Associated Domains
+      capability'sinin göründüğünü doğrula.
+- [x] 🧑‍💻 Oturumsuz kullanıcı davet linkine tıklarsa: kodu sakla → auth/onboarding
+      → sonra `join/{kod}`a düşür (`src/lib/pendingInvite.ts` +
+      `app/_layout.tsx`'teki `useProtectedRoute()`).
+- [x] 🧑‍💻 `halkora.app/j/{kod}` web fallback sayfası: `web/j/index.html` +
+      `web/_redirects` (Cloudflare Pages'e deploy etmek 🔑 — domain lazım).
 
 ### 3. Apple Sign-In + anonim hesap bağlama
 
 Anonim hesap kırılgan (uygulama silinirse her şey gider):
 
 - [ ] 🔑 Apple Developer: App ID'ye "Sign in with Apple" capability + Service ID
-      + Key → Supabase Auth → Apple provider ayarları.
-- [ ] 🧑‍💻 `expo-apple-authentication` + E1'de gerçek Apple butonu
-      (`signInWithIdToken`).
-- [ ] 🧑‍💻 **Anonim → Apple yükseltme:** mevcut anonim kullanıcının verisini
-      kaybettirmeden bağlama (`linkIdentity`). Ayarlar'a "Hesabını güvenceye al"
-      satırı.
-- [ ] 🧑‍💻 Google girişi butonunun kaderi: ya gerçek Google OAuth bağla ya da
-      butonu kaldır (şu an ikisi de anonim giriş yapıyor — yanıltıcı).
+      + Key → Supabase Auth → Apple provider ayarları + "Allow manual linking"
+      (adım adım: `docs/PHASE2-SUPABASE.md` "Ek J").
+- [x] 🧑‍💻 `expo-apple-authentication` + E1'de gerçek Apple butonu
+      (`signInWithIdToken`) — capability kurulana kadar Android/simülatörde
+      sessizce anonim girişe düşüyor, çökme yok.
+- [x] 🧑‍💻 **Anonim → Apple yükseltme:** mevcut anonim kullanıcının verisini
+      kaybettirmeden bağlama (`linkIdentity`). Ayarlar'a "Hesap" satırı eklendi
+      (anonimken dokununca bağlanıyor).
+- [x] 🧑‍💻 Google girişi butonunun kaderi: kaldırıldı (gerçekte anonim giriş
+      yapıp Google gibi görünüyordu — yanıltıcıydı).
 
 ### 4. Küçük ama kritik rötuşlar
 
-- [ ] 🧑‍💻 **Boş Home durumu:** hiç challenge yokken Home'da yönlendirici boş
+- [x] 🧑‍💻 **Boş Home durumu:** hiç challenge yokken Home'da yönlendirici boş
       durum ekranı (halka illüstrasyonu + "İlk halkanı kur" CTA → QuickStartSheet).
 - [ ] 🧑‍💻 `mockStore`/`mock.ts` temizliği: Supabase artık her akışı karşılıyor;
       mock katmanını incelt (optimistic cache olarak kalan kısmı ayrıştır).
-- [ ] 🧑‍💻 Ayarlar'daki sahte satırları gerçeğe bağla veya kaldır
-      (Bildirimler/Hesap/Dil şu an dekor; "Demo" bölümü yayında gizlenmeli).
+      **Bilerek ertelendi** — her ekranın okuduğu merkezi state katmanı, cihazda
+      test edemeden (bu oturumda yalnızca web smoke test mümkün) riske girmeye
+      değmez; ayrı, dikkatli bir geçiş olarak ele alınmalı.
+- [x] 🧑‍💻 Ayarlar'daki sahte satırları gerçeğe bağla veya kaldır
+      (Bildirimler artık gerçek izin durumunu gösteriyor, Hesap gerçek
+      anonim/Apple durumunu gösteriyor, Dil kaldırıldı — gerçek i18n yoktu;
+      "Demo" bölümü artık yalnızca mock modda (`!configured`) görünüyor).
 
 ---
 
