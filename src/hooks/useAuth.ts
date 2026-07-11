@@ -6,7 +6,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { registerForPushToken } from '@/lib/push';
-import { savePushToken, clearPushToken } from '@/data/profile';
+import { savePushToken, clearPushToken, deleteAccount as deleteAccountRequest } from '@/data/profile';
 
 /** "Selin Nur" -> "SN" */
 export function initialsFrom(name: string): string {
@@ -222,6 +222,18 @@ async function signOut(): Promise<void> {
 }
 
 /**
+ * Permanently deletes the account (App Store Review Guideline 5.1.1(v)) via
+ * the `delete-account` Edge Function, then clears local session state — the
+ * server-side user is already gone at that point, so this just drops the
+ * client's own copy of it rather than calling signOut() against a user that
+ * no longer exists.
+ */
+async function deleteAccount(): Promise<void> {
+  await deleteAccountRequest();
+  useAuthStore.setState({ session: null, name: null });
+}
+
+/**
  * Clears the profile name so the root guard routes back through onboarding —
  * keeps the same (anonymous) user. Handy for re-viewing the flow.
  */
@@ -253,6 +265,7 @@ export function useAuth() {
     linkAppleIdentity,
     saveName,
     signOut,
+    deleteAccount,
     resetOnboarding,
   };
 }

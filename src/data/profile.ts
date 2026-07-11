@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { edgeFunctionError } from '@/lib/errors';
 
 /**
  * Writes this device's Expo push token to its own row in `push_tokens` — a
@@ -18,4 +19,15 @@ export async function savePushToken(userId: string, token: string): Promise<void
 export async function clearPushToken(userId: string): Promise<void> {
   const { error } = await supabase.from('push_tokens').delete().eq('user_id', userId);
   if (error) throw error;
+}
+
+/**
+ * Permanently deletes the signed-in user's account (App Store Review
+ * Guideline 5.1.1(v) — required whenever account creation exists). Runs
+ * server-side under the `delete-account` Edge Function so it can call the
+ * admin API; see docs/PHASE2-SUPABASE.md "Ek L" for what it removes/keeps.
+ */
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account');
+  if (error) throw await edgeFunctionError(error);
 }

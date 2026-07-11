@@ -746,3 +746,89 @@ Gerçek cihazda: Welcome → "Apple ile devam et" → sistem Apple sheet'i açı
 satırında anonim bir kullanıcı için "Güvence yok" görünür ve dokununca aynı
 sheet açılıp bağlandıktan sonra "Apple ile bağlı"ya döner — uygulamayı silip
 tekrar kursan bile aynı challenge'lar geri gelir (artık anonim değilsin).
+
+## Ek K — Nudge hız sınırı + davet kodu entropisi (kod incelemesi 🟠)
+
+**İstemci tarafı (kod, zaten yapıldı):** `src/data/chat.ts`'teki `insertNudge`
+artık `23505` (unique violation) hatasını `insertReaction`le aynı şekilde
+sessizce yutuyor — DB'nin günlük limiti tetiklendiğinde kullanıcıya hata
+göstermiyor (UI zaten optimistic olarak "Sallandı ✓" gösteriyor).
+
+Geriye şu iki SQL migration'ı SQL Editor'de çalıştırman kalıyor:
+
+### 1. Nudge'ı günde bir kişiye bir kere ile sınırla
+
+```sql
+create unique index if not exists nudges_one_per_recipient_per_day
+  on nudges (from_user, to_user, ((created_at at time zone 'utc')::date));
+```
+
+Bu olmadan `insertNudge`'a hiçbir hız sınırı yok — push artık gerçekten
+gittiği için biri aynı kişiye dakikada onlarca "El salla 👋" bildirimi
+gönderebilirdi. `(created_at at time zone 'utc')::date` kullanmak zorunludur
+(`date_trunc` gibi session-timezone'a bağlı ifadeler Postgres'te index
+expression'ı olarak IMMUTABLE sayılmıyor, bu explicit UTC dönüşümü sayılıyor).
+
+### 2. Davet kodunu güçlendir (brute-force riski)
+
+Şu anki varsayılan (Ek A) `substr(md5(random()::text),1,6)` — yalnızca 6 hex
+karakter, ~16.7 milyon olası kombinasyon. `get_challenge_preview` ve
+`join_challenge_by_code` herkese açık RPC'ler olduğu için bu, otomatik bir
+scriptle taranabilecek kadar küçük bir alan — biri rastgele kodlar deneyip
+başkalarının challenge'ına (ve o challenge'ın check-in geçmişi, katılımcı
+isimleri, sohbeti gibi verilerine) katılabilir.
+
+```sql
+-- Yeni challenge'lar için varsayılanı büyüt (10 hex karakter, ~1 trilyon kombinasyon):
+alter table challenges
+  alter column invite_code set default substr(md5(random()::text || clock_timestamp()::text), 1, 10);
+```
+
+> Mevcut challenge'ların kodları **değişmiyor** (yalnızca yeni oluşturulanlar
+> için varsayılan büyüyor) — istersen ayrıca eskilerini de
+> `update challenges set invite_code = substr(md5(random()::text || id::text), 1, 10);`
+> ile yenileyebilirsin, ama bu paylaşılmış eski davet linklerini kıracağı için
+> zorunlu değil.
+
+- [ ] 🔑 **Ayrıca doğrula:** Supabase Dashboard → Settings → API'de rate
+      limiting'in açık olduğunu kontrol et — kod alanı büyüse de sınırsız
+      istek atılabiliyorsa brute-force yine de (çok daha yavaş) mümkün kalır.
+
+## Ek L — Hesap silme (App Store zorunluluğu)
+
+**Neden gerekli:** App Store Review Guideline 5.1.1(v) — uygulamada hesap
+oluşturma varsa (bizde var: Apple/anonim giriş), uygulama **içinde** hesabı
+silme yolu da olmalı. Bu olmadan review reddedilir.
+
+**Tasarım:** Bir kullanıcı hesabını silince onun **kendi** satırları (katılımcılık,
+check-in'leri, mesajları, tepkileri, nudge'ları, oy'ları, push token'ı)
+kalıcı olarak siliniyor. Ama başkalarının hâlâ katıldığı bir challenge'ı o
+kişi kurmuşsa, challenge'ın kendisi **silinmiyor** — `owner_id` `null`'a
+çekiliyor, grup için hiçbir şey kaybolmuyor. Silinen kullanıcı, kurduğu
+challenge'ın TEK katılımcısıysa (herkes zaten ayrılmışsa) o challenge da
+tamamen temizleniyor.
+
+Kod zaten repoda:
+[`supabase/functions/delete-account/index.ts`](../supabase/functions/delete-account/index.ts)
+(çağıranın kendi JWT'siyle kimliği doğrulanıyor — `check-in` fonksiyonuyla
+aynı desen), istemci tarafı `src/hooks/useAuth.ts`'teki `deleteAccount()` ve
+Ayarlar'daki "Hesabı sil" satırı (`app/(main)/settings.tsx`) da hazır.
+
+### Deploy
+
+```powershell
+supabase functions deploy delete-account
+```
+
+`--no-verify-jwt` **kullanma** — bu fonksiyonu yalnızca giriş yapmış
+kullanıcılar, kendi hesapları için çağırabilmeli;
+`supabase.functions.invoke('delete-account')` zaten aktif oturumun token'ını
+otomatik ekliyor.
+
+### Doğrulama
+
+Ayarlar → "Hesabı sil" → onay diyaloğu → hesap gerçekten silinir (Supabase
+Dashboard → Authentication → Users'ta artık görünmez), uygulama Welcome
+ekranına döner. Grup halindeki bir challenge'da SADECE hesabını silen
+kişinin katılımcılığı/check-in'leri/mesajları kayboluyor, diğer katılımcılar
+ve challenge'ın kendisi olduğu gibi kalıyor.

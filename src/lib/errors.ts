@@ -1,3 +1,5 @@
+import { FunctionsHttpError } from '@supabase/supabase-js';
+
 /**
  * Supabase errors (PostgrestError, AuthError, FunctionsHttpError) are plain
  * objects with a `.message` field — they are NOT `instanceof Error`. Using
@@ -15,4 +17,17 @@ export function errMessage(e: unknown): string {
   } catch {
     return String(e);
   }
+}
+
+/** Pull the real `{ error }` JSON body out of a failed Edge Function call. */
+export async function edgeFunctionError(e: unknown): Promise<Error> {
+  if (e instanceof FunctionsHttpError) {
+    try {
+      const body = await e.context.json();
+      if (body?.error) return new Error(body.error as string);
+    } catch {
+      // fall through to the generic message below
+    }
+  }
+  return e instanceof Error ? e : new Error(String(e));
 }

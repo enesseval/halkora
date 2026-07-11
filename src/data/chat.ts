@@ -85,5 +85,8 @@ export async function insertNudge(challengeId: string, toUserId: string): Promis
   const { error } = await supabase
     .from('nudges')
     .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId });
-  if (error) throw error;
+  // 23505 = unique violation — the DB's own "one nudge per person per day"
+  // limit (docs/PHASE2-SUPABASE.md "Ek K") already tripped; not a real error,
+  // the UI already shows the nudge as sent.
+  if (error && error.code !== '23505') throw error;
 }

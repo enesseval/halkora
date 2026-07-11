@@ -83,8 +83,9 @@ function Group({ children }: { children: React.ReactNode }) {
 export default function SettingsScreen() {
   const router = useRouter();
   const { open } = useMomentumDemo();
-  const { configured, name, isAnonymous, linkAppleIdentity, signOut, resetOnboarding } = useAuth();
+  const { configured, name, isAnonymous, linkAppleIdentity, signOut, deleteAccount, resetOnboarding } = useAuth();
   const [linking, setLinking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -117,6 +118,29 @@ export default function SettingsScreen() {
     } else {
       router.replace('/welcome');
     }
+  };
+
+  const runDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteAccount(); // guard routes to /welcome once the session clears
+    } catch (e) {
+      Alert.alert('Silinemedi', errMessage(e));
+      setDeleting(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (deleting) return;
+    Alert.alert(
+      'Hesabını sil?',
+      'Bu geri alınamaz. Katılımcılığın, check-in\'lerin, mesajların kalıcı olarak silinir. Kurduğun challenge\'lar grubun diğer üyeleri için kalmaya devam eder.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Hesabı sil', style: 'destructive', onPress: runDelete },
+      ],
+    );
   };
 
   return (
@@ -213,6 +237,18 @@ export default function SettingsScreen() {
             Çıkış yap
           </AppText>
         </Pressable>
+
+        {configured ? (
+          <Pressable
+            onPress={confirmDelete}
+            disabled={deleting}
+            style={({ pressed }) => ({ alignItems: 'center', paddingBottom: 22, opacity: pressed || deleting ? 0.6 : 1 })}
+          >
+            <AppText variant="secondary" color={colors.joker}>
+              {deleting ? 'Siliniyor…' : 'Hesabı sil'}
+            </AppText>
+          </Pressable>
+        ) : null}
 
         <AppText variant="meta" color={colors.textTertiary} tabular style={{ textAlign: 'center' }}>
           Sürüm 1.0.2

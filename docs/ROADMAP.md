@@ -148,20 +148,24 @@ ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
 
 ### 🟠 Güvenlik — orta vadeli
 
-- [ ] 🧑‍💻 **Nudge spam'i:** `insertNudge`'da hız sınırı yok; push tetiklediği
+- [x] 🧑‍💻 **Nudge spam'i:** `insertNudge`'da hız sınırı yoktu; push tetiklediği
       için biri aynı kişiye dakikada onlarca "El salla 👋" bildirimi
-      gönderebilir. Sunucu tarafında "aynı kişiye günde 1 nudge" kısıtı
-      (unique index veya RPC kontrolü) gerekiyor.
+      gönderebilirdi. Sunucu tarafında "aynı kişiye günde 1 nudge" kısıtı
+      eklendi (unique index — `docs/PHASE2-SUPABASE.md` "Ek K", SQL Editor'de
+      çalıştırman gerekiyor).
 - [ ] 🔑 **Davet kodu brute-force riski:** `get_challenge_preview` herkese
-      açık bir RPC. Kod üretiminin yeterince rastgele olduğunu doğrula +
-      Supabase Dashboard'da API rate limit ayarlarının açık olduğundan emin ol.
+      açık bir RPC. Kod uzunluğu 6 hex karakterden 10'a çıkarıldı (Ek K —
+      SQL Editor'de çalıştırman gerekiyor), ayrıca Supabase Dashboard'da API
+      rate limit ayarlarının açık olduğunu doğrulaman gerekiyor.
 - [x] 🧑‍💻 **Çıkışta push token temizlenmiyordu:** `signOut()` artık çıkıştan
       önce `push_tokens` satırını siliyor — kullanıcı çıkış yaptığında cihaz o
       hesabın bildirimlerini almayı bırakıyor (push_token tablosu taşınırken
       bonus olarak düzeltildi).
-- [ ] 🔑 **Hesap silme akışı yok:** App Store, hesap oluşturma varsa
-      uygulama-içi hesap silmeyi zorunlu kılıyor. Faz 5'ten önce eklenmeli
-      (Supabase'de `delete_account` RPC + auth kullanıcı silme).
+- [x] 🧑‍💻 **Hesap silme akışı yoktu:** App Store, hesap oluşturma varsa
+      uygulama-içi hesap silmeyi zorunlu kılıyor. `supabase/functions/delete-account`
+      + Ayarlar'da "Hesabı sil" satırı eklendi — kendi verini siliyor, başkalarının
+      hâlâ katıldığı kurduğun challenge'lar grup için kalmaya devam ediyor
+      (`docs/PHASE2-SUPABASE.md` "Ek L" — deploy etmen gerekiyor, 🔑).
 
 ### 🟡 Tutarlılık
 
