@@ -10,7 +10,10 @@
     "backgroundColor": "#0D0E11",
     "ios": {
       "supportsTablet": true,
-      "associatedDomains": ["applinks:halkora.app"]
+      "associatedDomains": [
+        "applinks:halkora.app"
+      ],
+      "bundleIdentifier": "com.anonymous.halkora"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,13 +23,24 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.POST_NOTIFICATIONS"],
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "https", "host": "halkora.app", "pathPrefix": "/j" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "https",
+              "host": "halkora.app",
+              "pathPrefix": "/j"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -44,6 +58,13 @@
           "color": "#FF6B47"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "360576a5-9684-4fcd-9092-fbd6565027b3"
+      }
+    },
+    "owner": "enesseval"
   }
 }

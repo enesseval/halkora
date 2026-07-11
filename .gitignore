@@ -1,5 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+appledev.txt
+AuthKey_T4WLX32KF5.p8
+
 # dependencies
 node_modules/
 
