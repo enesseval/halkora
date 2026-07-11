@@ -44,7 +44,7 @@ export default function WelcomeScreen() {
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ProgressRing totalDays={12} days={LOGO_DAYS} size="L" />
         <AppText variant="hero" style={{ marginTop: 32 }}>
-          The Challenge
+          Halkora
         </AppText>
         <AppText
           variant="body"

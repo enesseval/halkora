@@ -8,7 +8,7 @@ import { AppText, Button } from './ui';
 /** "Daveti paylaş" button + a real, working copy-link row. Used by E4 (invite) and Detail (upcoming). */
 export function InviteShare({ inviteCode, title }: { inviteCode: string; title: string }) {
   const [copied, setCopied] = useState(false);
-  const link = `thechallenge.app/j/${inviteCode}`;
+  const link = `halkora.app/j/${inviteCode}`;
 
   const share = () => {
     Share.share({ message: `"${title}" challenge'ına katıl: ${link}` }).catch(() => {});
