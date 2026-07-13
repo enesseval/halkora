@@ -130,6 +130,10 @@ function DayInput({
   );
 }
 
+// ProgressRing draws one SVG path segment per day — an unbounded custom count
+// (the input allowed up to 999) made that render cost unbounded too.
+const MAX_CUSTOM_DAYS = 100;
+
 const DAY_OPTIONS = [7, 30];
 const JOKER_OPTIONS = [
   { v: 0, label: 'Yok' },
@@ -211,8 +215,13 @@ export default function CreateScreen() {
     setDaysText('');
   };
   const changeCustomDays = (raw: string) => {
-    setDaysText(raw);
     const n = parseInt(raw, 10);
+    if (!Number.isNaN(n) && n > MAX_CUSTOM_DAYS) {
+      setDaysText(String(MAX_CUSTOM_DAYS));
+      setTotalDays(MAX_CUSTOM_DAYS);
+      return;
+    }
+    setDaysText(raw);
     if (!Number.isNaN(n) && n > 0) setTotalDays(n);
   };
   const today = new Date();

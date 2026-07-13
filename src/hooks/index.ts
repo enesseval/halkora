@@ -66,8 +66,12 @@ export function useChallengesQuery() {
     enabled: isSupabaseConfigured,
     // Polling fallback so other people's check-ins/joins show up while this
     // screen is open even if the Realtime subscription (or its Supabase
-    // project setup) isn't delivering events.
-    refetchInterval: isSupabaseConfigured ? 5000 : false,
+    // project setup) isn't delivering events. This queries every check-in
+    // ever made on every one of the user's challenges, so keep the interval
+    // wide — 12s is still "feels live" without hammering the DB every 5s.
+    // Safe to widen further (e.g. 30s) once Ek D's Realtime publication step
+    // is confirmed actually firing in the project.
+    refetchInterval: isSupabaseConfigured ? 12_000 : false,
   });
 
   useEffect(() => {
@@ -329,8 +333,9 @@ export function useChallengeMessages(id: string | undefined) {
     enabled: isSupabaseConfigured && !!id,
     // Same polling fallback as useTodayStatus — new messages/reactions from
     // others show up within a few seconds even without a working Realtime
-    // subscription.
-    refetchInterval: isSupabaseConfigured && !!id ? 4000 : false,
+    // subscription. Widened from 4s; a chat screen is actively open when
+    // this runs so it stays a bit tighter than the challenges-list poll.
+    refetchInterval: isSupabaseConfigured && !!id ? 8_000 : false,
   });
   useEffect(() => {
     if (!isSupabaseConfigured || !id || !data) return;

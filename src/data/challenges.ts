@@ -17,6 +17,12 @@ export async function insertChallenge(
   input: CreateChallengeInput,
   userId: string,
 ): Promise<InsertedChallenge> {
+  // The creator's own device timezone becomes this challenge's single source
+  // of truth for "what day is it" — written once here, then read back by the
+  // client (mapRow), the `check-in` Edge Function, and the join-window RPCs
+  // (docs/PHASE2-SUPABASE.md "Ek F"/"Ek M") so every participant, regardless
+  // of their own device's timezone, agrees on the same day boundary.
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data, error } = await supabase
     .from('challenges')
     .insert({
@@ -24,8 +30,8 @@ export async function insertChallenge(
       title: input.title,
       daily_action: input.dailyAction,
       total_days: input.totalDays,
-      start_date:
-        input.startDateISO ?? new Date().toISOString().slice(0, 10),
+      start_date: input.startDateISO ?? todayInTimezone(timezone),
+      timezone,
       status: input.startTomorrow ? 'upcoming' : 'active',
       joker_allowance: input.joker ?? 1,
       first_day_join_only: input.firstDayJoinOnly ?? false,
@@ -63,6 +69,7 @@ interface ChallengeRow {
   daily_action: string;
   total_days: number;
   start_date: string;
+  timezone: string;
   status: string;
   invite_code: string;
   joker_allowance: number;
@@ -100,11 +107,33 @@ function utcDateOf(iso: string): string {
   return iso.slice(0, 10);
 }
 
-/** Whole days from `startISO` (local midnight) to today. 0 === starts today. */
-function daysSinceStart(startISO: string): number {
-  const start = new Date(`${startISO}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+/** Today's date ("YYYY-MM-DD") as seen in `timezone` — used once at challenge
+ * creation so `start_date` agrees with the `timezone` column being written
+ * alongside it, instead of falling back to a UTC slice that can be off by a
+ * day from the creator's actual local date. */
+function todayInTimezone(timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/** Whole days from `startISO` to today, both read in the CHALLENGE's own
+ * timezone — not the viewing device's clock. Must match the `check-in` Edge
+ * Function's day math (docs/PHASE2-SUPABASE.md "Ek F") exactly, or a
+ * participant in a different timezone than the challenge can see "bugün
+ * işaretlenebilir" on screen and get rejected server-side. 0 === starts today. */
+function daysSinceStart(startISO: string, timezone: string): number {
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date()); // "YYYY-MM-DD"
+  const start = new Date(`${startISO}T00:00:00Z`);
+  const today = new Date(`${todayStr}T00:00:00Z`);
   return Math.round((today.getTime() - start.getTime()) / 86_400_000);
 }
 
@@ -122,7 +151,7 @@ function mapRow(
   nudgedToday: Set<string>,
   stake?: StakeRow,
 ): Challenge {
-  const diff = daysSinceStart(row.start_date);
+  const diff = daysSinceStart(row.start_date, row.timezone);
   const rawDay = diff + 1; // day 1 == start day
   const dateBasedStatus: Challenge['status'] =
     rawDay <= 0 ? 'upcoming' : rawDay > row.total_days ? 'completed' : 'active';
@@ -269,7 +298,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
     supabase
       .from('challenges')
       .select(
-        'id, title, daily_action, total_days, start_date, status, invite_code, joker_allowance, first_day_join_only',
+        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only',
       )
       .in('id', ids),
     supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),

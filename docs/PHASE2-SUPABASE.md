@@ -505,9 +505,13 @@ begin
   if not public.is_member(p_challenge_id) then
     raise exception 'Bu challenge''in üyesi değilsin.';
   end if;
-  update challenges
-  set start_date = current_date, status = 'active'
-  where id = p_challenge_id;
+  -- current_date is the DB SESSION's date (server/UTC), not the challenge's
+  -- own timezone column — used the challenge's timezone instead so a restart
+  -- always lands on the day this specific group actually sees as "today"
+  -- (matches the check-in Edge Function's day math, Ek F).
+  update challenges c
+  set start_date = (now() at time zone c.timezone)::date, status = 'active'
+  where c.id = p_challenge_id;
 end;
 $$;
 grant execute on function public.restart_challenge(uuid) to authenticated;
@@ -523,6 +527,17 @@ end;
 $$;
 grant execute on function public.end_challenge_early(uuid) to authenticated;
 ```
+
+> 🔑 **Güncelleme (gün sınırı tutarlılığı):** `restart_challenge` yukarıdaki
+> haliyle değiştiyse SQL Editor'de tekrar çalıştırman gerekiyor (`create or
+> replace function` zaten var olanı değiştirir, `restart_challenge`'ın dönüş
+> tipi değişmedi, `get_challenge_preview`'daki gibi önce `drop` etmene gerek
+> yok). Ayrıca `insertChallenge` artık challenge'ı oluşturan cihazın kendi
+> saat dilimini `timezone` kolonuna yazıyor (`Europe/Istanbul` default'una
+> güvenmek yerine) — bu, istemcinin "bugün kaçıncı gün" hesabını da artık
+> cihazın yerel saatinden değil, challenge'ın kendi `timezone`'undan yapmasıyla
+> birleşince, farklı saat diliminde biri ekranda "bugün işaretlenebilir"
+> görüp sunucudan ret yeme sorununu ortadan kaldırıyor.
 
 > ⚠️ Bilinen eksik: E9 (Bitiş & Kutlama) ekranındaki `finishStats` (kişi/check-in/
 > tamamlama %) ve katılımcı sıralaması hâlâ yalnızca **mock arşiv verisinde**

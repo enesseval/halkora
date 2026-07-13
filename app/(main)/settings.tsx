@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import { Feather } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
@@ -67,7 +68,9 @@ function Row({
           {value}
         </AppText>
       ) : null}
-      <Feather name="chevron-right" size={18} color={colors.textTertiary} />
+      {/* Only a row with a real action looks tappable — otherwise the chevron
+       * promises an interaction that never happens. */}
+      {onPress ? <Feather name="chevron-right" size={18} color={colors.textTertiary} /> : null}
     </Pressable>
   );
 }
@@ -163,8 +166,8 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.section }}>
-        {/* profile */}
-        <Pressable
+        {/* profile — informational only, no edit action yet */}
+        <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -183,8 +186,7 @@ export default function SettingsScreen() {
               {displayName}
             </AppText>
           </View>
-          <Feather name="chevron-right" size={18} color={colors.textTertiary} />
-        </Pressable>
+        </View>
 
         <View style={{ marginTop: 20 }}>
           <Group>
@@ -261,7 +263,7 @@ export default function SettingsScreen() {
         ) : null}
 
         <AppText variant="meta" color={colors.textTertiary} tabular style={{ textAlign: 'center' }}>
-          Sürüm 1.0.2
+          Sürüm {Constants.expoConfig?.version ?? '—'}
         </AppText>
       </ScrollView>
     </Screen>

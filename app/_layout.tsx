@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform, View } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -7,7 +7,7 @@ import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { colors } from '@/theme/tokens';
 import { useAuth, useAuthInit, useSyncPushToken } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
@@ -15,6 +15,18 @@ import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvi
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient();
+
+// react-query's polling (refetchInterval) only pauses itself when it thinks
+// the app isn't "focused" — on web that's tab visibility, but on native
+// nothing reports that by default, so the Home/Detail/chat polls kept
+// hitting Supabase every few seconds even with the app fully backgrounded.
+// Wiring AppState in makes refetchIntervalInBackground's default (false)
+// actually take effect on iOS/Android.
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', (state) => {
+    focusManager.setFocused(state === 'active');
+  });
+}
 
 /**
  * Auth-aware routing:

@@ -236,7 +236,7 @@ export const useMockStore = create<MockState>((set, get) => ({
         ? input.startsLabel ?? 'Yarın başlıyor'
         : undefined,
       meCheckedInToday: false,
-      jokerRemaining: 1,
+      jokerRemaining: input.joker ?? 1,
       hasMissedYesterday: false,
       inviteCode: override?.inviteCode ?? id.slice(-6),
       scheduleSummary: `${input.dailyAction || 'Günlük hedef'} · ${input.totalDays} gün`,
