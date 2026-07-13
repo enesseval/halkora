@@ -65,11 +65,12 @@ export function useChallengesQuery() {
     queryKey: MY_CHALLENGES_KEY,
     queryFn: fetchMyChallenges,
     enabled: isSupabaseConfigured,
-    // Pure fallback now that useRealtimeMyChallenges pushes updates the
-    // instant anyone check-ins/joins/leaves — this only matters if Ek D's
-    // Realtime publication step was never run for this project, or the
-    // websocket briefly drops. 25s is plenty for "eventually consistent".
-    refetchInterval: isSupabaseConfigured ? 25_000 : false,
+    // Pure reconciliation safety net now that useRealtimeMyChallenges pushes
+    // updates the instant anyone check-ins/joins/leaves — this only matters
+    // if the websocket silently drops (network switch, background/foreground)
+    // or Ek D's publication step isn't actually enabled. 60s is fine for
+    // "catch up eventually"; it's not the primary way data gets fresh anymore.
+    refetchInterval: isSupabaseConfigured ? 60_000 : false,
   });
 
   useEffect(() => {
@@ -329,11 +330,11 @@ export function useChallengeMessages(id: string | undefined) {
     queryKey: messagesKey(id ?? ''),
     queryFn: () => fetchMessages(id as string),
     enabled: isSupabaseConfigured && !!id,
-    // Same polling fallback as useTodayStatus — new messages/reactions from
-    // others show up within a few seconds even without a working Realtime
-    // subscription. Widened from 4s; a chat screen is actively open when
-    // this runs so it stays a bit tighter than the challenges-list poll.
-    refetchInterval: isSupabaseConfigured && !!id ? 8_000 : false,
+    // Same reconciliation-safety-net role as useChallengesQuery's poll —
+    // useRealtimeChallenge already pushes new messages/reactions instantly
+    // over the websocket. This is only the backstop for a dropped connection
+    // or a project where Ek D's publication step isn't enabled.
+    refetchInterval: isSupabaseConfigured && !!id ? 20_000 : false,
   });
   useEffect(() => {
     if (!isSupabaseConfigured || !id || !data) return;
