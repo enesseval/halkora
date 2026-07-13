@@ -316,12 +316,21 @@ export function useChallengeMessages(id: string | undefined) {
   useEffect(() => {
     if (!isSupabaseConfigured || !id || !data) return;
     everHadData.current = true;
-    // Guard against a stale in-flight fetch (started before a send) resolving
-    // *after* an optimistic local append and wiping it out — only apply
-    // server data when it's not behind what's already showing locally.
+    // Keep any not-yet-confirmed local bubble (id `local-...`) that the server
+    // hasn't echoed back yet. A plain "replace with server data" can lose a
+    // just-sent message even after insertMessage() succeeded: two concurrent
+    // fetches for the same challenge (the 4s poll + the post-send invalidate)
+    // can resolve out of order, so a response whose DB snapshot was taken
+    // *before* the insert committed can arrive *after* the correct one and
+    // wipe it. Once a matching row shows up in `data`, drop the local
+    // placeholder in favor of the real (server-id) one.
     const current = useMockStore.getState().challenges.find((c) => c.id === id);
-    if (current && data.length < current.messages.length) return;
-    setMessages(id, data);
+    const stillPending = (current?.messages ?? []).filter(
+      (m) =>
+        m.id.startsWith('local-') &&
+        !data.some((d) => d.mine && d.text === m.text && d.dayNumber === m.dayNumber),
+    );
+    setMessages(id, stillPending.length ? [...data, ...stillPending] : data);
   }, [data, id, setMessages]);
 
   return {
@@ -498,8 +507,9 @@ export function useCreateChallenge() {
   return async (input: CreateChallengeInput): Promise<string> => {
     if (isSupabaseConfigured) {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (user) {
         try {
           const row = await insertChallenge(input, user.id);

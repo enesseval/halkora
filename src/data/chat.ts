@@ -12,9 +12,13 @@ interface MessageRow {
 
 /** Messages + reaction counts for one challenge, newest last. */
 export async function fetchMessages(challengeId: string): Promise<Message[]> {
+  // getSession() (local, no network) instead of getUser() (network round-trip
+  // every call) — this runs on every 4s poll, and a slow/flaky getUser() call
+  // used to make "mine" detection unreliable and slowed the whole poll down.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
 
   const { data: msgs, error } = await supabase
     .from('messages')
@@ -56,8 +60,9 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
 
 export async function insertMessage(challengeId: string, dayNumber: number, text: string): Promise<void> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) throw new Error('Oturum bulunamadı.');
   const { error } = await supabase
     .from('messages')
@@ -67,8 +72,9 @@ export async function insertMessage(challengeId: string, dayNumber: number, text
 
 export async function insertReaction(messageId: string, emoji: string): Promise<void> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) throw new Error('Oturum bulunamadı.');
   const { error } = await supabase
     .from('message_reactions')
@@ -79,8 +85,9 @@ export async function insertReaction(messageId: string, emoji: string): Promise<
 
 export async function insertNudge(challengeId: string, toUserId: string): Promise<void> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) throw new Error('Oturum bulunamadı.');
   const { error } = await supabase
     .from('nudges')

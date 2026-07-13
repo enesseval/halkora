@@ -33,8 +33,9 @@ export async function insertCheckIn(
 /** Undo — removes the check-in this device just added (own row only, RLS-scoped). */
 export async function deleteCheckIn(challengeId: string, dayNumber: number): Promise<void> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) throw new Error('Oturum bulunamadı.');
   const participantId = await myParticipantId(challengeId, user.id);
 

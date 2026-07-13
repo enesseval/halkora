@@ -240,9 +240,15 @@ function mapRow(
 
 /** Challenges the current user participates in, mapped to the UI shape. */
 export async function fetchMyChallenges(): Promise<Challenge[]> {
+  // getSession() reads the already-verified session from local storage —
+  // getUser() makes a real network round-trip every call, and this runs on
+  // every 5s poll (Home + Detail). Any transient hiccup there used to make
+  // "no user yet" look identical to "no challenges", wiping the list for a
+  // cycle (flash of "Challenge bulunamadı" / stale-then-empty Home).
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) return [];
 
   const { data: mine, error: e1 } = await supabase
