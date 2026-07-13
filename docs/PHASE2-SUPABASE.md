@@ -402,14 +402,22 @@ create policy "read member nudges" on nudges
 ```
 
 **Realtime'ı açman gerekiyor** — yoksa `postgres_changes` aboneliği hiç tetiklenmez.
-Supabase Dashboard → **Database → Replication** → `supabase_realtime` publication'a
-şu tabloları ekle (toggle ile), ya da SQL Editor'de:
+En güvenilir yol SQL Editor'de bunu çalıştırmak (dashboard'daki toggle'ları aramaya
+gerek yok, herhangi bir compute tier'da çalışır):
 
 ```sql
-alter publication supabase_realtime add table check_ins, messages, message_reactions, participants;
+alter publication supabase_realtime add table check_ins, messages, message_reactions, participants, challenges;
 ```
 
-> Zaten "All tables" seçiliyse bu adıma gerek yok — dashboard'da kontrol et.
+> Zaten "All tables" seçiliyse bu adıma gerek yok — SQL Editor'de
+> `select * from pg_publication_tables where pubname = 'supabase_realtime';`
+> ile hangi tabloların zaten ekli olduğunu görebilirsin.
+>
+> ⚠️ Dashboard'da **Database → Replication** sayfasına girip "Small compute
+> gerekiyor" gibi bir uyarı görürsen o **Read Replicas** (ayrı, ücretli bir
+> bölgesel ölçekleme özelliği) ile ilgili — bizim kullandığımız Realtime
+> publication'la alakası yok, o yüzden bu uyarıyı görmezden gelip yukarıdaki
+> SQL'i çalıştırman yeterli.
 
 Detay ekranı artık her açılışta bir `postgres_changes` kanalına abone oluyor
 (`useRealtimeChallenge`): biri check-in yapınca, katılınca, mesaj/tepki atınca
