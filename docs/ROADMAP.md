@@ -169,29 +169,36 @@ ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
 
 ### 🟡 Tutarlılık
 
-- [ ] 🧑‍💻 **Gün sınırı iki farklı yerde iki farklı şekilde hesaplanıyor:**
-      istemci (`daysSinceStart`) cihazın yerel gece yarısını, `check-in` Edge
-      Function ise challenge'ın `timezone` kolonunu kullanıyor; `insertChallenge`
-      ise timezone'u hiç yazmıyor (DB default'una kalıyor). Farklı saat
-      diliminde biri ekranda "bugün işaretlenebilir" görüp sunucudan ret
-      yiyebilir — tek doğruluk kaynağı seçilmeli.
-- [ ] 🧑‍💻 Mock `createChallenge` joker seçimini yok sayıyor
-      (`jokerRemaining: 1` sabit) — gerçek yol doğru, yalnızca mock modda tutarsız.
-- [ ] 🧑‍💻 Ayarlar'da "Sürüm 1.0.2" elle yazılmış, `app.json` 1.0.0 diyor —
-      `expo-constants`'tan (`Constants.expoConfig?.version`) okunmalı.
-- [ ] 🧑‍💻 Ayarlar'daki profil kartı + "İsim" satırı chevron'lu görünüyor ama
-      hiçbir aksiyon yok — ya isim düzenleme akışı bağlanmalı ya chevron kaldırılmalı.
+- [x] 🧑‍💻 **Gün sınırı iki farklı yerde iki farklı şekilde hesaplanıyordu:**
+      `insertChallenge` artık cihazın gerçek IANA timezone'unu `timezone`
+      kolonuna yazıyor (DB default'una güvenmek yerine), istemci
+      (`daysSinceStart`) artık challenge'ın kendi `timezone`'unu okuyor
+      (cihaz yerel gece yarısı yerine), `restart_challenge` RPC'si de
+      `current_date` (DB session/UTC) yerine aynı timezone'u kullanıyor —
+      client + check-in Edge Function + join-window RPC'leri artık aynı günü
+      görüyor (`docs/PHASE2-SUPABASE.md` "Ek G" güncellemesi — SQL Editor'de
+      tekrar çalıştırman gerekiyor, 🔑).
+- [x] 🧑‍💻 Mock `createChallenge` artık step 3'te seçilen joker sayısını
+      kullanıyor (`input.joker ?? 1`) — gerçek yolla tutarlı.
+- [x] 🧑‍💻 Ayarlar'da sürüm artık `expo-constants`'tan (`Constants.expoConfig?.version`)
+      okunuyor, elle yazılmış string kalmadı.
+- [x] 🧑‍💻 Ayarlar'daki profil kartı + "İsim" satırı — aksiyonu olmayan
+      satırlar artık chevron göstermiyor (isim düzenleme akışı henüz yok).
 
 ### 🟢 Performans
 
-- [ ] 🧑‍💻 **`fetchMyChallenges` her 5 saniyede TÜM check-in geçmişini
-      çekiyor** — challenge/katılımcı sayısı arttıkça sınırsız büyüyen bir
-      sorgu. Poll aralığını büyüt + uygulama arka plandayken durdur
-      (`AppState`), uzun vadede özet hesaplamayı bir SQL view/RPC'ye taşı.
-- [ ] 🧑‍💻 Sohbet 4 saniyede bir polling yapıyor — Realtime aboneliği
-      doğrulandıktan sonra bu yalnızca fallback'e (ör. 30sn) düşürülmeli.
-- [ ] 🧑‍💻 Özel gün sayısı 999'a kadar girilebiliyor, `ProgressRing` her gün
-      için ayrı SVG path çiziyor — makul bir üst sınır (ör. 100) konmalı.
+- [x] 🧑‍💻 **`fetchMyChallenges` her 5 saniyede TÜM check-in geçmişini
+      çekiyordu** — poll aralığı 12sn'ye çıkarıldı, `AppState` artık
+      react-query'nin `focusManager`'ına bağlı olduğu için uygulama
+      arka plandayken poll'lar duruyor (önceden yalnızca web sekme
+      görünürlüğü bunu yapıyordu). Özet hesaplamayı bir SQL view/RPC'ye
+      taşımak hâlâ uzun vadeli bir iyileştirme olarak duruyor.
+- [x] 🧑‍💻 Sohbet poll'u 4sn'den 8sn'ye çıkarıldı + aynı `AppState` durdurma
+      mantığından faydalanıyor. Realtime'ın (Ek D) gerçekten tetiklendiği
+      doğrulanınca 30sn'ye kadar daha da genişletilebilir.
+- [x] 🧑‍💻 Özel gün sayısı artık 100 ile sınırlı (önceden 999'a kadar
+      girilebiliyordu) — `ProgressRing`'in her gün için ayrı SVG path
+      çizme maliyeti artık sınırsız büyümüyor.
 
 ### 💡 Özellik önerileri
 
