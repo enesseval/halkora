@@ -13,7 +13,10 @@
       "associatedDomains": [
         "applinks:halkora.app"
       ],
-      "bundleIdentifier": "com.anonymous.halkora"
+      "bundleIdentifier": "com.anonymous.halkora",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption":false
+      }
     },
     "android": {
       "adaptiveIcon": {
