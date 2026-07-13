@@ -59,19 +59,17 @@ export const MY_CHALLENGES_KEY = ['challenges', 'mine'] as const;
 export function useChallengesQuery() {
   const setChallenges = useMockStore((s) => s.setChallenges);
   const everHadData = useRef(false);
+  useRealtimeMyChallenges();
 
   const query = useQuery({
     queryKey: MY_CHALLENGES_KEY,
     queryFn: fetchMyChallenges,
     enabled: isSupabaseConfigured,
-    // Polling fallback so other people's check-ins/joins show up while this
-    // screen is open even if the Realtime subscription (or its Supabase
-    // project setup) isn't delivering events. This queries every check-in
-    // ever made on every one of the user's challenges, so keep the interval
-    // wide — 12s is still "feels live" without hammering the DB every 5s.
-    // Safe to widen further (e.g. 30s) once Ek D's Realtime publication step
-    // is confirmed actually firing in the project.
-    refetchInterval: isSupabaseConfigured ? 12_000 : false,
+    // Pure fallback now that useRealtimeMyChallenges pushes updates the
+    // instant anyone check-ins/joins/leaves — this only matters if Ek D's
+    // Realtime publication step was never run for this project, or the
+    // websocket briefly drops. 25s is plenty for "eventually consistent".
+    refetchInterval: isSupabaseConfigured ? 25_000 : false,
   });
 
   useEffect(() => {
@@ -372,6 +370,37 @@ export function useChallengeMessages(id: string | undefined) {
     error,
     retry: refetch,
   };
+}
+
+/**
+ * Push-based updates for the "my challenges" list (Home, and anywhere else
+ * useChallengesQuery is read) — a check-in, join, or restart/end-early by
+ * ANYONE on ANY of the user's challenges invalidates the list instantly,
+ * instead of waiting for the next poll. There's no single `challenge_id` to
+ * filter these subscriptions on (this covers every challenge the user is
+ * in), so — same pattern already used for `message_reactions` below —
+ * subscribe unfiltered: Supabase only ever delivers rows the subscriber's
+ * own RLS SELECT policies (Ek B) allow them to see, so this stays scoped to
+ * "my" data. Requires Ek D's `alter publication supabase_realtime add table
+ * ...` to have actually been run — until then this silently does nothing
+ * and the poll below is the only thing keeping the list fresh.
+ */
+function useRealtimeMyChallenges(): void {
+  const queryClient = useQueryClient();
+  const instanceId = useRef(Math.random().toString(36).slice(2)).current;
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const bump = () => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    const channel = supabase
+      .channel(`my-challenges-${instanceId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'check_ins' }, bump)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, bump)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, bump)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, instanceId]);
 }
 
 /**
