@@ -71,6 +71,10 @@ export interface Challenge {
   inviteCode: string;
   scheduleSummary: string; // "Her gün 20 sayfa · 14 gün"
   startsWhen: string; // "Yarın başlıyor"
+  /** Kurucunun seçimi: true ise davet yalnızca 1. gün açık (Ek M). */
+  firstDayJoinOnly: boolean;
+  /** firstDayJoinOnly + 1. gün geçtiyse true — davet artık kapalı. */
+  joinClosed: boolean;
   stake?: Stake;
   participants: Participant[];
   messages: Message[];

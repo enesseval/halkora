@@ -157,6 +157,8 @@ export interface JoinPreview {
   startsWhen: string;
   stakeText?: string;
   participants: { id: string; initials: string; name: string }[];
+  /** Ek M — kurucu daveti "yalnızca ilk gün" ile sınırlamışsa ve o gün geçtiyse true. */
+  joinClosed: boolean;
 }
 
 /**
@@ -188,6 +190,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
         scheduleSummary: '',
         startsWhen: '',
         participants: [],
+        joinClosed: false,
       };
     }
     return {
@@ -205,6 +208,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
         name,
         initials: name.slice(0, 2).toUpperCase(),
       })),
+      joinClosed: data.joinClosed,
     };
   }
 
@@ -219,6 +223,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       scheduleSummary: '',
       startsWhen: '',
       participants: [],
+      joinClosed: false,
     };
   }
   return {
@@ -234,6 +239,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     participants: mock.participants
       .filter((p) => !p.isMe)
       .map((p) => ({ id: p.id, name: p.name, initials: p.initials })),
+    joinClosed: mock.joinClosed,
   };
 }
 

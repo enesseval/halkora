@@ -21,6 +21,8 @@ export interface CreateChallengeInput {
   /** override the "starts" copy (e.g. a custom future date) */
   startsLabel?: string;
   stake?: Stake;
+  /** Ek M — kurucu davet penceresini "yalnızca ilk gün" ile sınırlayabilir. */
+  firstDayJoinOnly?: boolean;
 }
 
 interface MockState {
@@ -242,6 +244,10 @@ export const useMockStore = create<MockState>((set, get) => ({
         ? input.startsLabel ?? 'Yarın 06:00'
         : 'Bugün başladı',
       stake: input.stake,
+      firstDayJoinOnly: input.firstDayJoinOnly ?? false,
+      // Mock data doesn't simulate real elapsed time, so a just-created demo
+      // challenge is never actually closed to new joiners.
+      joinClosed: false,
       participants: [
         {
           id: ME_ID,

@@ -837,3 +837,96 @@ Dashboard → Authentication → Users'ta artık görünmez), uygulama Welcome
 ekranına döner. Grup halindeki bir challenge'da SADECE hesabını silen
 kişinin katılımcılığı/check-in'leri/mesajları kayboluyor, diğer katılımcılar
 ve challenge'ın kendisi olduğu gibi kalıyor.
+
+## Ek M — Katılım penceresi: "sadece ilk gün" seçeneği
+
+**Neden:** Bir challenge başladıktan günler sonra katılan biri, katılmadan
+önceki günlerde "kaçırdı" gibi görünmemeli — ama bunu çözmenin yolu katılımı
+zaman sınırlamak değil (bkz. sohbet: geç katılan biri hâlâ toplam gün
+sayısına göre adil bir yüzde alıyor, çünkü payda hep `total_days`). Bunun
+yerine kurucuya bir seçim bırakıyoruz: **"Sınırsız"** (istediği zaman
+katılabilir, varsayılan — mevcut davranış) veya **"Sadece ilk gün"**
+(challenge'ın 1. günü bitince davet kapanır).
+
+### 1. Şema
+
+```sql
+alter table challenges
+  add column if not exists first_day_join_only boolean not null default false;
+```
+
+### 2. `join_challenge_by_code` — sunucu tarafında zorunlu kıl
+
+İstemci tarafında bir kontrol yeterli değil — biri RPC'yi doğrudan çağırıp
+bypass edebilir. `join_challenge_by_code`'u güncelle (Ek C'deki fonksiyonun
+yerine geçer):
+
+```sql
+create or replace function public.join_challenge_by_code(p_code text)
+returns uuid language plpgsql security definer as $$
+declare
+  v_challenge_id uuid;
+  v_start_date date;
+  v_timezone text;
+  v_restrict boolean;
+  v_current_day int;
+begin
+  select id, start_date, timezone, first_day_join_only
+    into v_challenge_id, v_start_date, v_timezone, v_restrict
+    from challenges where invite_code = p_code;
+  if v_challenge_id is null then
+    raise exception 'Davet kodu bulunamadı';
+  end if;
+
+  if v_restrict then
+    v_current_day := ((now() at time zone v_timezone)::date - v_start_date) + 1;
+    if v_current_day > 1 then
+      raise exception 'Bu challenge''a katılım süresi doldu — yalnızca ilk gün katılım açıktı.';
+    end if;
+  end if;
+
+  insert into participants (challenge_id, user_id)
+  values (v_challenge_id, auth.uid())
+  on conflict (challenge_id, user_id) do nothing;
+
+  return v_challenge_id;
+end;
+$$;
+grant execute on function public.join_challenge_by_code(text) to authenticated;
+```
+
+### 3. `get_challenge_preview` — davet ekranının önceden bilmesi için
+
+```sql
+create or replace function public.get_challenge_preview(p_code text)
+returns table (
+  id uuid,
+  title text,
+  daily_action text,
+  total_days int,
+  start_date date,
+  status text,
+  stake_text text,
+  participant_count int,
+  sample_names text[],
+  join_closed boolean
+) language sql security definer stable as $$
+  select
+    c.id, c.title, c.daily_action, c.total_days, c.start_date, c.status,
+    (select s.text from stakes s where s.challenge_id = c.id limit 1) as stake_text,
+    (select count(*)::int from participants p where p.challenge_id = c.id) as participant_count,
+    (select array_agg(pr.name order by p.joined_at)
+       from participants p join profiles pr on pr.id = p.user_id
+       where p.challenge_id = c.id limit 5) as sample_names,
+    (c.first_day_join_only
+       and ((now() at time zone c.timezone)::date - c.start_date) + 1 > 1) as join_closed
+  from challenges c
+  where c.invite_code = p_code
+  limit 1;
+$$;
+grant execute on function public.get_challenge_preview(text) to anon, authenticated;
+```
+
+Bu SQL'i çalıştırdıktan sonra istemci tarafı zaten hazır (aşağıdaki commit'te):
+create akışında "Katılım" seçimi, davet/join ekranlarında süre dolunca
+gösterilecek mesaj, ve Detay ekranında kapanan daveti gizleme.

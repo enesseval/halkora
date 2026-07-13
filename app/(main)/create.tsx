@@ -227,6 +227,7 @@ export default function CreateScreen() {
   const [stakeMode, setStakeMode] = useState<'direct' | 'vote'>('direct');
   const [stakeText, setStakeText] = useState('');
   const [creating, setCreating] = useState(false);
+  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(false);
 
   const titles = ['Ne yapacaksınız?', 'Kaç gün?', 'Joker hakkı', 'Bahis'];
 
@@ -252,6 +253,7 @@ export default function CreateScreen() {
       joker,
       startsLabel: isToday ? undefined : startsLabel,
       stake: stakeText ? { mode: stakeMode, text: stakeText } : undefined,
+      firstDayJoinOnly,
     });
     router.replace(`/challenge/${id}/invite`);
   };
@@ -411,6 +413,19 @@ export default function CreateScreen() {
                 Başlangıç: {formatLongDate(startDate)}
               </AppText>
             ) : null}
+
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 8 }}>
+              Katılım
+            </AppText>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Chip label="Sınırsız" selected={!firstDayJoinOnly} onPress={() => setFirstDayJoinOnly(false)} />
+              <Chip label="Sadece ilk gün" selected={firstDayJoinOnly} onPress={() => setFirstDayJoinOnly(true)} />
+            </View>
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }}>
+              {firstDayJoinOnly
+                ? 'İlk gün bitince davet kapanır — sonradan katılınamaz.'
+                : 'Herkes istediği zaman katılabilir.'}
+            </AppText>
           </>
         ) : null}
 

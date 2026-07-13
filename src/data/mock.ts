@@ -21,6 +21,8 @@ function p(
 /* Yesterday (day 6) missed, 1 joker remaining → drives E8.             */
 /* ------------------------------------------------------------------ */
 const c1: Challenge = {
+  firstDayJoinOnly: false,
+  joinClosed: false,
   id: 'c1',
   title: '30 Gün Kitap Okuma',
   dailyAction: 'Bugün: 20 sayfa oku',
@@ -83,6 +85,8 @@ const c1: Challenge = {
 /* Challenge 2 — "Şekersiz 14 Gün". Day 3, not done, 2 others done (2/5) */
 /* ------------------------------------------------------------------ */
 const c2: Challenge = {
+  firstDayJoinOnly: false,
+  joinClosed: false,
   id: 'c2',
   title: 'Şekersiz 14 Gün',
   dailyAction: 'Bugün: Şeker yok',
@@ -111,6 +115,8 @@ const c2: Challenge = {
 /* Challenge 3 — "Sabah 06:30 Kulübü". Day 12/21, DONE today (calm card) */
 /* ------------------------------------------------------------------ */
 const c3: Challenge = {
+  firstDayJoinOnly: false,
+  joinClosed: false,
   id: 'c3',
   title: 'Sabah 06:30 Kulübü',
   dailyAction: "Bugün: 06:30'da kalk",
@@ -145,6 +151,8 @@ const c3: Challenge = {
 /* Challenge 4 — "10.000 Adım × 7 Gün". Starts tomorrow, 6 ready.        */
 /* ------------------------------------------------------------------ */
 const c4: Challenge = {
+  firstDayJoinOnly: false,
+  joinClosed: false,
   id: 'c4',
   title: '10.000 Adım × 7 Gün',
   dailyAction: 'Bugün: 10.000 adım',
@@ -175,6 +183,8 @@ const c4: Challenge = {
 /* Archive — completed "30 Gün Kitap Okuma v1" → drives E9.             */
 /* ------------------------------------------------------------------ */
 const archive1: Challenge = {
+  firstDayJoinOnly: false,
+  joinClosed: false,
   id: 'a1',
   title: '30 Gün Kitap Okuma',
   dailyAction: 'Her gün 20 sayfa',

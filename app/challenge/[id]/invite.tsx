@@ -106,7 +106,13 @@ export default function InviteScreen() {
       </Pressable>
 
       <View style={{ marginTop: 24 }}>
-        <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+        {challenge.joinClosed ? (
+          <AppText variant="secondary" color={colors.textTertiary} style={{ textAlign: 'center' }}>
+            Katılım yalnızca ilk gün açıktı, artık kapalı.
+          </AppText>
+        ) : (
+          <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+        )}
       </View>
 
       {/* live joiners */}

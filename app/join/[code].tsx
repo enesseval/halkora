@@ -43,7 +43,7 @@ export default function JoinScreen() {
   const people = preview.participants.map((p) => ({ id: p.id, initials: p.initials }));
 
   const submit = async () => {
-    if (joining || preview.notFound) return;
+    if (joining || preview.notFound || preview.joinClosed) return;
     setJoining(true);
     setErr(null);
     try {
@@ -89,6 +89,22 @@ export default function JoinScreen() {
           </AppText>
           <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
             Link yanlış ya da süresi geçmiş olabilir.
+          </AppText>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (preview.joinClosed) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        {closeButton}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <AppText variant="screenTitle" style={{ fontSize: 22, textAlign: 'center' }}>
+            Bu davetin süresi doldu.
+          </AppText>
+          <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
+            {preview.title} yalnızca ilk günü içinde katılıma açıktı.
           </AppText>
         </View>
       </Screen>

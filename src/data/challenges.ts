@@ -28,6 +28,7 @@ export async function insertChallenge(
         input.startDateISO ?? new Date().toISOString().slice(0, 10),
       status: input.startTomorrow ? 'upcoming' : 'active',
       joker_allowance: input.joker ?? 1,
+      first_day_join_only: input.firstDayJoinOnly ?? false,
     })
     .select('id, invite_code')
     .single();
@@ -65,6 +66,7 @@ interface ChallengeRow {
   status: string;
   invite_code: string;
   joker_allowance: number;
+  first_day_join_only: boolean;
 }
 
 interface ParticipantRow {
@@ -221,6 +223,10 @@ function mapRow(
     inviteCode: row.invite_code,
     scheduleSummary: `${row.daily_action} · ${row.total_days} gün`,
     startsWhen,
+    firstDayJoinOnly: row.first_day_join_only,
+    // Client-side mirror of the join_challenge_by_code RPC's check (Ek M) —
+    // display only, the RPC is what actually enforces it server-side.
+    joinClosed: row.first_day_join_only && currentDay > 1,
     stake: stake ? { mode: stake.mode, text: stake.text ?? '' } : undefined,
     participants,
     messages: [],
@@ -256,7 +262,9 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
   ] = await Promise.all([
     supabase
       .from('challenges')
-      .select('id, title, daily_action, total_days, start_date, status, invite_code, joker_allowance')
+      .select(
+        'id, title, daily_action, total_days, start_date, status, invite_code, joker_allowance, first_day_join_only',
+      )
       .in('id', ids),
     supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),
     supabase
