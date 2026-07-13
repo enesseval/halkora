@@ -73,7 +73,26 @@ export function useChallengesQuery() {
   useEffect(() => {
     if (isSupabaseConfigured && query.data) {
       everHadData.current = true;
-      setChallenges(query.data);
+      const current = useMockStore.getState().challenges;
+      const byId = new Map(query.data.map((c) => [c.id, c]));
+      // Nothing removes a challenge from "my list" (no leave/delete feature)
+      // — a poll/refetch should only ever add to or update it, never shrink
+      // it. A stale/out-of-order response racing with another concurrent
+      // fetch (e.g. a poll whose DB snapshot predates something that just
+      // committed) could otherwise wipe an already-loaded challenge off
+      // Home/Detail for a cycle even though nothing actually changed.
+      const currentIds = new Set(current.map((c) => c.id));
+      // fetchMyChallenges never fetches chat messages (that's the separate
+      // useChallengeMessages poll) — its rows always carry `messages: []`.
+      // Applying it wholesale would stomp whatever the chat poll had just
+      // populated back to empty every 5s, which is exactly what made a
+      // just-sent message flash and then vanish for BOTH sides of the chat.
+      const refreshed = current.map((c) => {
+        const fresh = byId.get(c.id);
+        return fresh ? { ...fresh, messages: c.messages } : c;
+      });
+      const brandNew = query.data.filter((c) => !currentIds.has(c.id));
+      setChallenges([...refreshed, ...brandNew]);
     }
   }, [query.data, setChallenges]);
 
@@ -316,21 +335,29 @@ export function useChallengeMessages(id: string | undefined) {
   useEffect(() => {
     if (!isSupabaseConfigured || !id || !data) return;
     everHadData.current = true;
-    // Keep any not-yet-confirmed local bubble (id `local-...`) that the server
-    // hasn't echoed back yet. A plain "replace with server data" can lose a
-    // just-sent message even after insertMessage() succeeded: two concurrent
-    // fetches for the same challenge (the 4s poll + the post-send invalidate)
-    // can resolve out of order, so a response whose DB snapshot was taken
-    // *before* the insert committed can arrive *after* the correct one and
-    // wipe it. Once a matching row shows up in `data`, drop the local
-    // placeholder in favor of the real (server-id) one.
-    const current = useMockStore.getState().challenges.find((c) => c.id === id);
-    const stillPending = (current?.messages ?? []).filter(
-      (m) =>
-        m.id.startsWith('local-') &&
-        !data.some((d) => d.mine && d.text === m.text && d.dayNumber === m.dayNumber),
+    const currentList = useMockStore.getState().challenges.find((c) => c.id === id)?.messages ?? [];
+    const byId = new Map(data.map((m) => [m.id, m]));
+
+    // Drop a local optimistic bubble (id `local-...`) once its real
+    // (server-id) counterpart has shown up in `data` — matched by author +
+    // text + day, since the ids never match a real db id.
+    const confirmed = new Set(data.filter((d) => d.mine).map((d) => `${d.dayNumber}::${d.text}`));
+    const kept = currentList.filter(
+      (m) => !m.id.startsWith('local-') || !confirmed.has(`${m.dayNumber}::${m.text}`),
     );
-    setMessages(id, stillPending.length ? [...data, ...stillPending] : data);
+
+    // Messages are never deleted server-side — a poll/refetch should only
+    // ever add to (or refresh reaction counts on) the list, never shrink it.
+    // A stale/out-of-order response (racing with another concurrent fetch,
+    // e.g. the 4s poll vs. the post-send/post-reaction invalidate) could
+    // otherwise wipe an already-confirmed message off the screen for a cycle
+    // even though it's safely stored — this hit both the sender's and the
+    // recipient's device, since neither has anything to do with the local
+    // optimistic bubble once a message is truly persisted.
+    const keptIds = new Set(kept.map((m) => m.id));
+    const refreshed = kept.map((m) => byId.get(m.id) ?? m);
+    const brandNew = data.filter((m) => !keptIds.has(m.id));
+    setMessages(id, [...refreshed, ...brandNew]);
   }, [data, id, setMessages]);
 
   return {
