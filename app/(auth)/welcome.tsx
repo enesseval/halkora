@@ -16,7 +16,7 @@ const LOGO_DAYS: SegmentState[] = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { configured, signInWithApple } = useAuth();
+  const { configured, signInWithApple, signInAnonymously } = useAuth();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -68,7 +68,17 @@ export default function WelcomeScreen() {
             anonymous sign-in inside signInWithApple() itself — there is no
             separate "Google" button anymore since it never actually did real
             Google OAuth, it silently signed in anonymously, which is
-            misleading (docs/ROADMAP.md Faz 3A-3). */}
+            misleading (docs/ROADMAP.md Faz 3A-3). This is the HONEST guest
+            path instead — same anonymous sign-in, but labeled for what it is.
+            Upgradeable later from Settings ("Hesabını güvenceye al"). */}
+        <AppText
+          variant="secondary"
+          color={colors.textSecondary}
+          onPress={() => run(signInAnonymously)}
+          style={{ textAlign: 'center' }}
+        >
+          Misafir olarak devam et
+        </AppText>
         {err ? (
           <AppText variant="meta" color={colors.joker} style={{ textAlign: 'center' }}>
             {err}
