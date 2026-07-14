@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } 
 import { colors, hairline, radius, type } from '@/theme/tokens';
 import { Participant, SegmentState } from '@/data/types';
 import { buildDays } from '@/lib/day';
+import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Avatar } from './ui';
 
@@ -24,6 +25,7 @@ function personalDays(p: Participant, total: number, currentDay: number): Segmen
 }
 
 export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: Props) {
+  const { t } = useT();
   const silent = !participant.checkedInToday && (participant.silentDays ?? 0) >= 2;
   const shakeX = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }));
@@ -50,12 +52,12 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
   let status: string;
   if (participant.checkedInToday) {
     status = participant.isMe && participant.checkinTime
-      ? `✓ Bugün · ${participant.checkinTime}`
-      : '✓ Bugün';
+      ? t.participant.checkedInTodayAt(participant.checkinTime)
+      : t.participant.checkedInToday;
   } else if (silent) {
-    status = `${participant.silentDays} gündür sessiz`;
+    status = t.participant.silentDays(participant.silentDays ?? 0);
   } else {
-    status = 'Bekliyor';
+    status = t.participant.waiting;
   }
 
   return (
@@ -84,7 +86,7 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
           {participant.name}
           {participant.isMe ? (
             <AppText variant="meta" color={colors.textTertiary}>
-              {' '}(Sen)
+              {' '}{t.participant.you}
             </AppText>
           ) : null}
         </AppText>
@@ -122,7 +124,7 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
                 color: participant.nudged ? colors.textTertiary : colors.textSecondary,
               }}
             >
-              {participant.nudged ? 'Sallandı ✓' : 'El salla 👋'}
+              {participant.nudged ? t.participant.nudged : t.participant.nudge}
             </AppText>
           </Pressable>
         </Animated.View>

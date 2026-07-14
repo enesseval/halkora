@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
+import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Button } from './ui';
 
@@ -18,6 +19,7 @@ export function MissedDaySheet({
   onUseJoker: () => void;
   onDismiss: () => void;
 }) {
+  const { t } = useT();
   const [usedJoker, setUsedJoker] = useState(false);
 
   useEffect(() => {
@@ -43,10 +45,10 @@ export function MissedDaySheet({
       }}
     >
       <AppText variant="screenTitle" style={{ textAlign: 'center' }}>
-        Dün olmadı.{'\n'}Bugün buradasın.
+        {t.detail.notStarted}
       </AppText>
       <AppText variant="secondary" tabular style={{ marginTop: 8, marginBottom: 36 }}>
-        {challenge.title} · Gün {challenge.currentDay}/{challenge.totalDays}
+        {challenge.title} · {t.common.dayOf(challenge.currentDay, challenge.totalDays)}
       </AppText>
 
       <ProgressRing
@@ -64,10 +66,10 @@ export function MissedDaySheet({
       <View style={{ height: 40 }} />
 
       <View style={{ width: '100%', gap: 12 }}>
-        <Button label="Bugünün check-in'i" onPress={onDismiss} />
+        <Button label={t.detail.todayCheckIn} onPress={onDismiss} />
         {challenge.jokerRemaining > 0 && !usedJoker ? (
           <Button
-            label={`Dün için joker kullan · ${challenge.jokerRemaining} hakkın var`}
+            label={t.detail.useJoker(challenge.jokerRemaining)}
             variant="amber"
             onPress={() => {
               onUseJoker();
@@ -94,6 +96,7 @@ export function MomentumSheet({
   onEndEarly: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const startDay = momentum.daysTogether - momentum.last3.length + 1;
   return (
     <Animated.View
@@ -134,10 +137,10 @@ export function MomentumSheet({
           }}
         />
         <AppText variant="screenTitle" style={{ fontSize: 24 }}>
-          Grubun temposu düştü.
+          {t.detail.momentumTitle}
         </AppText>
         <AppText variant="secondary" style={{ marginTop: 8 }}>
-          Son 3 günde check-in'ler azaldı. Nasıl devam etmek istersin?
+          {t.detail.momentumSubtitle}
         </AppText>
 
         <View
@@ -156,7 +159,7 @@ export function MomentumSheet({
           {momentum.last3.map((n, i) => (
             <View key={i} style={{ alignItems: 'center', flex: 1 }}>
               <AppText variant="meta" color={colors.textTertiary} tabular>
-                Gün {startDay + i}
+                {t.detail.momentumDay(startDay + i)}
               </AppText>
               <AppText
                 tabular
@@ -165,20 +168,20 @@ export function MomentumSheet({
                 {n}
               </AppText>
               <AppText variant="meta" color={colors.textTertiary} tabular>
-                / {momentum.total} kişi
+                {t.detail.momentumOutOf(momentum.total)}
               </AppText>
             </View>
           ))}
           <View style={{ flex: 1.4, paddingLeft: 8 }}>
             <AppText variant="secondary" color={colors.textSecondary}>
-              Halka yine de duruyor. Karar grubun.
+              {t.detail.momentumFootnote}
             </AppText>
           </View>
         </View>
 
         <View style={{ gap: 12, marginTop: 20 }}>
-          <Button label="Yeniden başlat" onPress={onRestart} />
-          <Button label="Erken bitir" variant="secondary" onPress={onEndEarly} />
+          <Button label={t.detail.restart} onPress={onRestart} />
+          <Button label={t.detail.endEarly} variant="secondary" onPress={onEndEarly} />
         </View>
 
         <AppText
@@ -187,7 +190,7 @@ export function MomentumSheet({
           tabular
           style={{ textAlign: 'center', marginTop: 18 }}
         >
-          {momentum.daysTogether} gün birlikte devam ettiniz.
+          {t.detail.daysTogether(momentum.daysTogether)}
         </AppText>
       </Animated.View>
     </Animated.View>

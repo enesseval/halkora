@@ -22,6 +22,17 @@ export async function clearPushToken(userId: string): Promise<void> {
 }
 
 /**
+ * Persists the user's chosen app language so server-side copy (push
+ * notification bodies — docs/PHASE2-SUPABASE.md "Ek N") can match it too.
+ * Best-effort from the caller's side — the in-app language switch itself
+ * never depends on this succeeding.
+ */
+export async function saveLocale(userId: string, locale: string): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ locale }).eq('id', userId);
+  if (error) throw error;
+}
+
+/**
  * Permanently deletes the signed-in user's account (App Store Review
  * Guideline 5.1.1(v) — required whenever account creation exists). Runs
  * server-side under the `delete-account` Edge Function so it can call the

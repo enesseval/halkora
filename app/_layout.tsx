@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,8 +9,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { colors } from '@/theme/tokens';
-import { useAuth, useAuthInit, useSyncPushToken } from '@/hooks/useAuth';
+import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
+import { initLocale } from '@/i18n';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -113,15 +114,28 @@ function useNotificationDeepLink(ready: boolean) {
   }, [ready, router]);
 }
 
+/** Reads the persisted language choice (or detects the device's) once, before
+ * anything renders real copy — see src/i18n/index.ts. */
+function useLocaleInit(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    initLocale().then(() => setReady(true));
+  }, []);
+  return ready;
+}
+
 function RootNavigator() {
   const { ready, configured } = useAuth();
+  const localeReady = useLocaleInit();
   useAuthInit();
   useProtectedRoute();
   useSyncPushToken();
+  useSyncLocale();
   useNotificationDeepLink(ready);
 
-  // Avoid a flash of Home before the persisted session is restored.
-  if (configured && !ready) {
+  // Avoid a flash of Home before the persisted session is restored, or of
+  // default-locale copy before the saved/detected language is applied.
+  if (!localeReady || (configured && !ready)) {
     return <View style={{ flex: 1, backgroundColor: colors.bgBase }} />;
   }
 

@@ -14,6 +14,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { registerForPushToken } from '@/lib/push';
 import { takePendingInviteCode } from '@/lib/pendingInvite';
 import { AppText, Avatar, AvatarStack, Button, Chip, Screen } from '@/components/ui';
+import { useT } from '@/i18n';
 
 const O1_DAYS: SegmentState[] = [
   'done', 'done', 'done', 'today',
@@ -45,6 +46,7 @@ function Dots({ step }: { step: number }) {
 
 /* O1 — hook / promise */
 function Hook() {
+  const { t } = useT();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <ProgressRing totalDays={14} days={O1_DAYS} size="L" activeIndex={3}
@@ -55,10 +57,10 @@ function Hook() {
         }
       />
       <AppText variant="hero" style={{ textAlign: 'center', marginTop: 40 }}>
-        Kendine verdiğin sözler yalnızken kolay unutulur.
+        {t.onboarding.hook.title}
       </AppText>
       <AppText variant="secondary" style={{ textAlign: 'center', marginTop: 14 }}>
-        Arkadaşların izlerken değil.
+        {t.onboarding.hook.subtitle}
       </AppText>
     </View>
   );
@@ -66,11 +68,12 @@ function Hook() {
 
 /* O2 — mechanic / one tap */
 function Mechanic() {
+  const { t } = useT();
   return (
     <View style={{ flex: 1, justifyContent: 'center' }}>
-      <AppText variant="hero">Her gün{'\n'}tek dokunuş.</AppText>
+      <AppText variant="hero">{t.onboarding.mechanic.title}</AppText>
       <AppText variant="secondary" style={{ marginTop: 14, maxWidth: 320 }}>
-        Check-in yaparsın, günün segmenti dolar. Grubun anında görür.
+        {t.onboarding.mechanic.subtitle}
       </AppText>
 
       <View
@@ -86,12 +89,12 @@ function Mechanic() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18 }}>
           <View style={{ flex: 1 }}>
             <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: 13, color: colors.textSecondary }}>
-              30 Gün Kitap Okuma
+              {t.onboarding.mechanic.cardTitle}
             </AppText>
             <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 20, lineHeight: 25, marginTop: 6 }}>
-              Bugün: 20 sayfa oku
+              {t.onboarding.mechanic.cardAction}
             </AppText>
-            <AppText tabular style={{ ...type.secondary, marginTop: 12 }}>5/8 kişi tamamladı</AppText>
+            <AppText tabular style={{ ...type.secondary, marginTop: 12 }}>{t.onboarding.mechanic.cardProgress}</AppText>
           </View>
           <ProgressRing totalDays={14} days={CARD_DAYS} size="M" activeIndex={6}
             centerContent={
@@ -100,7 +103,7 @@ function Mechanic() {
           />
         </View>
         <View style={{ height: 56, borderRadius: radius.pill, backgroundColor: colors.ember, alignItems: 'center', justifyContent: 'center' }}>
-          <AppText style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>Check-in</AppText>
+          <AppText style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>{t.onboarding.mechanic.checkIn}</AppText>
         </View>
       </View>
     </View>
@@ -109,16 +112,17 @@ function Mechanic() {
 
 /* O3 — stake */
 function Stake() {
+  const { t } = useT();
   const options = [
-    { label: 'Tamamlayamayan kahve ısmarlar', emoji: '☕', on: true },
-    { label: 'Yemek ısmarlar', emoji: '🍽️', on: false },
-    { label: 'Grubun seçtiği filmi izler', emoji: '🎬', on: false },
+    { label: t.onboarding.stake.option1, emoji: '☕', on: true },
+    { label: t.onboarding.stake.option2, emoji: '🍽️', on: false },
+    { label: t.onboarding.stake.option3, emoji: '🎬', on: false },
   ];
   return (
     <View style={{ flex: 1, justifyContent: 'center' }}>
-      <AppText variant="hero">İşin ucunda{'\n'}bir şey olsun.</AppText>
+      <AppText variant="hero">{t.onboarding.stake.title}</AppText>
       <AppText variant="secondary" style={{ marginTop: 14, maxWidth: 330 }}>
-        Grup bir bahis koyar. Tamamlayamayan öder — dostça, küçük, unutulmaz.
+        {t.onboarding.stake.subtitle}
       </AppText>
       <View style={{ gap: 10, marginTop: 28, alignItems: 'flex-start' }}>
         {options.map((o) => (
@@ -137,7 +141,7 @@ function Stake() {
           plain
         />
         <AppText variant="meta" color={colors.textTertiary} style={{ flex: 1 }}>
-          Kaybeden belli olur, kimse utandırılmaz.
+          {t.onboarding.stake.footnote}
         </AppText>
       </View>
     </View>
@@ -154,18 +158,19 @@ function NameStep({
   setName: (t: string) => void;
   onSubmit: () => void;
 }) {
+  const { t } = useT();
   return (
     <View style={{ flex: 1, justifyContent: 'center' }}>
-      <AppText variant="screenTitle">Grubun seni{'\n'}nasıl tanısın?</AppText>
+      <AppText variant="screenTitle">{t.onboarding.name.title}</AppText>
       <AppText variant="secondary" style={{ marginTop: 12, maxWidth: 320 }}>
-        Sadece ismin yeter. Hesap, şifre, e-posta yok.
+        {t.onboarding.name.subtitle}
       </AppText>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 32 }}>
         <Avatar initials={name.trim() ? initialsFrom(name) : 'SN'} size={44} tint />
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="Adın"
+          placeholder={t.onboarding.name.placeholder}
           placeholderTextColor={colors.textTertiary}
           autoFocus
           autoCapitalize="words"
@@ -187,7 +192,7 @@ function NameStep({
         />
       </View>
       <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10 }}>
-        İstediğin zaman değiştirebilirsin.
+        {t.onboarding.name.footnote}
       </AppText>
     </View>
   );
@@ -195,6 +200,7 @@ function NameStep({
 
 /* O5 — push permission */
 function NotifStep() {
+  const { t } = useT();
   return (
     <View style={{ flex: 1, justifyContent: 'center' }}>
       <View
@@ -210,10 +216,9 @@ function NotifStep() {
       >
         <Feather name="bell" size={26} color={colors.ember} />
       </View>
-      <AppText variant="hero">Grubun seni{'\n'}dürtebilsin.</AppText>
+      <AppText variant="hero">{t.onboarding.notif.title}</AppText>
       <AppText variant="secondary" style={{ marginTop: 14, maxWidth: 320 }}>
-        Biri check-in yapınca, sana el sallayınca ya da akşam olup da halkan
-        seni bekliyorsa haber veririz. Başka hiçbir şey için değil.
+        {t.onboarding.notif.subtitle}
       </AppText>
     </View>
   );
@@ -221,6 +226,7 @@ function NotifStep() {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { saveName } = useAuth();
   const [step, setStep] = useState(0); // 0,1,2 intro · 3 name · 4 notifications
   const [name, setName] = useState('');
@@ -240,7 +246,7 @@ export default function OnboardingScreen() {
       await saveName(name);
       setStep(4);
     } catch {
-      setErr('Kaydedilemedi. Bağlantını kontrol edip tekrar dene.');
+      setErr(t.errors.saveFailed);
       setSaving(false);
     }
   };
@@ -270,7 +276,7 @@ export default function OnboardingScreen() {
         <View style={{ height: 28, justifyContent: 'center', alignItems: 'flex-end' }}>
           {!isName && !isNotif ? (
             <AppText variant="secondary" color={colors.textSecondary} onPress={() => setStep(3)}>
-              Atla
+              {t.common.skip}
             </AppText>
           ) : null}
         </View>
@@ -291,7 +297,7 @@ export default function OnboardingScreen() {
           {!isName && !isNotif ? <Dots step={step} /> : null}
           {isName ? (
             <Button
-              label={saving ? 'Kaydediliyor…' : 'Devam'}
+              label={saving ? t.onboarding.name.saving : t.common.continue}
               onPress={submitName}
               disabled={!canSubmitName}
             />
@@ -299,7 +305,7 @@ export default function OnboardingScreen() {
           {isNotif ? (
             <>
               <Button
-                label={askingPermission ? 'Soruluyor…' : 'Bildirimlere izin ver'}
+                label={askingPermission ? t.onboarding.notif.asking : t.onboarding.notif.allow}
                 onPress={() => finishNotifStep(true)}
                 disabled={askingPermission}
               />
@@ -309,12 +315,12 @@ export default function OnboardingScreen() {
                 onPress={() => (askingPermission ? undefined : finishNotifStep(false))}
                 style={{ textAlign: 'center' }}
               >
-                Şimdi değil
+                {t.onboarding.notif.notNow}
               </AppText>
             </>
           ) : null}
           {!isName && !isNotif ? (
-            <Button label={step === 2 ? 'Başlayalım' : 'Devam'} onPress={advance} />
+            <Button label={step === 2 ? t.onboarding.start : t.common.continue} onPress={advance} />
           ) : null}
         </View>
       </KeyboardAvoidingView>

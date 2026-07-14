@@ -19,19 +19,28 @@ import {
   ME_ID,
   ME_NAME,
   ME_INITIALS,
-  TEMPLATES,
-  STAKE_PRESETS,
+  getTemplates,
+  getStakePresets,
   REACTION_EMOJIS,
-  INVITE_JOINERS,
+  getInviteJoiners,
 } from '@/data/mock';
 import { formatLongDate, waitingNames } from '@/lib/day';
 import { firstName } from '@/stores/mockStore';
 import { Challenge, Participant } from '@/data/types';
+import { useT } from '@/i18n';
 
 // Re-export types + static config so screens have a single import source.
 export type { Challenge, Participant, Message, Stake, StakeOption, SegmentState, Momentum } from '@/data/types';
 export type { CreateChallengeInput };
-export { ME_ID, ME_NAME, ME_INITIALS, TEMPLATES, STAKE_PRESETS, REACTION_EMOJIS, INVITE_JOINERS };
+export {
+  ME_ID,
+  ME_NAME,
+  ME_INITIALS,
+  getTemplates as TEMPLATES,
+  getStakePresets as STAKE_PRESETS,
+  REACTION_EMOJIS,
+  getInviteJoiners as INVITE_JOINERS,
+};
 
 /** Single challenge by id (undefined if not found). */
 export function useChallenge(id: string | undefined): Challenge | undefined {
@@ -189,6 +198,7 @@ export interface JoinPreview {
  * of a few safe fields); mock path reads the local store directly.
  */
 export function useJoinPreview(code: string | undefined): JoinPreview {
+  const { t } = useT();
   const mock = useChallengeByCode(code);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -222,8 +232,8 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       retry: refetch,
       title: data.title,
       totalDays: data.totalDays,
-      scheduleSummary: `${data.dailyAction} · ${data.totalDays} gün`,
-      startsWhen: data.status === 'upcoming' ? 'Yarın başlıyor' : 'Devam ediyor',
+      scheduleSummary: t.common.scheduleSummary(data.dailyAction, data.totalDays),
+      startsWhen: data.status === 'upcoming' ? t.common.startsTomorrow : t.common.ongoing,
       stakeText: data.stakeText,
       participants: data.sampleNames.map((name, i) => ({
         id: `s${i}`,
@@ -267,6 +277,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
 
 /** Check-in action + derived status for one challenge. */
 export function useCheckIn(id: string) {
+  const { t } = useT();
   const checkIn = useMockStore((s) => s.checkIn);
   const undo = useMockStore((s) => s.undoCheckIn);
   const challenge = useChallenge(id);
@@ -289,7 +300,7 @@ export function useCheckIn(id: string) {
         })
         .catch((e) => {
           undo(id); // roll back the optimistic update
-          Alert.alert('Check-in kaydedilemedi', errMessage(e));
+          Alert.alert(t.errors.checkInFailed, errMessage(e));
         });
     }
   };
@@ -456,6 +467,7 @@ export function useRealtimeChallenge(id: string | undefined) {
 
 /** All challenge-scoped actions in one place. */
 export function useChallengeActions(id: string) {
+  const { t } = useT();
   const useJoker = useMockStore((s) => s.useJoker);
   const ackMissed = useMockStore((s) => s.ackMissed);
   const sendMessageMock = useMockStore((s) => s.sendMessage);
@@ -487,7 +499,7 @@ export function useChallengeActions(id: string) {
           } catch {
             // best-effort resync; the alert below still tells the user it failed
           }
-          Alert.alert('Joker kaydedilemedi', errMessage(e));
+          Alert.alert(t.errors.jokerFailed, errMessage(e));
         });
     }
   };
@@ -506,7 +518,7 @@ export function useChallengeActions(id: string) {
         return true;
       } catch (e) {
         removeMessageMock(id, localId); // roll back — it never actually sent
-        Alert.alert('Mesaj gönderilemedi', errMessage(e));
+        Alert.alert(t.errors.messageFailed, errMessage(e));
         return false;
       }
     }
@@ -534,7 +546,7 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       restartChallenge(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert('Yeniden başlatılamadı', errMessage(e)));
+        .catch((e) => Alert.alert(t.errors.restartFailed, errMessage(e)));
     }
   };
 
@@ -543,7 +555,7 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       endChallengeEarly(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert('Bitirilemedi', errMessage(e)));
+        .catch((e) => Alert.alert(t.errors.endEarlyFailed, errMessage(e)));
     }
   };
 
@@ -564,6 +576,7 @@ export function useChallengeActions(id: string) {
  * participants + stake). Returns the id used by the UI.
  */
 export function useCreateChallenge() {
+  const { t } = useT();
   const create = useMockStore((s) => s.createChallenge);
   const queryClient = useQueryClient();
   return async (input: CreateChallengeInput): Promise<string> => {
@@ -582,10 +595,7 @@ export function useCreateChallenge() {
           return id;
         } catch (e) {
           const msg = errMessage(e);
-          Alert.alert(
-            'Supabase kaydı başarısız',
-            `${msg}\n\nchallenges/participants tablolarını ve RLS'i kurdun mu? (docs/PHASE2-SUPABASE.md · Ek A)`,
-          );
+          Alert.alert(t.errors.supabaseWriteFailed, t.errors.supabaseWriteFailedDetail(msg));
         }
       }
     }

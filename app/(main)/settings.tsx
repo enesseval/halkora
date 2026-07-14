@@ -10,6 +10,7 @@ import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
+import { useT, type Locale } from '@/i18n';
 
 /** null while the initial permission check is in flight. Push is native-only —
  * expo-notifications' web shim doesn't fully implement this, so skip there. */
@@ -93,8 +94,17 @@ function Group({ children }: { children: React.ReactNode }) {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { t, locale, setLocale } = useT();
   const { open } = useMomentumDemo();
-  const { configured, name, isAnonymous, linkAppleIdentity, signOut, deleteAccount, resetOnboarding } = useAuth();
+  const {
+    configured,
+    name,
+    isAnonymous,
+    linkAppleIdentity,
+    signOut,
+    deleteAccount,
+    resetOnboarding,
+  } = useAuth();
   const [linking, setLinking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const notifGranted = useNotificationStatus();
@@ -108,10 +118,26 @@ export default function SettingsScreen() {
     try {
       await linkAppleIdentity();
     } catch (e) {
-      Alert.alert('Bağlanamadı', errMessage(e));
+      Alert.alert(t.errors.linkFailed, errMessage(e));
     } finally {
       setLinking(false);
     }
+  };
+
+  const changeLanguage = (l: Locale) => {
+    if (l === locale) return;
+    // Applies instantly; useSyncLocale() (mounted in the root layout) picks
+    // up this change and syncs profiles.locale in the background.
+    setLocale(l);
+  };
+
+  const pickLanguage = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Alert.alert(t.settings.language, undefined, [
+      { text: t.settings.languageTurkish, onPress: () => changeLanguage('tr') },
+      { text: t.settings.languageEnglish, onPress: () => changeLanguage('en') },
+      { text: t.common.cancel, style: 'cancel' },
+    ]);
   };
 
   const goOnboarding = async () => {
@@ -138,7 +164,7 @@ export default function SettingsScreen() {
     try {
       await deleteAccount(); // guard routes to /welcome once the session clears
     } catch (e) {
-      Alert.alert('Silinemedi', errMessage(e));
+      Alert.alert(t.errors.deleteFailed, errMessage(e));
       setDeleting(false);
     }
   };
@@ -146,14 +172,10 @@ export default function SettingsScreen() {
   const confirmDelete = () => {
     if (deleting) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    Alert.alert(
-      'Hesabını sil?',
-      'Bu geri alınamaz. Katılımcılığın, check-in\'lerin, mesajların kalıcı olarak silinir. Kurduğun challenge\'lar grubun diğer üyeleri için kalmaya devam eder.',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Hesabı sil', style: 'destructive', onPress: runDelete },
-      ],
-    );
+    Alert.alert(t.settings.deleteConfirmTitle, t.settings.deleteConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.settings.deleteAccount, style: 'destructive', onPress: runDelete },
+    ]);
   };
 
   return (
@@ -162,7 +184,7 @@ export default function SettingsScreen() {
         <IconButton size={38} onPress={() => router.back()}>
           <Feather name="chevron-left" size={20} color={colors.textPrimary} />
         </IconButton>
-        <AppText variant="screenTitle">Ayarlar</AppText>
+        <AppText variant="screenTitle">{t.settings.title}</AppText>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.section }}>
@@ -190,12 +212,12 @@ export default function SettingsScreen() {
 
         <View style={{ marginTop: 20 }}>
           <Group>
-            <Row icon="user" label="İsim" value={displayName} />
+            <Row icon="user" label={t.settings.name} value={displayName} />
             <Divider />
             <Row
               icon="bell"
-              label="Bildirimler"
-              value={notifGranted === null ? '' : notifGranted ? 'Açık' : 'Kapalı'}
+              label={t.settings.notifications}
+              value={notifGranted === null ? '' : notifGranted ? t.settings.notificationsOn : t.settings.notificationsOff}
               onPress={() => Linking.openSettings().catch(() => {})}
             />
             {configured ? (
@@ -203,27 +225,34 @@ export default function SettingsScreen() {
                 <Divider />
                 <Row
                   icon="key"
-                  label="Hesap"
-                  value={linking ? 'Bağlanıyor…' : isAnonymous ? 'Güvence yok' : 'Apple ile bağlı'}
+                  label={t.settings.account}
+                  value={linking ? t.settings.accountLinking : isAnonymous ? t.settings.accountUnsecured : t.settings.accountLinked}
                   tint={isAnonymous ? colors.ember : undefined}
                   onPress={isAnonymous ? secureAccount : undefined}
                 />
               </>
             ) : null}
             <Divider />
-            <Row icon="rotate-ccw" label="Onboarding'i tekrar gör" onPress={goOnboarding} />
+            <Row
+              icon="globe"
+              label={t.settings.language}
+              value={locale === 'tr' ? t.settings.languageTurkish : t.settings.languageEnglish}
+              onPress={pickLanguage}
+            />
+            <Divider />
+            <Row icon="rotate-ccw" label={t.settings.seeOnboardingAgain} onPress={goOnboarding} />
           </Group>
         </View>
 
         {/* demo entries — mock-only, never shown against a real backend */}
         {!configured ? (
           <View style={{ marginTop: 24 }}>
-            <SectionLabel>Demo</SectionLabel>
+            <SectionLabel>{t.settings.demo}</SectionLabel>
             <View style={{ marginTop: 10 }}>
               <Group>
                 <Row
                   icon="trending-down"
-                  label="Momentum düşüşü (E10)"
+                  label={t.settings.demoMomentum}
                   onPress={() => {
                     open('c1');
                     router.push('/challenge/c1');
@@ -232,7 +261,7 @@ export default function SettingsScreen() {
                 <Divider />
                 <Row
                   icon="flag"
-                  label="Bitiş & kutlama (E9)"
+                  label={t.settings.demoComplete}
                   onPress={() => router.push('/challenge/a1/complete')}
                 />
               </Group>
@@ -246,7 +275,7 @@ export default function SettingsScreen() {
           style={({ pressed }) => ({ alignItems: 'center', paddingVertical: 22, opacity: pressed ? 0.6 : 1 })}
         >
           <AppText variant="secondary" color={colors.textTertiary}>
-            Çıkış yap
+            {t.settings.logout}
           </AppText>
         </Pressable>
 
@@ -257,13 +286,13 @@ export default function SettingsScreen() {
             style={({ pressed }) => ({ alignItems: 'center', paddingBottom: 22, opacity: pressed || deleting ? 0.6 : 1 })}
           >
             <AppText variant="secondary" color={colors.joker}>
-              {deleting ? 'Siliniyor…' : 'Hesabı sil'}
+              {deleting ? t.settings.deleting : t.settings.deleteAccount}
             </AppText>
           </Pressable>
         ) : null}
 
         <AppText variant="meta" color={colors.textTertiary} tabular style={{ textAlign: 'center' }}>
-          Sürüm {Constants.expoConfig?.version ?? '—'}
+          {t.settings.version(Constants.expoConfig?.version ?? '—')}
         </AppText>
       </ScrollView>
     </Screen>

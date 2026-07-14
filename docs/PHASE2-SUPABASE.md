@@ -349,7 +349,7 @@ declare
 begin
   select id into v_challenge_id from challenges where invite_code = p_code;
   if v_challenge_id is null then
-    raise exception 'Davet kodu bulunamadı';
+    raise exception 'INVITE_NOT_FOUND';
   end if;
 
   insert into participants (challenge_id, user_id)
@@ -511,7 +511,7 @@ create or replace function public.restart_challenge(p_challenge_id uuid)
 returns void language plpgsql security definer as $$
 begin
   if not public.is_member(p_challenge_id) then
-    raise exception 'Bu challenge''in üyesi değilsin.';
+    raise exception 'NOT_A_MEMBER';
   end if;
   -- current_date is the DB SESSION's date (server/UTC), not the challenge's
   -- own timezone column — used the challenge's timezone instead so a restart
@@ -528,7 +528,7 @@ create or replace function public.end_challenge_early(p_challenge_id uuid)
 returns void language plpgsql security definer as $$
 begin
   if not public.is_member(p_challenge_id) then
-    raise exception 'Bu challenge''in üyesi değilsin.';
+    raise exception 'NOT_A_MEMBER';
   end if;
   update challenges set status = 'completed' where id = p_challenge_id;
 end;
@@ -898,13 +898,13 @@ begin
     into v_challenge_id, v_start_date, v_timezone, v_restrict
     from challenges where invite_code = p_code;
   if v_challenge_id is null then
-    raise exception 'Davet kodu bulunamadı';
+    raise exception 'INVITE_NOT_FOUND';
   end if;
 
   if v_restrict then
     v_current_day := ((now() at time zone v_timezone)::date - v_start_date) + 1;
     if v_current_day > 1 then
-      raise exception 'Bu challenge''a katılım süresi doldu — yalnızca ilk gün katılım açıktı.';
+      raise exception 'JOIN_WINDOW_CLOSED';
     end if;
   end if;
 
@@ -953,3 +953,54 @@ grant execute on function public.get_challenge_preview(text) to anon, authentica
 Bu SQL'i çalıştırdıktan sonra istemci tarafı zaten hazır (aşağıdaki commit'te):
 create akışında "Katılım" seçimi, davet/join ekranlarında süre dolunca
 gösterilecek mesaj, ve Detay ekranında kapanan daveti gizleme.
+
+## Ek N — Tam uygulama içi i18n (Türkçe + İngilizce)
+
+Uygulamanın tamamı (ekranlar, hata mesajları, push bildirimleri) artık iki
+dilli — `src/i18n/tr.ts` + `en.ts`, Ayarlar'da bir dil seçici, cihazın
+diline göre otomatik ilk seçim. Bunun sunucu tarafındaki iki parçası **senin
+çalıştırman gerekiyor**:
+
+### 1. `profiles.locale` kolonu (🔑 ZORUNLU)
+
+```sql
+alter table profiles
+  add column if not exists locale text not null default 'tr';
+```
+
+İstemci, kullanıcı Ayarlar'dan dil değiştirdiğinde (veya ilk onboarding'i
+bitirdiğinde) bu kolonu otomatik günceller (`useSyncLocale`,
+`src/hooks/useAuth.ts`) — sen sadece kolonu eklemen yeterli.
+
+### 2. Hata mesajları artık kod dönüyor (🔑 ZORUNLU — yeniden çalıştır)
+
+`join_challenge_by_code`, `restart_challenge`, `end_challenge_early` — bu
+üçü artık Türkçe/İngilizce metin yerine sabit bir kod döndürüyor
+(`INVITE_NOT_FOUND`, `JOIN_WINDOW_CLOSED`, `NOT_A_MEMBER`, ...) ve istemci
+bunu aktif dile göre kendisi çeviriyor (`src/lib/errors.ts`). Bu üç
+fonksiyonun SQL'i yukarıda ("Ek G", "Ek M") zaten güncellendi — **SQL
+Editor'de tekrar çalıştırman yeterli**, dönüş tipleri değişmediği için
+önce `drop function` yapmana gerek yok.
+
+`check-in` ve `delete-account` Edge Function'ları da aynı şekilde artık
+prose yerine kod döndürüyor — bir sonraki adımda onları da yeniden deploy
+edeceksin.
+
+### 3. Push bildirimleri: alıcının diline göre (🔑 ZORUNLU — yeniden deploy)
+
+`notify` ve `evening-reminder` Edge Function'ları artık her alıcının
+`profiles.locale`'ına bakıp bildirim başlığını/gövdesini o dilde
+oluşturuyor (aynı toplu gönderimde biri Türkçe biri İngilizce görebilir —
+bu doğru davranış). Deploy komutları Ek I'dekiyle aynı:
+
+```sql
+supabase functions deploy notify --no-verify-jwt
+supabase functions deploy evening-reminder --no-verify-jwt
+supabase functions deploy check-in
+supabase functions deploy delete-account
+```
+
+> Not: Bu dört Edge Function'ın kodu bu commit'te değişti (check-in ve
+> delete-account artık kod döndürüyor, notify ve evening-reminder artık
+> alıcının diline bakıyor) — dördünü de yeniden deploy etmen gerekiyor,
+> sadece yeni eklenenleri değil.

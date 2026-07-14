@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { edgeFunctionError } from '@/lib/errors';
+import { getDict } from '@/i18n';
 
 export type CheckInType = 'done' | 'joker';
 
@@ -36,7 +37,7 @@ export async function deleteCheckIn(challengeId: string, dayNumber: number): Pro
     data: { session },
   } = await supabase.auth.getSession();
   const user = session?.user;
-  if (!user) throw new Error('Oturum bulunamadı.');
+  if (!user) throw new Error(getDict().errors.sessionMissing);
   const participantId = await myParticipantId(challengeId, user.id);
 
   const { error } = await supabase

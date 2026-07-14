@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { buildDays, nowClock } from '@/lib/day';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { getDict } from '@/i18n';
 import {
-  MOCK_CHALLENGES,
+  getMockChallenges,
   ME_ID,
   ME_NAME,
   ME_INITIALS,
@@ -57,7 +58,7 @@ interface MockState {
 
 /** Deep clone the seed so store mutations never touch the source module. */
 function seed(): Challenge[] {
-  return JSON.parse(JSON.stringify(MOCK_CHALLENGES)) as Challenge[];
+  return JSON.parse(JSON.stringify(getMockChallenges())) as Challenge[];
 }
 
 /**
@@ -221,10 +222,11 @@ export const useMockStore = create<MockState>((set, get) => ({
 
   createChallenge: (input, override) => {
     const id = override?.id ?? `new-${Date.now()}`;
+    const t = getDict();
     const challenge: Challenge = {
       id,
-      title: input.title || 'Yeni Challenge',
-      dailyAction: `Bugün: ${input.dailyAction || 'hedefini tamamla'}`,
+      title: input.title || t.common.newChallengeFallback,
+      dailyAction: `${t.common.today}: ${input.dailyAction || t.common.completeYourGoalFallback}`,
       totalDays: input.totalDays,
       currentDay: input.startTomorrow ? 0 : 1,
       days: buildDays(
@@ -233,16 +235,16 @@ export const useMockStore = create<MockState>((set, get) => ({
       ),
       status: input.startTomorrow ? 'upcoming' : 'active',
       startsLabel: input.startTomorrow
-        ? input.startsLabel ?? 'Yarın başlıyor'
+        ? input.startsLabel ?? t.common.startsTomorrow
         : undefined,
       meCheckedInToday: false,
       jokerRemaining: input.joker ?? 1,
       hasMissedYesterday: false,
       inviteCode: override?.inviteCode ?? id.slice(-6),
-      scheduleSummary: `${input.dailyAction || 'Günlük hedef'} · ${input.totalDays} gün`,
+      scheduleSummary: t.common.scheduleSummary(input.dailyAction || t.common.dailyGoalFallback, input.totalDays),
       startsWhen: input.startTomorrow
-        ? input.startsLabel ?? 'Yarın 06:00'
-        : 'Bugün başladı',
+        ? input.startsLabel ?? t.common.tomorrowSixAm
+        : t.common.startsToday,
       stake: input.stake,
       firstDayJoinOnly: input.firstDayJoinOnly ?? false,
       // Mock data doesn't simulate real elapsed time, so a just-created demo

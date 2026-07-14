@@ -11,10 +11,12 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { StakeBadge } from '@/components/StakeBadge';
 import { CardSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { useT } from '@/i18n';
 
 export default function JoinScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const router = useRouter();
+  const { t } = useT();
   const preview = useJoinPreview(code);
   const join = useJoin();
   const { configured, name: myName } = useAuth();
@@ -50,7 +52,7 @@ export default function JoinScreen() {
       const id = await join(code ?? '', name.trim());
       router.replace(`/challenge/${id}`);
     } catch (e) {
-      setErr(errMessage(e) || 'Katılamadık. Kodu kontrol edip tekrar dene.');
+      setErr(errMessage(e) || t.errors.messageFailedGeneric);
       setJoining(false);
     }
   };
@@ -71,7 +73,7 @@ export default function JoinScreen() {
       <Screen edges={['top', 'bottom']}>
         {closeButton}
         <ErrorState
-          message="Davet yüklenemedi."
+          message={t.join.loadFailed}
           detail={errMessage(preview.error)}
           onRetry={preview.retry}
         />
@@ -85,10 +87,10 @@ export default function JoinScreen() {
         {closeButton}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <AppText variant="screenTitle" style={{ fontSize: 22, textAlign: 'center' }}>
-            Bu davet bulunamadı.
+            {t.join.notFoundTitle}
           </AppText>
           <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-            Link yanlış ya da süresi geçmiş olabilir.
+            {t.join.notFoundSubtitle}
           </AppText>
         </View>
       </Screen>
@@ -101,10 +103,10 @@ export default function JoinScreen() {
         {closeButton}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <AppText variant="screenTitle" style={{ fontSize: 22, textAlign: 'center' }}>
-            Bu davetin süresi doldu.
+            {t.join.closedTitle}
           </AppText>
           <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-            {preview.title} yalnızca ilk günü içinde katılıma açıktı.
+            {t.join.closedSubtitle(preview.title)}
           </AppText>
         </View>
       </Screen>
@@ -116,7 +118,7 @@ export default function JoinScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {closeButton}
       <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center', marginTop: 12 }}>
-        Bir davete katılıyorsun
+        {t.join.subtitle}
       </AppText>
 
       <View style={{ flex: 1, justifyContent: 'center' }}>
@@ -156,11 +158,13 @@ export default function JoinScreen() {
           <View style={{ alignItems: 'center', marginTop: 24, gap: 10 }}>
             <AvatarStack people={people} max={4} size={30} />
             <AppText variant="secondary" color={colors.textSecondary} tabular>
-              {preview.participants
-                .slice(0, 2)
-                .map((p) => p.name.split(' ')[0])
-                .join(', ')}{' '}
-              ve {Math.max(preview.participants.length - 2, 0)} kişi katıldı
+              {t.join.socialProof(
+                preview.participants
+                  .slice(0, 2)
+                  .map((p) => p.name.split(' ')[0])
+                  .join(', '),
+                Math.max(preview.participants.length - 2, 0),
+              )}
             </AppText>
           </View>
         ) : null}
@@ -170,13 +174,13 @@ export default function JoinScreen() {
       <View style={{ gap: 12, paddingBottom: spacing.section }}>
         {configured ? (
           <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-            {myName ?? 'Sen'} olarak katılacaksın
+            {t.join.joiningAs(myName ?? t.join.youFallback)}
           </AppText>
         ) : (
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Adın"
+            placeholder={t.join.namePlaceholder}
             placeholderTextColor={colors.textTertiary}
             style={{
               height: 54,
@@ -197,7 +201,7 @@ export default function JoinScreen() {
             {err}
           </AppText>
         ) : null}
-        <Button label={joining ? 'Katılıyor…' : 'Katıl'} onPress={submit} disabled={joining} />
+        <Button label={joining ? t.join.joining : t.join.joinCta} onPress={submit} disabled={joining} />
       </View>
       </KeyboardAvoidingView>
     </Screen>

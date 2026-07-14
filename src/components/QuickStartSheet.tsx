@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { extractCode } from '@/lib/invite';
+import { useT } from '@/i18n';
 import { AppText } from './ui';
 
 function Row({
@@ -74,6 +75,7 @@ export function QuickStartSheet({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { t } = useT();
   const [mode, setMode] = useState<'choose' | 'join'>('choose');
   const [input, setInput] = useState('');
   const [clip, setClip] = useState<string | null>(null);
@@ -155,20 +157,20 @@ export function QuickStartSheet({
         {mode === 'choose' ? (
           <>
             <AppText variant="screenTitle" style={{ fontSize: 22, marginBottom: 18 }}>
-              Ne yapmak istersin?
+              {t.start.whatToDo}
             </AppText>
             <View style={{ gap: 12 }}>
               <Row
                 icon="plus"
                 emberIcon
-                title="Challenge oluştur"
-                subtitle="Hedefi sen koy, grubunu çağır."
+                title={t.start.createTitleShort}
+                subtitle={t.start.createSubtitleShort}
                 onPress={goCreate}
               />
               <Row
                 icon="link-2"
-                title="Davetle katıl"
-                subtitle="Bir kod veya link girerek katıl."
+                title={t.start.joinTitle}
+                subtitle={t.start.joinSubtitleShort}
                 onPress={() => setMode('join')}
               />
             </View>
@@ -189,7 +191,7 @@ export function QuickStartSheet({
               <AppText
                 style={{ flex: 1, textAlign: 'center', fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textPrimary, marginRight: 28 }}
               >
-                Davetle katıl
+                {t.start.joinHeaderTitle}
               </AppText>
             </View>
 
@@ -210,7 +212,7 @@ export function QuickStartSheet({
               <TextInput
                 value={input}
                 onChangeText={setInput}
-                placeholder="Davet linki veya kod"
+                placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -224,7 +226,7 @@ export function QuickStartSheet({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <Feather name="clipboard" size={13} color={colors.ember} />
                   <AppText variant="meta" color={colors.ember}>
-                    {fromClipboard ? 'Panoda bir davet bulduk' : 'Davet hazır'}
+                    {fromClipboard ? t.start.foundInClipboard : t.start.inviteReady}
                   </AppText>
                 </View>
                 <Pressable
@@ -242,7 +244,7 @@ export function QuickStartSheet({
                   })}
                 >
                   <AppText style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>
-                    Bu challenge'a katıl
+                    {t.start.joinThisChallenge}
                   </AppText>
                 </Pressable>
               </View>

@@ -13,24 +13,26 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { useT } from '@/i18n';
 
 const EMPTY_RING_DAYS: SegmentState[] = Array(12).fill('empty');
 
 /** Shown when the visitor has zero challenges at all (never created, never joined). */
 function EmptyHome({ onStart }: { onStart: () => void }) {
+  const { t } = useT();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 24 }}>
       <ProgressRing totalDays={12} days={EMPTY_RING_DAYS} size="L" />
       <View style={{ alignItems: 'center', gap: 8 }}>
         <AppText variant="hero" style={{ textAlign: 'center' }}>
-          Henüz bir halkan yok.
+          {t.home.emptyTitle}
         </AppText>
         <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 280 }}>
-          Bir challenge kur, grubunu çağır — ya da bir davetle katıl.
+          {t.home.emptySubtitle}
         </AppText>
       </View>
       <View style={{ alignSelf: 'stretch' }}>
-        <Button label="İlk halkanı kur" onPress={onStart} />
+        <Button label={t.home.emptyCta} onPress={onStart} />
       </View>
     </View>
   );
@@ -49,6 +51,7 @@ function PendingCardWithCheckIn({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { dateLabel, pending, done, upcoming, loading, firstLoadError, backgroundError, error, retry } =
     useTodayStatus();
   const { refreshing, refresh } = useRefreshChallenges();
@@ -62,11 +65,11 @@ export default function HomeScreen() {
   useEffect(() => {
     if (backgroundError && !alerted.current) {
       alerted.current = true;
-      Alert.alert('Güncellenemedi', errMessage(error) || 'Bağlantını kontrol et.');
+      Alert.alert(t.errors.updateFailed, errMessage(error) || t.errors.checkConnection);
     } else if (!backgroundError) {
       alerted.current = false;
     }
-  }, [backgroundError, error]);
+  }, [backgroundError, error, t]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
@@ -82,7 +85,7 @@ export default function HomeScreen() {
           }}
         >
           <View>
-            <AppText variant="screenTitle">Bugün</AppText>
+            <AppText variant="screenTitle">{t.home.title}</AppText>
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
               {dateLabel}
             </AppText>
@@ -110,7 +113,7 @@ export default function HomeScreen() {
             <HomeSkeleton />
           ) : firstLoadError ? (
             <ErrorState
-              message="Challenge'ların yüklenemedi."
+              message={t.home.challengesLoadFailed}
               detail={errMessage(error)}
               onRetry={retry}
             />
@@ -135,7 +138,7 @@ export default function HomeScreen() {
               {/* completed — calm */}
               {done.length > 0 ? (
                 <View style={{ marginTop: 16 }}>
-                  <SectionLabel>Tamamlandı</SectionLabel>
+                  <SectionLabel>{t.home.completed}</SectionLabel>
                   <View style={{ gap: 10, marginTop: 12 }}>
                     {done.map((c) => (
                       <Animated.View key={c.id} layout={LinearTransition} entering={FadeIn}>
@@ -149,7 +152,7 @@ export default function HomeScreen() {
               {/* upcoming — faint */}
               {upcoming.length > 0 ? (
                 <View style={{ marginTop: spacing.section }}>
-                  <SectionLabel>Yakında</SectionLabel>
+                  <SectionLabel>{t.home.upcoming}</SectionLabel>
                   <View style={{ marginTop: 4 }}>
                     {upcoming.map((c) => (
                       <UpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />

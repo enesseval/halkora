@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return fail('Oturum bulunamadı.', 401);
+    if (!authHeader) return fail('SESSION_MISSING', 401);
 
     // Bound to the CALLER's own JWT — only used to resolve who is calling,
     // exactly like check-in/index.ts.
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
     const { data: userData, error: userErr } = await authed.auth.getUser();
-    if (userErr || !userData.user) return fail('Geçersiz oturum.', 401);
+    if (userErr || !userData.user) return fail('INVALID_SESSION', 401);
     const userId = userData.user.id;
 
     const admin = createClient(

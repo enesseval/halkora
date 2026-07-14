@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius } from '@/theme/tokens';
 import { Challenge } from '@/data/types';
 import { completedCount } from '@/hooks';
+import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AvatarStack } from './ui';
 
@@ -14,6 +15,7 @@ interface Props {
 
 /** E2 — big actionable card for a challenge still awaiting today's check-in. */
 export function PendingCard({ challenge, onPress, onCheckIn }: Props) {
+  const { t } = useT();
   const done = completedCount(challenge);
   const total = challenge.participants.length;
   const doneAvatars = challenge.participants
@@ -85,7 +87,7 @@ export function PendingCard({ challenge, onPress, onCheckIn }: Props) {
                 fontVariant: ['tabular-nums'],
               }}
             >
-              {done}/{total} tamamladı
+              {t.home.donePct(done, total)}
             </Text>
           </View>
         </View>
@@ -125,7 +127,7 @@ export function PendingCard({ challenge, onPress, onCheckIn }: Props) {
         })}
       >
         <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>
-          Check-in
+          {t.common.checkIn}
         </Text>
       </Pressable>
     </Pressable>
@@ -140,6 +142,7 @@ export function CompletedCard({
   challenge: Challenge;
   onPress: () => void;
 }) {
+  const { t } = useT();
   return (
     <Pressable
       onPress={() => {
@@ -181,8 +184,7 @@ export function CompletedCard({
             fontVariant: ['tabular-nums'],
           }}
         >
-          <Text style={{ color: colors.ember }}>✓</Text> Tamamlandı · Gün{' '}
-          {challenge.currentDay}/{challenge.totalDays}
+          <Text style={{ color: colors.ember }}>✓</Text> {t.home.completedOn(challenge.currentDay, challenge.totalDays)}
         </Text>
       </View>
     </Pressable>
@@ -197,6 +199,7 @@ export function UpcomingRow({
   challenge: Challenge;
   onPress: () => void;
 }) {
+  const { t } = useT();
   return (
     <Pressable
       onPress={() => {
@@ -225,7 +228,7 @@ export function UpcomingRow({
           {'  ·  '}
           {challenge.startsWhen}
           {'  ·  '}
-          {challenge.participants.length} kişi hazır
+          {t.home.peopleReady(challenge.participants.length)}
         </Text>
       </Text>
     </Pressable>

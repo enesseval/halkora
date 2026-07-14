@@ -7,6 +7,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { AppText, Button, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { errMessage } from '@/lib/errors';
+import { useT } from '@/i18n';
 import type { SegmentState } from '@/hooks';
 
 const LOGO_DAYS: SegmentState[] = [
@@ -16,6 +17,7 @@ const LOGO_DAYS: SegmentState[] = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { configured, signInWithApple, signInAnonymously } = useAuth();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function WelcomeScreen() {
       await fn();
     } catch (e) {
       // Surface the real reason (e.g. "Anonymous sign-ins are disabled").
-      setErr(errMessage(e) || 'Giriş yapılamadı. Tekrar dene.');
+      setErr(errMessage(e) || t.errors.signInFailed);
       setBusy(false);
     }
   };
@@ -44,20 +46,20 @@ export default function WelcomeScreen() {
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ProgressRing totalDays={12} days={LOGO_DAYS} size="L" />
         <AppText variant="hero" style={{ marginTop: 32 }}>
-          Halkora
+          {t.common.appName}
         </AppText>
         <AppText
           variant="body"
           color={colors.textSecondary}
           style={{ textAlign: 'center', marginTop: 12, maxWidth: 280 }}
         >
-          Başkalarıyla birlikte hesap verebilir kalmanın en kolay yolu.
+          {t.welcome.tagline}
         </AppText>
       </View>
 
       <View style={{ gap: 12, paddingBottom: spacing.section }}>
         <Button
-          label="Apple ile devam et"
+          label={t.welcome.continueWithApple}
           onPress={() => run(signInWithApple)}
           disabled={busy}
           style={{ backgroundColor: colors.textPrimary }}
@@ -77,7 +79,7 @@ export default function WelcomeScreen() {
           onPress={() => run(signInAnonymously)}
           style={{ textAlign: 'center' }}
         >
-          Misafir olarak devam et
+          {t.welcome.continueAsGuest}
         </AppText>
         {err ? (
           <AppText variant="meta" color={colors.joker} style={{ textAlign: 'center' }}>
@@ -89,7 +91,7 @@ export default function WelcomeScreen() {
             color={colors.textTertiary}
             style={{ textAlign: 'center', marginTop: 8 }}
           >
-            Devam ederek kullanım koşullarını kabul edersin.
+            {t.welcome.terms}
           </AppText>
         )}
       </View>

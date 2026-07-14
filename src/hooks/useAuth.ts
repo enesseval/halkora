@@ -6,7 +6,8 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { registerForPushToken } from '@/lib/push';
-import { savePushToken, clearPushToken, deleteAccount as deleteAccountRequest } from '@/data/profile';
+import { savePushToken, clearPushToken, saveLocale, deleteAccount as deleteAccountRequest } from '@/data/profile';
+import { getDict, useI18nStore } from '@/i18n';
 
 /** "Selin Nur" -> "SN" */
 export function initialsFrom(name: string): string {
@@ -130,6 +131,28 @@ export function useSyncPushToken(): void {
   }, [ready, session, name]);
 }
 
+/**
+ * Keeps `profiles.locale` in sync with the app's current language — read by
+ * the `notify` / `evening-reminder` Edge Functions (docs/PHASE2-SUPABASE.md
+ * "Ek N") so push copy matches whatever language this device is showing,
+ * not just whatever it was at signup. Fires once the user is signed in +
+ * onboarded, and again any time they switch language from Settings.
+ */
+export function useSyncLocale(): void {
+  const ready = useAuthStore((s) => s.ready);
+  const session = useAuthStore((s) => s.session);
+  const name = useAuthStore((s) => s.name);
+  const locale = useI18nStore((s) => s.locale);
+  const lastSaved = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !ready || !session || !name) return;
+    if (locale === lastSaved.current) return;
+    lastSaved.current = locale;
+    saveLocale(session.user.id, locale).catch(() => {});
+  }, [ready, session, name, locale]);
+}
+
 /* ---------------- actions ---------------- */
 
 async function signInAnonymously(): Promise<void> {
@@ -163,7 +186,7 @@ async function signInWithApple(): Promise<void> {
     if (isAppleCancellation(e)) return; // user dismissed the sheet, not an error
     throw e;
   }
-  if (!credential.identityToken) throw new Error('Apple girişi tamamlanamadı.');
+  if (!credential.identityToken) throw new Error(getDict().errors.appleIncomplete);
   const { error } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
     token: credential.identityToken,
@@ -179,7 +202,7 @@ async function signInWithApple(): Promise<void> {
  */
 async function linkAppleIdentity(): Promise<void> {
   if (Platform.OS !== 'ios' || !(await AppleAuthentication.isAvailableAsync())) {
-    throw new Error('Apple ile giriş bu cihazda kullanılamıyor.');
+    throw new Error(getDict().errors.appleUnavailable);
   }
   let credential: AppleAuthentication.AppleAuthenticationCredential;
   try {
@@ -190,7 +213,7 @@ async function linkAppleIdentity(): Promise<void> {
     if (isAppleCancellation(e)) return;
     throw e;
   }
-  if (!credential.identityToken) throw new Error('Apple girişi tamamlanamadı.');
+  if (!credential.identityToken) throw new Error(getDict().errors.appleIncomplete);
   const { error } = await supabase.auth.linkIdentity({
     provider: 'apple',
     token: credential.identityToken,

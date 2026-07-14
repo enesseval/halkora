@@ -1,4 +1,18 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import { getDict } from '@/i18n';
+
+/**
+ * RPCs (Postgres `raise exception`) and Edge Functions (`fail()`) return a
+ * stable UPPER_SNAKE_CASE code as the error message instead of hardcoded
+ * prose, so the client can show it in whatever language is active. A code
+ * with no dictionary entry (or a message that was never a code to begin
+ * with — a raw Postgres/network error, say) falls through unchanged, so
+ * this never turns a real error into a blank/broken message.
+ */
+function localizeIfCode(raw: string): string {
+  const codes = getDict().errors.codes as Record<string, string>;
+  return codes[raw] ?? raw;
+}
 
 /**
  * Supabase errors (PostgrestError, AuthError, FunctionsHttpError) are plain
@@ -7,10 +21,10 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
  * Object]" instead of the real reason. This checks for `.message` first.
  */
 export function errMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
+  if (e instanceof Error) return localizeIfCode(e.message);
   if (e && typeof e === 'object' && 'message' in e) {
     const m = (e as { message?: unknown }).message;
-    if (typeof m === 'string' && m) return m;
+    if (typeof m === 'string' && m) return localizeIfCode(m);
   }
   try {
     return JSON.stringify(e);
@@ -24,7 +38,7 @@ export async function edgeFunctionError(e: unknown): Promise<Error> {
   if (e instanceof FunctionsHttpError) {
     try {
       const body = await e.context.json();
-      if (body?.error) return new Error(body.error as string);
+      if (body?.error) return new Error(localizeIfCode(body.error as string));
     } catch {
       // fall through to the generic message below
     }

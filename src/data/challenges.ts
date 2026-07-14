@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
 import { buildDays, formatShortDate } from '@/lib/day';
+import { getDict } from '@/i18n';
 
 export interface InsertedChallenge {
   id: string;
@@ -163,15 +164,16 @@ function mapRow(
     row.status === 'completed' ? 'completed' : dateBasedStatus;
   const currentDay = status === 'upcoming' ? 0 : Math.min(rawDay, row.total_days);
 
+  const t = getDict();
   // "Yarın başlıyor" only when it's actually tomorrow — a challenge starting
   // in 20 days showed that same label before this fix, which is just wrong.
   const daysUntilStart = -diff;
   const startsWhen =
     status === 'upcoming'
       ? daysUntilStart === 1
-        ? 'Yarın başlıyor'
-        : `${formatShortDate(new Date(`${row.start_date}T00:00:00`))}'da başlıyor`
-      : 'Devam ediyor';
+        ? t.common.startsTomorrow
+        : t.common.startsOn(formatShortDate(new Date(`${row.start_date}T00:00:00`)))
+      : t.common.ongoing;
 
   const myParticipant = parts.find((p) => p.user_id === myUserId);
   const myCheckIns = myParticipant
@@ -206,7 +208,7 @@ function mapRow(
 
   const participants: Participant[] = parts.map((p) => {
     const prof = profMap.get(p.user_id);
-    const name = prof?.name ?? 'Katılımcı';
+    const name = prof?.name ?? t.common.person;
     const todayCi = checkIns.find((c) => c.participant_id === p.id && c.day_number === currentDay);
     // Every day this participant covered (done or joker) — the E9 leaderboard.
     const completedDays = checkIns.filter((c) => c.participant_id === p.id).length;
@@ -238,7 +240,7 @@ function mapRow(
   return {
     id: row.id,
     title: row.title,
-    dailyAction: `Bugün: ${row.daily_action}`,
+    dailyAction: `${t.common.today}: ${row.daily_action}`,
     totalDays: row.total_days,
     currentDay,
     days: buildDays(row.total_days, explicit),
@@ -250,7 +252,7 @@ function mapRow(
     jokerRemaining: Math.max(row.joker_allowance - jokerUsed, 0),
     hasMissedYesterday,
     inviteCode: row.invite_code,
-    scheduleSummary: `${row.daily_action} · ${row.total_days} gün`,
+    scheduleSummary: t.common.scheduleSummary(row.daily_action, row.total_days),
     startsWhen,
     firstDayJoinOnly: row.first_day_join_only,
     // Client-side mirror of the join_challenge_by_code RPC's check (Ek M) —

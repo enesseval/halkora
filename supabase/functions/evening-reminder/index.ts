@@ -19,6 +19,27 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
+// Kept in sync by hand with src/i18n/tr.ts + en.ts — see notify/index.ts's
+// comment for why this Edge Function can't just import those directly.
+const COPY = {
+  tr: {
+    title: 'Halkan bekliyor',
+    single: 'Bugün için check-in yapmadın — halka seni bekliyor.',
+    multi: (n: number) => `${n} halka bugün seni bekliyor.`,
+  },
+  en: {
+    title: 'Your ring is waiting',
+    single: "You haven't checked in today — your ring is waiting on you.",
+    multi: (n: number) => `${n} rings are waiting on you today.`,
+  },
+} as const;
+
+type Locale = keyof typeof COPY;
+
+function copyFor(locale: string | null | undefined): (typeof COPY)['tr'] {
+  return COPY[(locale as Locale) ?? 'tr'] ?? COPY.tr;
+}
+
 function localHour(timeZone: string): number {
   return Number(
     new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hour12: false }).format(new Date()),
@@ -94,7 +115,7 @@ Deno.serve(async (req) => {
 
     const userIds = Array.from(pendingByUser.keys());
     const [{ data: profiles }, { data: tokenRows }] = await Promise.all([
-      admin.from('profiles').select('id, last_reminder_date').in('id', userIds),
+      admin.from('profiles').select('id, last_reminder_date, locale').in('id', userIds),
       admin.from('push_tokens').select('user_id, token').in('user_id', userIds),
     ]);
     const tokenByUser = new Map((tokenRows ?? []).map((r) => [r.user_id as string, r.token as string]));
@@ -115,13 +136,11 @@ Deno.serve(async (req) => {
       const pending = pendingByUser.get(profile.id as string);
       if (!pending || pending.size === 0) continue;
       const [firstChallengeId] = pending;
+      const c = copyFor(profile.locale as string | null);
       messages.push({
         to: token,
-        title: 'Halkan bekliyor',
-        body:
-          pending.size === 1
-            ? 'Bugün için check-in yapmadın — halka seni bekliyor.'
-            : `${pending.size} halka bugün seni bekliyor.`,
+        title: c.title,
+        body: pending.size === 1 ? c.single : c.multi(pending.size),
         data: { challengeId: firstChallengeId },
       });
       remindedIds.push(profile.id as string);

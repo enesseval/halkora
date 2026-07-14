@@ -15,10 +15,12 @@ import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { useT } from '@/i18n';
 
 export default function InviteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useT();
   const challenge = useChallenge(id);
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   // The animated INVITE_JOINERS list is a Phase-1 demo-only flourish — a real
@@ -27,9 +29,9 @@ export default function InviteScreen() {
   const [joined, setJoined] = useState(0);
 
   useEffect(() => {
-    if (isSupabaseConfigured || joined >= INVITE_JOINERS.length) return;
-    const t = setTimeout(() => setJoined((n) => n + 1), 3000);
-    return () => clearTimeout(t);
+    if (isSupabaseConfigured || joined >= INVITE_JOINERS().length) return;
+    const timer = setTimeout(() => setJoined((n) => n + 1), 3000);
+    return () => clearTimeout(timer);
   }, [joined]);
 
   if (!challenge) {
@@ -45,9 +47,9 @@ export default function InviteScreen() {
         {loading ? (
           <RingScreenSkeleton />
         ) : firstLoadError ? (
-          <ErrorState message="Challenge yüklenemedi." detail={errMessage(error)} onRetry={refetch} />
+          <ErrorState message={t.detail.loadFailed} detail={errMessage(error)} onRetry={refetch} />
         ) : (
-          <ErrorState message="Challenge bulunamadı." />
+          <ErrorState message={t.detail.notFound} />
         )}
       </Screen>
     );
@@ -62,10 +64,10 @@ export default function InviteScreen() {
       </View>
 
       <AppText variant="screenTitle" style={{ marginTop: 8 }}>
-        Hazır. Şimdi grubunu çağır.
+        {t.invite.heading}
       </AppText>
       <AppText variant="secondary" style={{ marginTop: 8 }}>
-        Challenge {challenge.startsWhen}.
+        {t.invite.startsWhen(challenge.startsWhen)}
       </AppText>
 
       {/* summary card */}
@@ -108,7 +110,7 @@ export default function InviteScreen() {
       <View style={{ marginTop: 24 }}>
         {challenge.joinClosed ? (
           <AppText variant="secondary" color={colors.textTertiary} style={{ textAlign: 'center' }}>
-            Katılım yalnızca ilk gün açıktı, artık kapalı.
+            {t.invite.joinClosed}
           </AppText>
         ) : (
           <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
@@ -128,6 +130,7 @@ export default function InviteScreen() {
 /** Real mode: the challenge's actual participants (excluding the owner/self),
  * kept live by useChallengesQuery's polling — never fake people. */
 function RealJoiners({ participants }: { participants: Participant[] }) {
+  const { t } = useT();
   const others = participants.filter((p) => !p.isMe);
   return (
     <>
@@ -137,7 +140,7 @@ function RealJoiners({ participants }: { participants: Participant[] }) {
         tabular
         style={{ textTransform: 'uppercase', letterSpacing: 1.2, marginTop: spacing.section, marginBottom: 8 }}
       >
-        Katılanlar · {others.length}
+        {t.invite.participantsCount(others.length)}
       </AppText>
       <View>
         {others.map((p) => (
@@ -169,7 +172,7 @@ function RealJoiners({ participants }: { participants: Participant[] }) {
             }}
           />
           <AppText variant="secondary" color={colors.textTertiary}>
-            Davet linki açık...
+            {t.invite.linkOpen}
           </AppText>
         </View>
       </View>
@@ -179,6 +182,8 @@ function RealJoiners({ participants }: { participants: Participant[] }) {
 
 /** Phase-1 demo-only: animates in a few fake names so the empty screen isn't blank. */
 function MockJoiners({ joined }: { joined: number }) {
+  const { t } = useT();
+  const joiners = INVITE_JOINERS();
   return (
     <>
       <AppText
@@ -187,10 +192,10 @@ function MockJoiners({ joined }: { joined: number }) {
         tabular
         style={{ textTransform: 'uppercase', letterSpacing: 1.2, marginTop: spacing.section, marginBottom: 8 }}
       >
-        Katılanlar · {joined}
+        {t.invite.participantsCount(joined)}
       </AppText>
       <View>
-        {INVITE_JOINERS.slice(0, joined).map((j, i) => (
+        {joiners.slice(0, joined).map((j, i) => (
           <Animated.View
             key={j.id}
             entering={FadeIn.duration(300)}
@@ -208,11 +213,11 @@ function MockJoiners({ joined }: { joined: number }) {
               {j.name} <AppText color={colors.ember}>✓</AppText>
             </AppText>
             <AppText variant="meta" color={colors.textTertiary}>
-              {i === 0 ? 'az önce' : `${i * 2} dk`}
+              {i === 0 ? t.invite.justNow : t.invite.minutesAgo(i * 2)}
             </AppText>
           </Animated.View>
         ))}
-        {joined < INVITE_JOINERS.length ? (
+        {joined < joiners.length ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
             <View
               style={{
