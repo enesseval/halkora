@@ -13,7 +13,7 @@
       "associatedDomains": [
         "applinks:halkora.app"
       ],
-      "bundleIdentifier": "com.enesseval.halkora",
+      "bundleIdentifier": "com.halkora.app",
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
         "CFBundleLocalizations": ["tr", "en"],
@@ -21,7 +21,7 @@
       }
     },
     "android": {
-      "package": "com.enesseval.halkora",
+      "package": "com.halkora.app",
       "adaptiveIcon": {
         "backgroundColor": "#0D0E11",
         "foregroundImage": "./assets/android-icon-foreground.png",
