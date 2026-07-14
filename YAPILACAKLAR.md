@@ -102,8 +102,16 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
       participants da ekli).
 - [x] **Auth → URL Configuration**: redirect URL'e `halkora://` ekli mi teyit et
       (şema `thechallenge`'dan `halkora`'ya değişti — dashboard'da eskisi kalmış olabilir).
-- [ ] **API rate limit** ayarlarının açık olduğunu doğrula (Settings → API) —
-      `get_challenge_preview` herkese açık RPC (Ek K §2 notu).
+- [x] ~~API rate limit ayarlarının açık olduğunu doğrula (Settings → API)~~ —
+      **düzeltme:** bu yanlış bir yönlendirmeydi, Supabase Dashboard'da
+      `get_challenge_preview` gibi herkese açık RPC'ler için genel amaçlı bir
+      "API rate limit" toggle'ı **yok**. Dashboard'daki tek rate-limit paneli
+      Authentication → Rate Limits — o da yalnızca auth uçlarını (OTP/e-posta
+      gönderimi, kayıt, token yenileme) kapsıyor, RPC çağrılarını değil. Yani
+      kontrol edecek bir yer yok; brute-force koruması tamamen Ek K §2'de
+      yapılan kod alanı genişletmesine (10 hex karakter, ~1 trilyon
+      kombinasyon) dayanıyor — bu, gerçekçi hiçbir saldırı hızında pratikte
+      taranamayacak kadar büyük, ekstra bir dashboard ayarına ihtiyaç yok.
 - [x] 🔐 **Not:** denetim çıktısında service role key + webhook secret görünüyor
       (webhook tanımları bunları header olarak taşıyor, normal) — o çıktıyı
       herkese açık bir yere yapıştırma. Paylaştıysan: Dashboard'dan JWT secret
@@ -111,13 +119,28 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
 
 ## 4. Apple Developer ($99/yıl hesap)
 
-- [ ] **App ID**: `com.enesseval.halkora` olarak oluştur/güncelle
-      (⚠️ app.json artık bu ID'yi kullanıyor — eski `com.anonymous.halkora`
-      placeholder'ıydı, App Store'a bir kez çıkınca bundle ID değiştirilemez;
-      farklı bir ID istiyorsan ŞİMDİ söyle, app.json'ı ona göre düzeltelim).
-- [] App ID'de **Push Notifications** capability + **APNs Auth Key (.p8)**
-      oluştur → `npx eas-cli credentials` ile EAS'a yükle (Ek I §5).
-- [ ] App ID'de **Sign In with Apple** capability (primary) + Supabase
+- [ ] ⚠️ **Bundle ID kesinleşti: `com.halkora.app`** — app.json güncellendi
+      (hem `ios.bundleIdentifier` hem `android.package`). Şu an TestFlight'ta
+      olan build `com.anonymous.halkora` ile atılmıştı (Expo'nun literal
+      fallback placeholder'ı — kalıcı olması hiç mantıklı değildi, bu yüzden
+      şimdi, henüz App Store'da canlıya çıkmadan değiştiriyoruz). Geçiş
+      adımları:
+  - [ ] Apple Developer → Certificates, IDs & Profiles → Identifiers'da
+        **yeni bir App ID** kaydet: `com.halkora.app`. Eski
+        `com.anonymous.halkora` kaydını silmene gerek yok, dursun.
+  - [ ] App Store Connect'te **yeni bir app kaydı** oluştur, bu yeni Bundle
+        ID'yi seç (App Store Connect'teki bir app kaydı hangi bundle ID ile
+        oluşturulduysa ona kilitleniyor — eski kaydı yeni ID'ye çeviremeyiz).
+  - [ ] `npx eas-cli build --platform ios --profile production` ile yeni bir
+        build al (prebuild yeni `bundleIdentifier`'ı otomatik alır, elle bir
+        şey yapmana gerek yok) → yeni App Store Connect kaydına submit et.
+  - [ ] TestFlight test kullanıcılarını yeni app kaydına tekrar davet et —
+        eski `com.anonymous.halkora` build'i/app kaydı artık kullanılmayacak,
+        silmek zorunda değilsin, sessizce terk edebilirsin.
+- [ ] Yeni App ID'de (`com.halkora.app`) **Push Notifications** capability +
+      **APNs Auth Key (.p8)** oluştur → `npx eas-cli credentials` ile EAS'a
+      yükle (Ek I §5).
+- [ ] Yeni App ID'de **Sign In with Apple** capability (primary) + Supabase
       Dashboard → Auth → Providers → Apple ayarları + "Allow manual linking" (Ek J).
 - [ ] Associated Domains: build sonrası Xcode'da capability'nin göründüğünü doğrula.
 
