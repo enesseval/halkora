@@ -5,39 +5,39 @@
 > `docs/PHASE2-SUPABASE.md`'de (Ek referansları aşağıda). Bir adımı bitirince
 > kutucuğu işaretle — bu dosya repo'da kalıcı, her oturumda buradan devam ederiz.
 >
-> ⚠️ **Hangi SQL'lerin zaten çalıştırıldığını bilmiyoruz.** Önce
-> `docs/db-audit.sql`'i SQL Editor'de çalıştırıp çıktısını paylaş — eksikleri
-> netleştirip bu listeyi birlikte güncelleyeceğiz.
+> ✅ **DB denetimi yapıldı (14 Tem 2026)** — `docs/db-audit.sql` çıktısı
+> incelendi. Zaten canlıda olanlar aşağıda işaretli; eksik çıkan HER ŞEY tek
+> dosyada toplandı: **`docs/db-fixes.sql`**.
 
 ---
 
 ## 1. Supabase — SQL Editor
 
-Sırası önemli değil, hepsi idempotent (`if not exists` / `create or replace`):
+- [ ] **`docs/db-fixes.sql`'i baştan sona çalıştır** — denetimde eksik çıkan
+      her şey tek dosyada, idempotent:
+  - `profiles.locale` kolonu (⚠️ Edge Function deploy'undan ÖNCE — yoksa push kırılır)
+  - Davet kodu default'u hâlâ 6 karakter → 10'a çıkarma (Ek K §2)
+  - Nudge "günde 1" unique index'i canlıda yok → spam hâlâ mümkün (Ek K §1)
+  - `join_challenge_by_code` / `restart_challenge` / `end_challenge_early`
+    hâlâ Türkçe prose fırlatıyor → hata kodu versiyonları (Ek G + Ek M §2)
+  - 🐛 `stakes`'e SELECT politikası (denetimin bulduğu gerçek bug: RLS
+    yüzünden bahis metni gerçek modda hiç görünmüyordu)
+  - Mesaj/nudge/tepki insert politikalarına üyelik şartı + `participants`
+    doğrudan insert'ini kurucuyla sınırlama (join-penceresi bypass'ı kapanıyor)
+  - FK index'leri, `status` CHECK'i, SECURITY DEFINER'lara `search_path`
 
-- [ ] **`push_tokens` tablosu + `last_reminder_date`** (Ek I §1) — push token'lar
-      için ayrı, sahibine-özel tablo. Eski `profiles.push_token` kolonu varsa sil:
-      `alter table profiles drop column if exists push_token;`
-- [ ] **Nudge hız sınırı** (Ek K §1) — "aynı kişiye günde 1 nudge" unique index.
-- [ ] **Davet kodu 10 karaktere çıkarma** (Ek K §2) — brute-force direnci.
-- [ ] **`first_day_join_only` kolonu** (Ek M §1) — katılım penceresi özelliği.
-- [ ] **`profiles.locale` kolonu** (Ek N §1) — dile göre push için ZORUNLU:
-      ```sql
-      alter table profiles add column if not exists locale text not null default 'tr';
-      ```
-- [ ] **RPC'leri yeniden çalıştır** (hepsi `create or replace`, drop gerekmez):
-  - `join_challenge_by_code` (Ek M §2 — join penceresi + hata kodları)
-  - `get_challenge_preview` (Ek M §3 — 10 karakterlik kod + `first_day_join_only`)
-  - `restart_challenge` + `end_challenge_early` (Ek G — timezone düzeltmesi + hata kodları)
-- [ ] **pg_cron + pg_net extension'larını aç** (Dashboard → Database → Extensions),
-      sonra `evening-reminder` cron'unu kur (Ek I §4'teki `cron.schedule` SQL'i).
+Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
+- [x] `push_tokens` tablosu + RLS + `profiles.last_reminder_date` (Ek I §1)
+- [x] `first_day_join_only` kolonu + güncel `get_challenge_preview` (Ek M)
+- [x] `handle_new_user` trigger'ı, `is_member`, tüm tablolarda RLS açık
+- [x] pg_cron + pg_net açık, `evening-reminder-hourly` cron'u kurulu ve aktif
 
 ## 2. Supabase — Edge Functions (CLI)
 
-- [ ] **`WEBHOOK_SECRET` üret ve tanımla** (bir kere):
-      `supabase secrets set WEBHOOK_SECRET=<uzun-rastgele-değer>`
-- [ ] **4 fonksiyonu da deploy et** (dördünün de kodu değişti — i18n hata kodları
-      + dile göre push):
+- [x] `WEBHOOK_SECRET` tanımlı (webhook + cron header'larında doğrulandı)
+- [ ] **4 fonksiyonu da YENİDEN deploy et** — dördünün de kodu değişti (i18n
+      hata kodları + dile göre push + `evening-reminder`'ın status filtresi
+      düzeltmesi). ⚠️ Önce `db-fixes.sql` (locale kolonu), sonra deploy:
       ```powershell
       supabase functions deploy notify --no-verify-jwt
       supabase functions deploy evening-reminder --no-verify-jwt
@@ -47,15 +47,18 @@ Sırası önemli değil, hepsi idempotent (`if not exists` / `create or replace`
 
 ## 3. Supabase — Dashboard ayarları
 
-- [ ] **3 DB Webhook** (Database → Webhooks): `check_ins` / `messages` / `nudges`
-      INSERT → `notify` fonksiyonuna POST. Header'lar: `Authorization: Bearer
-      <SERVICE_ROLE_KEY>` + `x-webhook-secret: <WEBHOOK_SECRET>` (Ek I §3).
+- [x] 3 DB Webhook kurulu (`notify-checkin` / `notify-message` / `notify-nudge`,
+      secret header'lı) — denetimde trigger olarak doğrulandı.
+- [x] Realtime: `messages` publication'da (bonus: check_ins / reactions /
+      participants da ekli).
 - [ ] **Auth → URL Configuration**: redirect URL'e `halkora://` ekli mi teyit et
       (şema `thechallenge`'dan `halkora`'ya değişti — dashboard'da eskisi kalmış olabilir).
 - [ ] **API rate limit** ayarlarının açık olduğunu doğrula (Settings → API) —
       `get_challenge_preview` herkese açık RPC (Ek K §2 notu).
-- [ ] **Realtime**: `messages` tablosunun `supabase_realtime` publication'ında
-      olduğunu doğrula (Ek D) — audit sorgusu bunu da gösterecek.
+- [ ] 🔐 **Not:** denetim çıktısında service role key + webhook secret görünüyor
+      (webhook tanımları bunları header olarak taşıyor, normal) — o çıktıyı
+      herkese açık bir yere yapıştırma. Paylaştıysan: Dashboard'dan JWT secret
+      rotasyonu yap ve webhook/cron header'larını yeni key'le güncelle.
 
 ## 4. Apple Developer ($99/yıl hesap)
 

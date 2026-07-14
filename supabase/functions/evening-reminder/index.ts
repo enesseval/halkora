@@ -67,10 +67,17 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    // NOT .eq('status','active'): a "starts tomorrow" challenge is created as
+    // 'upcoming' and nothing ever flips the DB column to 'active' (the client
+    // derives live status from dates) — filtering on 'active' would silently
+    // exclude those groups forever. The day-window check below already skips
+    // challenges that haven't started or have run past total_days; only an
+    // explicit early-end ('completed', set by end_challenge_early) must be
+    // excluded here.
     const { data: challenges } = await admin
       .from('challenges')
       .select('id, start_date, timezone, total_days')
-      .eq('status', 'active');
+      .neq('status', 'completed');
 
     const eveningChallenges = (challenges ?? []).filter((c) => localHour(c.timezone as string) === 20);
     if (eveningChallenges.length === 0) {
