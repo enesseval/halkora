@@ -4,9 +4,9 @@
 // Deploy + wiring (DB Webhooks + the shared secret below): see
 // docs/PHASE2-SUPABASE.md "Ek I". Locale-aware copy: see "Ek N".
 //
-// Invoked by three Database Webhooks (one per table), each posting the
+// Invoked by four Database Webhooks (one per table), each posting the
 // standard Supabase webhook payload:
-//   { type: 'INSERT', table: 'check_ins' | 'messages' | 'nudges', record: {...} }
+//   { type: 'INSERT', table: 'check_ins' | 'messages' | 'nudges' | 'invites', record: {...} }
 //
 // Deployed with --no-verify-jwt (the caller is Supabase's own webhook
 // dispatcher, not a signed-in user) — WEBHOOK_SECRET is what stands in for
@@ -33,6 +33,8 @@ const COPY = {
     checkedIn: (name: string) => `${name} check-in yaptı ✓`,
     nudgeTitle: 'El salla 👋',
     nudgeBody: 'Sana el salladı — sıra sende.',
+    inviteTitle: 'Halka daveti 💌',
+    inviteBody: (name: string, challengeTitle: string) => `${name} seni "${challengeTitle}" halkasına davet etti.`,
     someone: 'Biri',
     challengeFallback: 'Halkan',
   },
@@ -40,6 +42,8 @@ const COPY = {
     checkedIn: (name: string) => `${name} checked in ✓`,
     nudgeTitle: 'Nudge 👋',
     nudgeBody: "Someone nudged you — you're up.",
+    inviteTitle: 'Ring invite 💌',
+    inviteBody: (name: string, challengeTitle: string) => `${name} invited you to "${challengeTitle}".`,
     someone: 'Someone',
     challengeFallback: 'Your ring',
   },
@@ -52,7 +56,7 @@ function copyFor(locale: string | null | undefined): (typeof COPY)['tr'] {
 }
 
 type WebhookPayload = {
-  table: 'check_ins' | 'messages' | 'nudges';
+  table: 'check_ins' | 'messages' | 'nudges' | 'invites';
   record: Record<string, unknown>;
 };
 
@@ -96,8 +100,8 @@ Deno.serve(async (req) => {
     // Chat messages carry their own free-text body (never translated); the
     // other two kinds get locale-aware copy composed per recipient below.
     let messageBody: string | undefined;
-    // nudges target exactly one recipient; the other two notify every other
-    // participant in the challenge.
+    // nudges and invites target exactly one recipient; the other two notify
+    // every other participant in the challenge.
     let onlyRecipient: string | undefined;
 
     if (table === 'check_ins') {
@@ -117,17 +121,26 @@ Deno.serve(async (req) => {
       challengeId = record.challenge_id as string;
       actorUserId = record.from_user as string;
       onlyRecipient = record.to_user as string;
+    } else if (table === 'invites') {
+      challengeId = record.challenge_id as string;
+      actorUserId = record.from_user as string;
+      onlyRecipient = record.to_user as string;
     } else {
       return ok();
     }
     if (!challengeId || !actorUserId) return ok();
 
     const [{ data: challenge }, { data: actorProfile }] = await Promise.all([
-      admin.from('challenges').select('title').eq('id', challengeId).single(),
+      admin.from('challenges').select('title, invite_code').eq('id', challengeId).single(),
       admin.from('profiles').select('name').eq('id', actorUserId).single(),
     ]);
     const actorName = actorProfile?.name as string | undefined;
     const challengeTitle = challenge?.title as string | undefined;
+    // Recipient of an 'invites' row isn't a participant yet — RLS would block
+    // them from reading the challenge if the app routed them straight to
+    // /challenge/{id} on tap, so that tap needs the invite CODE instead
+    // (routes to the public join-preview screen, docs "Ek O" follow-up).
+    const inviteCode = table === 'invites' ? (challenge?.invite_code as string | undefined) : undefined;
 
     let recipientIds: string[];
     if (onlyRecipient) {
@@ -162,11 +175,14 @@ Deno.serve(async (req) => {
         } else if (table === 'nudges') {
           title = c.nudgeTitle;
           body = c.nudgeBody;
+        } else if (table === 'invites') {
+          title = c.inviteTitle;
+          body = c.inviteBody(actorName ?? c.someone, challengeTitle ?? c.challengeFallback);
         } else {
           title = `${actorName ?? c.someone} · ${challengeTitle ?? c.challengeFallback}`;
           body = messageBody ?? '';
         }
-        return { to: r.token as string, title, body, data: { challengeId } };
+        return { to: r.token as string, title, body, data: { challengeId, inviteCode } };
       });
     if (messages.length === 0) return ok();
 

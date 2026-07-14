@@ -269,17 +269,24 @@ handle sistemi davet özelliğinin ön koşulu.
       Madde 2 (davet) bunu henüz çağırmıyor — o ekranın işi.
 - [x] 🧑‍💻 i18n: tüm yeni string'ler tr+en (AGENTS.md kuralı).
 
-### 2. Handle ile davet
+### 2. Handle ile davet — ✅ kod tamam, SQL + webhook senin işin
 
-- [ ] 🧑‍💻 `invites` tablosu: `(challenge_id, from_user, to_user, created_at,
+- [x] 🧑‍💻 `invites` tablosu: `(challenge_id, from_user, to_user, created_at,
       unique(challenge_id, to_user))` + RLS (gönderen yazar — üyelik şartıyla,
-      alıcı okur). Nudge'la aynı desen.
-- [ ] 🧑‍💻 `notify` Edge Function'a 4. tablo: `invites` INSERT → alıcıya
-      dilinde push: "Enes seni 30 Gün Kitap Okuma halkasına davet etti" +
-      `data.challengeId`/davet koduyla join önizlemesine deep link. Yeni DB
-      webhook kurulumu 🔑.
-- [ ] 🧑‍💻 Davet ekranına "@kullanıcıadıyla davet et" alanı: yaz → bul
-      (RPC) → gönder; "bulunamadı" ve "zaten üye/davetli" durumları.
+      alıcı okur). Nudge'la aynı desen. Tek dosyada: `docs/db-invites.sql`
+      — 🔑 SQL Editor'de çalıştırman gerekiyor.
+- [x] 🧑‍💻 `notify` Edge Function'a 4. tablo: `invites` INSERT → alıcıya
+      dilinde push ("Enes seni '30 Gün Kitap Okuma' halkasına davet etti") +
+      `data.inviteCode` ile `/join/{kod}`'a deep link (challenge id'ye değil —
+      alıcı henüz üye değil, RLS onu Detay ekranından zaten engelliyor). 🔑
+      Yeni DB webhook + `notify`'ı yeniden deploy etmen gerekiyor
+      (`docs/PHASE2-SUPABASE.md` "Ek O2").
+- [x] 🧑‍💻 Davet ekranına "@kullanıcıadıyla davet et" alanı: yaz → bul
+      (`find_user_by_username` RPC) → gönder; "bulunamadı", "kendini davet
+      edemezsin", "zaten üye", "zaten davet edilmiş" durumları ayrı ayrı
+      gösteriliyor. Bu davet gerçek katılım değil — yalnızca bir bildirim
+      tetikler, alıcı katılımı `join_challenge_by_code` ile kendisi
+      tamamlar, yani "sadece ilk gün" penceresini asla bypass etmez.
 - [ ] 💡 MVP sonrası: uygulama içi "davetlerim" kutusu (push kaçarsa davet
       kaybolmasın diye Home'da bir satır) — v1'de push + link yeterli.
 

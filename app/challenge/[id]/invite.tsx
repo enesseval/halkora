@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useChallenge, useChallengesQuery, INVITE_JOINERS } from '@/hooks';
-import type { Participant } from '@/hooks';
+import type { Challenge, Participant } from '@/hooks';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { errMessage } from '@/lib/errors';
-import { AppText, Avatar, IconButton, Screen } from '@/components/ui';
+import { useAuth } from '@/hooks/useAuth';
+import { findUserByUsername, sendInvite, isDuplicateInviteError } from '@/data/invites';
+import { AppText, Avatar, Button, IconButton, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
@@ -113,7 +115,14 @@ export default function InviteScreen() {
             {t.invite.joinClosed}
           </AppText>
         ) : (
-          <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+          <>
+            <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+            {/* Real-mode only: no username system in mock mode (Ek O). Same
+                reason it's hidden when joinClosed — sending one would only
+                point the recipient at a join flow that's about to reject
+                them. */}
+            {isSupabaseConfigured ? <InviteByHandle challenge={challenge} /> : null}
+          </>
         )}
       </View>
 
@@ -124,6 +133,104 @@ export default function InviteScreen() {
         <MockJoiners joined={joined} />
       )}
     </Screen>
+  );
+}
+
+/** Real-mode only (Ek O) — resolve an exact @handle and send an invite row;
+ * the recipient still goes through the normal join_challenge_by_code flow
+ * themselves (via the notification's deep link), so this can never bypass
+ * the join window or add someone without their own action. */
+function InviteByHandle({ challenge }: { challenge: Challenge }) {
+  const { t } = useT();
+  const { session } = useAuth();
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
+
+  const submit = async () => {
+    const handle = input.trim().toLowerCase();
+    if (!handle || sending) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setSending(true);
+    setStatus(null);
+    try {
+      const found = await findUserByUsername(handle);
+      if (!found) {
+        setStatus({ kind: 'error', text: t.invite.handleNotFound });
+        return;
+      }
+      if (found.id === session?.user.id) {
+        setStatus({ kind: 'error', text: t.invite.handleIsYou });
+        return;
+      }
+      if (challenge.participants.some((p) => p.id === found.id)) {
+        setStatus({ kind: 'error', text: t.invite.handleAlreadyMember });
+        return;
+      }
+      await sendInvite(challenge.id, found.id);
+      setStatus({ kind: 'success', text: t.invite.byHandleSent(found.name ?? `@${found.username}`) });
+      setInput('');
+    } catch (e) {
+      setStatus({
+        kind: 'error',
+        text: isDuplicateInviteError(e) ? t.invite.handleAlreadyInvited : errMessage(e),
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <View style={{ marginTop: 16 }}>
+      <AppText variant="meta" color={colors.textTertiary} style={{ marginBottom: 8 }}>
+        {t.invite.byHandleTitle}
+      </AppText>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.pill,
+          borderWidth: hairline,
+          borderColor: status?.kind === 'error' ? colors.joker : colors.strokeSubtle,
+          paddingHorizontal: 16,
+          height: 52,
+        }}
+      >
+        <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.textTertiary }}>
+          @
+        </AppText>
+        <TextInput
+          value={input}
+          onChangeText={(raw) => setInput(raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20))}
+          placeholder={t.invite.byHandlePlaceholder}
+          placeholderTextColor={colors.textTertiary}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="send"
+          onSubmitEditing={submit}
+          style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 15 }}
+        />
+      </View>
+      <View style={{ marginTop: 10 }}>
+        <Button
+          label={sending ? t.invite.byHandleSending : t.invite.byHandleSend}
+          variant="secondary"
+          onPress={submit}
+          disabled={!input.trim() || sending}
+        />
+      </View>
+      {status ? (
+        <AppText
+          variant="meta"
+          color={status.kind === 'error' ? colors.joker : colors.ember}
+          style={{ marginTop: 8, textAlign: 'center' }}
+        >
+          {status.text}
+        </AppText>
+      ) : null}
+    </View>
   );
 }
 
@@ -229,7 +336,7 @@ function MockJoiners({ joined }: { joined: number }) {
               }}
             />
             <AppText variant="secondary" color={colors.textTertiary}>
-              Davet linki açık...
+              {t.invite.linkOpen}
             </AppText>
           </View>
         ) : null}

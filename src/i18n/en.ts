@@ -263,6 +263,15 @@ export const en: Dictionary = {
     minutesAgo: (n: number) => (n === 1 ? '1 min' : `${n} min`),
     shareInvite: 'Share invite',
     shareMessage: (title: string, link: string) => `Join "${title}": ${link}`,
+    byHandleTitle: 'Invite by username',
+    byHandlePlaceholder: 'username',
+    byHandleSend: 'Send',
+    byHandleSending: 'Sending…',
+    byHandleSent: (name: string) => `Invited ${name} ✓`,
+    handleNotFound: 'No one has that username.',
+    handleIsYou: "You can't invite yourself.",
+    handleAlreadyMember: "They're already in this ring.",
+    handleAlreadyInvited: "You've already invited them.",
   },
 
   complete: {

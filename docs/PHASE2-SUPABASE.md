@@ -1043,3 +1043,30 @@ Editor'de baştan sona çalıştır (idempotent). İçinde:
 adımının altında canlı `@handle` önizlemesi, Ayarlar'da düzenlenebilir
 "Kullanıcı adı" satırı. Deploy gerektirmiyor — yalnızca SQL, kod zaten
 `main`'de.
+
+## Ek O2 — Handle ile davet (Faz 3C madde 2)
+
+Davet ekranında artık "@kullanıcıadıyla davet et" alanı var. Tek dosyada:
+[`docs/db-invites.sql`](./db-invites.sql) — `invites` tablosu (bir kişi bir
+challenge'a bir kere davet edilebilir, unique constraint) + RLS (gönderen
+yalnızca ÜYESİ OLDUĞU bir challenge için kendi adına yazabilir — nudge/message
+ile aynı üyelik şartı deseni).
+
+**Bu davet gerçek katılım DEĞİL** — yalnızca bir bildirim tetikler; alıcı
+bildirime dokununca `/join/{kod}` ekranına düşer ve katılımı normal
+`join_challenge_by_code` akışıyla kendisi tamamlar. Yani "sadece ilk gün
+katılım" penceresini asla bypass etmez — pencere kapalıysa alıcı normal join
+ekranındaki kapalı-davet mesajını görür.
+
+**🔑 İki manuel adım:**
+1. `docs/db-invites.sql`'i SQL Editor'de çalıştır.
+2. Dashboard → Database → Webhooks'a **4. bir webhook** ekle (mevcut 3'ün
+   aynısı — Ek I §3'teki tabloya bak): tablo `invites`, event `INSERT`, aynı
+   URL, aynı `Authorization`/`x-webhook-secret` header'ları.
+
+`notify` Edge Function'ı bu commit'te `invites` tablosunu da işleyecek
+şekilde güncellendi (alıcının diline göre "X seni Y halkasına davet etti"
+bildirimi) — yeniden deploy etmen gerekiyor:
+```sql
+supabase functions deploy notify --no-verify-jwt
+```

@@ -96,8 +96,15 @@ function useNotificationDeepLink(ready: boolean) {
     if (!ready || Platform.OS === 'web') return;
 
     const go = (data: unknown) => {
-      const challengeId = (data as { challengeId?: string } | undefined)?.challengeId;
-      if (challengeId) router.push(`/challenge/${challengeId}`);
+      const d = data as { challengeId?: string; inviteCode?: string } | undefined;
+      // An invite recipient isn't a participant yet — RLS blocks
+      // /challenge/{id}, so this routes to the public join-preview screen
+      // instead (docs/PHASE2-SUPABASE.md "Ek O" follow-up).
+      if (d?.inviteCode) {
+        router.push(`/join/${d.inviteCode}`);
+      } else if (d?.challengeId) {
+        router.push(`/challenge/${d.challengeId}`);
+      }
     };
 
     if (!handled.current) {

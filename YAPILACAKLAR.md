@@ -44,6 +44,16 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
       artık `@` ile bir değer göstermeli (onboarding'de otomatik atanmış
       olmalı); satıra dokunup değiştirmeyi dene, rezerve bir isim (`admin`
       gibi) veya zaten alınmış bir isim denenince anlamlı hata görmelisin.
+- [ ] **`docs/db-invites.sql`'i SQL Editor'de çalıştır** (Faz 3C madde 2 —
+      handle ile davet) — `invites` tablosu + RLS. Detay: `docs/PHASE2-SUPABASE.md`
+      "Ek O2".
+- [ ] **Dashboard → Database → Webhooks'a 4. bir webhook ekle**: tablo
+      `invites`, event `INSERT`, mevcut 3 webhook'la (Ek I §3) AYNI URL ve
+      header'lar (`Authorization: Bearer <SERVICE_ROLE_KEY>` +
+      `x-webhook-secret: <WEBHOOK_SECRET>`).
+- [ ] Davet ekranında (`/challenge/{id}/invite`) "Kullanıcı adıyla davet et"
+      alanı görünmeli (gerçek modda) — bir @handle yazıp gönder, ikinci bir
+      hesapla/cihazla bildirim gelip gelmediğini doğrula.
 
 ## 2. Supabase — Edge Functions (CLI)
 

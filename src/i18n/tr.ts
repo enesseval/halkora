@@ -267,6 +267,15 @@ export const tr = {
     minutesAgo: (n: number) => `${n} dk`,
     shareInvite: 'Daveti paylaş',
     shareMessage: (title: string, link: string) => `"${title}" challenge'ına katıl: ${link}`,
+    byHandleTitle: 'Kullanıcı adıyla davet et',
+    byHandlePlaceholder: 'kullaniciadi',
+    byHandleSend: 'Gönder',
+    byHandleSending: 'Gönderiliyor…',
+    byHandleSent: (name: string) => `${name} davet edildi ✓`,
+    handleNotFound: 'Bu kullanıcı adıyla biri bulunamadı.',
+    handleIsYou: 'Kendini davet edemezsin.',
+    handleAlreadyMember: 'Bu kişi zaten halkada.',
+    handleAlreadyInvited: 'Bu kişiyi zaten davet ettin.',
   },
 
   complete: {
