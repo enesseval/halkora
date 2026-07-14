@@ -267,7 +267,9 @@ export const tr = {
     statCheckins: 'check-in',
     statCompletion: 'tamamlama',
     stakeResult: (text: string) => `Bahis: ${text}`,
-    rematch: 'Aynı grupla yeni challenge başlat',
+    // Rematch (Faz 3B) henüz yok — aynı gruba otomatik davet göndermiyor,
+    // sadece boş create akışına götürüyor. Metin bunu vaat etmemeli.
+    rematch: 'Yeni bir halka kur',
     shareResult: 'Sonucu paylaş',
     shareMessage: (title: string, totalDays: number) => `"${title}" tamamlandı — ${totalDays} gün, birlikte. 🔥`,
   },

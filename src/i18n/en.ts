@@ -263,7 +263,7 @@ export const en: Dictionary = {
     statCheckins: 'check-ins',
     statCompletion: 'completion',
     stakeResult: (text: string) => `Stake: ${text}`,
-    rematch: 'Start a new challenge with the same group',
+    rematch: 'Start a new ring',
     shareResult: 'Share result',
     shareMessage: (title: string, totalDays: number) =>
       `"${title}" completed — ${totalDays} days, together. 🔥`,

@@ -297,22 +297,23 @@ handle sistemi davet özelliğinin ön koşulu.
       gün katılım — `is_pro` kapısının arkasında. Ücretsizde bugünkü basit
       özet kalır.
 
-### 4. Bitiş ekranı istatistikleri — gerçek veriden
+### 4. Bitiş ekranı istatistikleri — ✅ zaten gerçek veriden (kontrol edildi)
 
-Ek G'deki bilinen eksik: E9 (Bitiş & Kutlama) ekranındaki `finishStats`
-(kişi / toplam check-in / tamamlama %) ve katılımcı sıralaması yalnızca mock
-arşiv verisinde dolu; gerçek bir challenge bitince boş/eksik görünüyor.
-Fast-days testinde ilk göze çarpacak şey bu.
+~~Ek G'deki bilinen eksik~~ — 14 Tem 2026'da kod incelendi: `mapRow`
+(`src/data/challenges.ts`) `finishStats` (kişi/check-in/tamamlama %) ve
+her katılımcının `completedDays`'ini status `'completed'` olan HER
+challenge için gerçek `check_ins`'ten zaten hesaplıyor; mock arşiv
+(`archive1`) ayrı bir demo görünümü, kod yolu paylaşmıyor. Doküman notu
+bayatmış, düzeltildi (Ek G). Gerçekten eksik olan tek şey — `stakeResult`
+("kim kaybetti" metni) — bilinçli olarak hesaplanmıyor: kim kaybettiğine
+grup karar verir, `complete.tsx` bu durumda zaten `stake.text`'e düşüyor.
+Bir sonraki fast-days testinde bu ekranın gerçek veriyle doğru geldiğini
+görmen gerekir; görmezsen bana söyle, o zaman gerçek bir bug'dır.
 
-- [ ] 🧑‍💻 Gerçek challenge için `check_ins`'ten hesapla: katılımcı başına
-      done+joker sayısı, grup tamamlama yüzdesi (payda `total_days ×
-      katılımcı`), sıralama (done > joker tie-break). Veri zaten
-      `fetchMyChallenges`'ın çektiği satırlarda var — yeni sorgu gerekmeyebilir,
-      `mapRow`'da `finishStats`'ı 'completed' durumunda doldurmak yetebilir.
-- [ ] 🧑‍💻 "Aynı grupla yeni challenge başlat" butonunun boş create'e gittiği
-      biliniyor (Faz 3B "Rematch") — bu iş kapsamında DEĞİL, ama bitiş ekranı
-      elden geçerken buton en azından gizlenmeli/etiketlenmeli ki test
-      kullanıcısı kırık akış sanmasın.
+- [x] 🧑‍💻 **Yanıltıcı buton metni düzeltildi:** "Aynı grupla yeni challenge
+      başlat" aslında hiçbir grubu taşımıyor, boş create'e gidiyor (Rematch,
+      Faz 3B'de henüz yok) — metin artık "Yeni bir halka kur" / "Start a new
+      ring" diyor, olmayan bir özelliği vaat etmiyor.
 
 ---
 

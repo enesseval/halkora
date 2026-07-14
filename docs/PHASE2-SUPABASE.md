@@ -547,10 +547,15 @@ grant execute on function public.end_challenge_early(uuid) to authenticated;
 > birleşince, farklı saat diliminde biri ekranda "bugün işaretlenebilir"
 > görüp sunucudan ret yeme sorununu ortadan kaldırıyor.
 
-> ⚠️ Bilinen eksik: E9 (Bitiş & Kutlama) ekranındaki `finishStats` (kişi/check-in/
-> tamamlama %) ve katılımcı sıralaması hâlâ yalnızca **mock arşiv verisinde**
-> (`archive1`) dolu geliyor — gerçek bir challenge'ı `endEarly` ile bitirince o
-> istatistikler henüz `check_ins`'ten hesaplanmıyor. Ayrı bir iş olarak bırakıldı.
+> ✅ Düzeltme (14 Tem 2026): bu notta "E9'daki `finishStats` yalnızca mock
+> arşiv verisinde dolu geliyor" yazıyordu — kod incelemesinde bunun **bayat**
+> olduğu görüldü. `mapRow` (`src/data/challenges.ts`) `finishStats`'ı ve her
+> katılımcının `completedDays`'ini status `'completed'` olan HER challenge
+> için gerçek `check_ins` verisinden zaten hesaplıyor (mock arşiv sadece bir
+> demo görünümü, ayrı bir kod yolu değil). Gerçekten hesaplanmayan tek şey
+> `stakeResult` ("kim kaybetti" metni) — bu bilinçli bir tasarım kararı: kim
+> kaybettiğine grup karar verir, sunucu tahmin edemez; `complete.tsx` bu
+> durumda zaten `stake.text`'e düşüyor.
 
 ## Ek H — EAS Build çökme sorunu (ZORUNLU — TestFlight için)
 
