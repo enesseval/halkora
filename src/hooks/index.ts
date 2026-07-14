@@ -10,7 +10,13 @@ import { Alert } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMockStore, CreateChallengeInput } from '@/stores/mockStore';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { insertChallenge, fetchMyChallenges, restartChallenge, endChallengeEarly } from '@/data/challenges';
+import {
+  insertChallenge,
+  fetchMyChallenges,
+  restartChallenge,
+  endChallengeEarly,
+  updateChallengeDetails,
+} from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
@@ -478,6 +484,7 @@ export function useChallengeActions(id: string) {
   const nudgeMock = useMockStore((s) => s.nudge);
   const restart = useMockStore((s) => s.restart);
   const endEarly = useMockStore((s) => s.endEarly);
+  const updateDetailsMock = useMockStore((s) => s.updateDetails);
   const setChallenges = useMockStore((s) => s.setChallenges);
   const challenge = useChallenge(id);
   const queryClient = useQueryClient();
@@ -562,6 +569,18 @@ export function useChallengeActions(id: string) {
     }
   };
 
+  /** Owner-settings sheet awaits this directly (like saveUsername) so it can
+   * show the error inline instead of a global Alert — unlike the other
+   * actions here, there's no optimistic UI to roll back if it fails. */
+  const doUpdateDetails = async (title: string, dailyAction: string, stakeText: string): Promise<void> => {
+    if (isSupabaseConfigured) {
+      await updateChallengeDetails(id, title, dailyAction, stakeText);
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    } else {
+      updateDetailsMock(id, title, dailyAction, stakeText);
+    }
+  };
+
   return {
     useJoker: doUseJoker,
     ackMissed: () => ackMissed(id),
@@ -570,6 +589,7 @@ export function useChallengeActions(id: string) {
     nudge: doNudge,
     restart: doRestart,
     endEarly: doEndEarly,
+    updateDetails: doUpdateDetails,
   };
 }
 

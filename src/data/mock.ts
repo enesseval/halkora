@@ -27,6 +27,7 @@ function buildC1(m: MockDict): Challenge {
   return {
     firstDayJoinOnly: false,
     joinClosed: false,
+    isOwner: false,
     id: 'c1',
     title: m.c1.title,
     dailyAction: m.c1.dailyAction,
@@ -93,6 +94,7 @@ function buildC2(m: MockDict): Challenge {
   return {
     firstDayJoinOnly: false,
     joinClosed: false,
+    isOwner: false,
     id: 'c2',
     title: m.c2.title,
     dailyAction: m.c2.dailyAction,
@@ -125,6 +127,7 @@ function buildC3(m: MockDict): Challenge {
   return {
     firstDayJoinOnly: false,
     joinClosed: false,
+    isOwner: false,
     id: 'c3',
     title: m.c3.title,
     dailyAction: m.c3.dailyAction,
@@ -164,6 +167,7 @@ function buildC4(m: MockDict): Challenge {
   return {
     firstDayJoinOnly: false,
     joinClosed: false,
+    isOwner: false,
     id: 'c4',
     title: m.c4.title,
     dailyAction: m.c4.dailyAction,
@@ -198,6 +202,7 @@ function buildArchive1(m: MockDict): Challenge {
   return {
     firstDayJoinOnly: false,
     joinClosed: false,
+    isOwner: false,
     id: 'a1',
     title: m.archive1.title,
     dailyAction: m.archive1.dailyAction,

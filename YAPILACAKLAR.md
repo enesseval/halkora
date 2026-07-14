@@ -54,6 +54,12 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
 - [ ] Davet ekranında (`/challenge/{id}/invite`) "Kullanıcı adıyla davet et"
       alanı görünmeli (gerçek modda) — bir @handle yazıp gönder, ikinci bir
       hesapla/cihazla bildirim gelip gelmediğini doğrula.
+- [ ] **`docs/db-owner-settings.sql`'i SQL Editor'de çalıştır** (Faz 3C madde
+      3 — kurucu ayarları) — `update_challenge_details` RPC'si. Detay:
+      `docs/PHASE2-SUPABASE.md` "Ek O3". Deploy yok.
+- [ ] Çalıştırdıktan sonra doğrulama: kurduğun bir halkanın Detay ekranında
+      sağ üstte ⚙️ görünmeli, başlık/günlük eylem/bahis metnini değiştirip
+      kaydedebilmelisin; kurmadığın bir halkada ⚙️ hiç görünmemeli.
 
 ## 2. Supabase — Edge Functions (CLI)
 

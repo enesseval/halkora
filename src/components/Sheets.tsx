@@ -342,3 +342,166 @@ export function UsernameSheet({
     </Animated.View>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Detay ekranı — kurucu ayarları (Faz 3C, docs "Ek O3")               */
+/* ------------------------------------------------------------------ */
+function EditField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <View style={{ marginTop: 16 }}>
+      <AppText variant="meta" color={colors.textTertiary} style={{ marginBottom: 8 }}>
+        {label}
+      </AppText>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textTertiary}
+        style={{
+          height: 50,
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.badge,
+          borderWidth: hairline,
+          borderColor: colors.strokeSubtle,
+          paddingHorizontal: 16,
+          color: colors.textPrimary,
+          fontFamily: fonts.bodyMedium,
+          fontSize: 16,
+        }}
+      />
+    </View>
+  );
+}
+
+export function OwnerSettingsSheet({
+  visible,
+  challenge,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  challenge: Challenge;
+  onClose: () => void;
+  onSave: (title: string, dailyAction: string, stakeText: string) => Promise<void>;
+}) {
+  const { t } = useT();
+  const [title, setTitle] = useState(challenge.title);
+  const [dailyAction, setDailyAction] = useState(challenge.dailyActionRaw ?? '');
+  const [stakeText, setStakeText] = useState(challenge.stake?.text ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setTitle(challenge.title);
+      setDailyAction(challenge.dailyActionRaw ?? '');
+      setStakeText(challenge.stake?.text ?? '');
+      setError(null);
+    }
+    // Deliberately excludes `challenge` from deps — only reset when the
+    // sheet transitions to visible, not on every poll-driven refresh while
+    // it's open (that would wipe whatever the owner is mid-typing).
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const canSave = title.trim().length > 0 && dailyAction.trim().length > 0 && !saving;
+
+  const submit = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(title.trim(), dailyAction.trim(), stakeText.trim());
+      onClose();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        justifyContent: 'flex-end',
+        zIndex: 30,
+      }}
+    >
+      <Pressable style={{ flex: 1 }} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 20,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+            {t.detail.ownerSettingsTitle}
+          </AppText>
+
+          <EditField label={t.detail.ownerSettingsTitleLabel} value={title} onChangeText={setTitle} />
+          <EditField
+            label={t.detail.ownerSettingsDailyActionLabel}
+            value={dailyAction}
+            onChangeText={setDailyAction}
+          />
+          <EditField
+            label={t.detail.ownerSettingsStakeLabel}
+            value={stakeText}
+            onChangeText={setStakeText}
+            placeholder={t.detail.ownerSettingsStakePlaceholder}
+          />
+
+          {error ? (
+            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+              {error}
+            </AppText>
+          ) : null}
+
+          <View style={{ marginTop: 20 }}>
+            <Button
+              label={saving ? t.detail.ownerSettingsSaving : t.detail.ownerSettingsSave}
+              onPress={submit}
+              disabled={!canSave}
+            />
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Animated.View>
+  );
+}

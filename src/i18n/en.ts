@@ -79,6 +79,9 @@ export const en: Dictionary = {
       USERNAME_INVALID: 'Username must be 3-20 characters — lowercase letters, numbers, and underscores only.',
       USERNAME_RESERVED: 'That username isn\'t available.',
       USERNAME_TAKEN: 'That username is already taken.',
+      NOT_THE_OWNER: "You're not this ring's owner.",
+      TITLE_REQUIRED: "Title can't be empty.",
+      DAILY_ACTION_REQUIRED: "Daily action can't be empty.",
     },
   },
 
@@ -251,6 +254,13 @@ export const en: Dictionary = {
     restart: 'Restart',
     endEarly: 'End early',
     daysTogether: (n: number) => (n === 1 ? "You've kept it up for 1 day together." : `You've kept it up for ${n} days together.`),
+    ownerSettingsTitle: 'Ring settings',
+    ownerSettingsTitleLabel: 'Title',
+    ownerSettingsDailyActionLabel: 'Daily action',
+    ownerSettingsStakeLabel: 'Stake (optional)',
+    ownerSettingsStakePlaceholder: 'Write your own stake...',
+    ownerSettingsSave: 'Save',
+    ownerSettingsSaving: 'Saving…',
   },
 
   invite: {

@@ -29,7 +29,7 @@ import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
 import { ParticipantRow } from '@/components/ParticipantRow';
 import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
-import { MissedDaySheet, MomentumSheet } from '@/components/Sheets';
+import { MissedDaySheet, MomentumSheet, OwnerSettingsSheet } from '@/components/Sheets';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
@@ -55,6 +55,7 @@ export default function DetailScreen() {
   const { firstLoadError: chatError, error: chatErrorDetail, retry: retryChat } = useChallengeMessages(id);
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
+  const [showOwnerSettings, setShowOwnerSettings] = useState(false);
 
   const rows = useMemo<Row[]>(() => {
     if (!challenge) return [];
@@ -154,7 +155,13 @@ export default function DetailScreen() {
       >
         {challenge.title}
       </AppText>
-      <View style={{ width: 40 }} />
+      {challenge.isOwner ? (
+        <IconButton size={40} onPress={() => setShowOwnerSettings(true)}>
+          <Feather name="settings" size={18} color={colors.textSecondary} />
+        </IconButton>
+      ) : (
+        <View style={{ width: 40 }} />
+      )}
     </View>
   );
 
@@ -410,6 +417,16 @@ export default function DetailScreen() {
             router.replace(`/challenge/${challenge.id}/complete`);
           }}
           onClose={close}
+        />
+      ) : null}
+
+      {/* Faz 3C madde 3 — owner-only settings */}
+      {showOwnerSettings ? (
+        <OwnerSettingsSheet
+          visible={showOwnerSettings}
+          challenge={challenge}
+          onClose={() => setShowOwnerSettings(false)}
+          onSave={actions.updateDetails}
         />
       ) : null}
     </View>

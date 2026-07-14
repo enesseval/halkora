@@ -77,6 +77,7 @@ interface ChallengeRow {
   joker_allowance: number;
   first_day_join_only: boolean;
   created_at: string;
+  owner_id: string | null;
 }
 
 interface ParticipantRow {
@@ -246,6 +247,7 @@ function mapRow(
     id: row.id,
     title: row.title,
     dailyAction: `${t.common.today}: ${row.daily_action}`,
+    dailyActionRaw: row.daily_action,
     totalDays: row.total_days,
     currentDay,
     days: buildDays(row.total_days, explicit),
@@ -260,6 +262,7 @@ function mapRow(
     scheduleSummary: t.common.scheduleSummary(row.daily_action, row.total_days),
     startsWhen,
     firstDayJoinOnly: row.first_day_join_only,
+    isOwner: row.owner_id === myUserId,
     // Client-side mirror of the join_challenge_by_code RPC's check (Ek M) —
     // display only, the RPC is what actually enforces it server-side.
     joinClosed: row.first_day_join_only && currentDay > 1,
@@ -305,7 +308,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
     supabase
       .from('challenges')
       .select(
-        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at',
+        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at, owner_id',
       )
       .in('id', ids),
     supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),
@@ -382,5 +385,26 @@ export async function restartChallenge(challengeId: string): Promise<void> {
 /** E10 "Erken bitir" — marks the challenge completed. */
 export async function endChallengeEarly(challengeId: string): Promise<void> {
   const { error } = await supabase.rpc('end_challenge_early', { p_challenge_id: challengeId });
+  if (error) throw error;
+}
+
+/**
+ * Faz 3C madde 3 — owner-only edit of title/daily action/stake text.
+ * Deliberately narrow (docs/db-owner-settings.sql): day count, jokers, start
+ * date, and the join window can never be changed this way — they'd change
+ * the meaning/fairness of check-ins the group already made.
+ */
+export async function updateChallengeDetails(
+  challengeId: string,
+  title: string,
+  dailyAction: string,
+  stakeText: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('update_challenge_details', {
+    p_challenge_id: challengeId,
+    p_title: title,
+    p_daily_action: dailyAction,
+    p_stake_text: stakeText,
+  });
   if (error) throw error;
 }

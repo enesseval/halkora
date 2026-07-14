@@ -1070,3 +1070,22 @@ bildirimi) — yeniden deploy etmen gerekiyor:
 ```sql
 supabase functions deploy notify --no-verify-jwt
 ```
+
+## Ek O3 — Kurucu ayarları (Faz 3C madde 3)
+
+Detay ekranında artık kurucuya özel bir ⚙️ ayarlar girişi var — sheet: başlık,
+günlük eylem, bahis metni düzenlenebilir. Tek dosyada:
+[`docs/db-owner-settings.sql`](./db-owner-settings.sql) —
+`update_challenge_details(p_challenge_id, p_title, p_daily_action,
+p_stake_text)` RPC'si, yalnızca `owner_id = auth.uid()` olan kurucu çağırabilir
+(`NOT_THE_OWNER` kodu). Deploy gerekmiyor, yalnızca SQL.
+
+Bilinçli olarak DAR tutuldu: gün sayısı, joker hakkı, başlangıç tarihi,
+katılım penceresi bu RPC'nin kapsamı dışında — Ek G'deki restart/endEarly
+gerekçesiyle aynı: bunlar geçmiş check-in'lerin anlamını/adaletini değiştirir.
+
+> 💡 Not: ROADMAP'te önerilen "başlık değişince sohbete otomatik system
+> mesajı" (grup sessizce değişiklik yaşamasın diye) bu turda YAPILMADI —
+> sunucu tarafında locale-aware system-mesaj kompozisyonu için bugün hiçbir
+> altyapı yok (mesajlar hep istemci metniyle yazılıyor), yeni bir mekanizma
+> icat etmek yerine ayrı, dikkatli bir iş olarak bırakıldı.

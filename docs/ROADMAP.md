@@ -290,19 +290,26 @@ handle sistemi davet özelliğinin ön koşulu.
 - [ ] 💡 MVP sonrası: uygulama içi "davetlerim" kutusu (push kaçarsa davet
       kaybolmasın diye Home'da bir satır) — v1'de push + link yeterli.
 
-### 3. Kurucu ayarları (Detay ekranında ⚙️)
+### 3. Kurucu ayarları (Detay ekranında ⚙️) — ✅ kod tamam, SQL senin işin
 
-- [ ] 🧑‍💻 Detay ekranında yalnızca kurucuya görünen ayarlar girişi → sheet:
-      **başlık, günlük eylem, bahis metni** düzenlenebilir. Gün sayısı, joker,
-      başlangıç tarihi, katılım penceresi bilinçli olarak DÜZENLENEMEZ —
-      bunlar geçmiş check-in'lerin anlamını/adaleti değiştirir (grup 10 gün
-      koştuktan sonra 30 günü 15'e çekmek gibi).
-- [ ] 🧑‍💻 Dar RPC: `update_challenge_details(p_challenge_id, p_title,
-      p_daily_action, p_stake_text)` — owner-only, SECURITY DEFINER. Genel bir
-      UPDATE RLS politikası yerine (Ek G'deki gerekçeyle aynı: geniş policy
-      title/owner dahil her alanı açardı).
+- [x] 🧑‍💻 Detay ekranında yalnızca kurucuya görünen ⚙️ ayarlar girişi (top bar,
+      sağ üstte — kurucu değilsen aynı yerde boş bir spacer var, layout
+      kaymaz) → sheet: **başlık, günlük eylem, bahis metni** düzenlenebilir.
+      Gün sayısı, joker, başlangıç tarihi, katılım penceresi bilinçli olarak
+      DÜZENLENEMEZ — bunlar geçmiş check-in'lerin anlamını/adaleti değiştirir
+      (grup 10 gün koştuktan sonra 30 günü 15'e çekmek gibi).
+- [x] 🧑‍💻 Dar RPC: `update_challenge_details(p_challenge_id, p_title,
+      p_daily_action, p_stake_text)` — owner-only (`NOT_THE_OWNER` kodu),
+      SECURITY DEFINER. Genel bir UPDATE RLS politikası yerine (Ek G'deki
+      gerekçeyle aynı: geniş policy title/owner dahil her alanı açardı). Tek
+      dosyada: `docs/db-owner-settings.sql` — 🔑 SQL Editor'de çalıştırman
+      gerekiyor, deploy yok.
 - [ ] 🧑‍💻 Başlık değişince sohbete system message ("Kurucu halkanın adını
-      '...' yaptı") — grup neyin değiştiğini görsün, sessiz değişiklik olmasın.
+      '...' yaptı") — bu turda YAPILMADI. Sunucu tarafında locale-aware
+      system-mesaj kompozisyonu için bugün hiçbir altyapı yok (mesajlar hep
+      istemci metniyle yazılıyor, `notify`'ın push-copy COPY dict'ine benzer
+      bir mekanizma sohbet mesajları için henüz mevcut değil) — yeni bir
+      mekanizma icat etmek yerine ayrı, dikkatli bir iş olarak bırakıldı.
 - [ ] 💡 Pro bağlantısı (beta sonrası, Faz 4 ile): aynı ayarlar alanına
       "İstatistikler" bölümü — grup tamamlama eğrisi, en istikrarlı üye, gün
       gün katılım — `is_pro` kapısının arkasında. Ücretsizde bugünkü basit

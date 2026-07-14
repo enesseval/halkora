@@ -83,6 +83,9 @@ export const tr = {
       USERNAME_INVALID: 'Kullanıcı adı 3-20 karakter olmalı; yalnızca küçük harf, rakam ve alt çizgi kullanabilirsin.',
       USERNAME_RESERVED: 'Bu kullanıcı adı kullanılamaz.',
       USERNAME_TAKEN: 'Bu kullanıcı adı zaten alınmış.',
+      NOT_THE_OWNER: "Bu halkanın kurucusu değilsin.",
+      TITLE_REQUIRED: 'Başlık boş olamaz.',
+      DAILY_ACTION_REQUIRED: 'Günlük eylem boş olamaz.',
     },
   },
 
@@ -255,6 +258,13 @@ export const tr = {
     restart: 'Yeniden başlat',
     endEarly: 'Erken bitir',
     daysTogether: (n: number) => `${n} gün birlikte devam ettiniz.`,
+    ownerSettingsTitle: 'Halka ayarları',
+    ownerSettingsTitleLabel: 'Başlık',
+    ownerSettingsDailyActionLabel: 'Günlük eylem',
+    ownerSettingsStakeLabel: 'Bahis (opsiyonel)',
+    ownerSettingsStakePlaceholder: 'Kendi bahsini yaz...',
+    ownerSettingsSave: 'Kaydet',
+    ownerSettingsSaving: 'Kaydediliyor…',
   },
 
   invite: {

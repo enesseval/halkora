@@ -52,6 +52,8 @@ interface MockState {
   joinByCode: (code: string, name: string) => string;
   restart: (id: string) => void;
   endEarly: (id: string) => void;
+  /** Faz 3C madde 3 — owner-only edit of title/daily action/stake text. */
+  updateDetails: (id: string, title: string, dailyAction: string, stakeText: string) => void;
   openMomentumDemo: (id: string) => void;
   closeMomentumDemo: () => void;
 }
@@ -227,6 +229,7 @@ export const useMockStore = create<MockState>((set, get) => ({
       id,
       title: input.title || t.common.newChallengeFallback,
       dailyAction: `${t.common.today}: ${input.dailyAction || t.common.completeYourGoalFallback}`,
+      dailyActionRaw: input.dailyAction || t.common.completeYourGoalFallback,
       totalDays: input.totalDays,
       currentDay: input.startTomorrow ? 0 : 1,
       days: buildDays(
@@ -250,6 +253,9 @@ export const useMockStore = create<MockState>((set, get) => ({
       // Mock data doesn't simulate real elapsed time, so a just-created demo
       // challenge is never actually closed to new joiners.
       joinClosed: false,
+      // Whoever runs the create flow is always its owner — matches real
+      // mode's challenges.owner_id.
+      isOwner: true,
       participants: [
         {
           id: ME_ID,
@@ -336,6 +342,24 @@ export const useMockStore = create<MockState>((set, get) => ({
 
   openMomentumDemo: (id) => set({ momentumDemoId: id }),
   closeMomentumDemo: () => set({ momentumDemoId: null }),
+
+  updateDetails: (id, title, dailyAction, stakeText) => {
+    const t = getDict();
+    set((s) => ({
+      challenges: s.challenges.map((c) => {
+        if (c.id !== id) return c;
+        const clean = stakeText.trim();
+        return {
+          ...c,
+          title,
+          dailyAction: `${t.common.today}: ${dailyAction}`,
+          dailyActionRaw: dailyAction,
+          scheduleSummary: t.common.scheduleSummary(dailyAction, c.totalDays),
+          stake: clean ? { mode: c.stake?.mode ?? 'direct', text: clean } : undefined,
+        };
+      }),
+    }));
+  },
 }));
 
 export { firstName };
