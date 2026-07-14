@@ -33,7 +33,7 @@ geldik.
 
 ## 1. Supabase — SQL Editor
 
-- [ ] **`docs/db-fixes.sql`'i baştan sona çalıştır** — denetimde eksik çıkan
+- [x] **`docs/db-fixes.sql`'i baştan sona çalıştır** — denetimde eksik çıkan
       her şey tek dosyada, idempotent:
   - `profiles.locale` kolonu (⚠️ Edge Function deploy'undan ÖNCE — yoksa push kırılır)
   - Davet kodu default'u hâlâ 6 karakter → 10'a çıkarma (Ek K §2)
@@ -54,7 +54,7 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
 
 ## 1,5. Supabase — @kullanıcıadı sistemi (Faz 3C madde 1, yeni)
 
-- [ ] **`docs/db-username.sql`'i SQL Editor'de baştan sona çalıştır** —
+- [x] **`docs/db-username.sql`'i SQL Editor'de baştan sona çalıştır** —
       `reserved_usernames` tablosu, `profiles.username` kolonu + format/
       benzersizlik kısıtları, rezerve-isim trigger'ı, `set_username` ve
       `find_user_by_username` RPC'leri. Detay: `docs/PHASE2-SUPABASE.md`
@@ -64,17 +64,17 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
       artık `@` ile bir değer göstermeli (onboarding'de otomatik atanmış
       olmalı); satıra dokunup değiştirmeyi dene, rezerve bir isim (`admin`
       gibi) veya zaten alınmış bir isim denenince anlamlı hata görmelisin.
-- [ ] **`docs/db-invites.sql`'i SQL Editor'de çalıştır** (Faz 3C madde 2 —
+- [x] **`docs/db-invites.sql`'i SQL Editor'de çalıştır** (Faz 3C madde 2 —
       handle ile davet) — `invites` tablosu + RLS. Detay: `docs/PHASE2-SUPABASE.md`
       "Ek O2".
-- [ ] **Dashboard → Database → Webhooks'a 4. bir webhook ekle**: tablo
+- [x] **Dashboard → Database → Webhooks'a 4. bir webhook ekle**: tablo
       `invites`, event `INSERT`, mevcut 3 webhook'la (Ek I §3) AYNI URL ve
       header'lar (`Authorization: Bearer <SERVICE_ROLE_KEY>` +
       `x-webhook-secret: <WEBHOOK_SECRET>`).
 - [ ] Davet ekranında (`/challenge/{id}/invite`) "Kullanıcı adıyla davet et"
       alanı görünmeli (gerçek modda) — bir @handle yazıp gönder, ikinci bir
       hesapla/cihazla bildirim gelip gelmediğini doğrula.
-- [ ] **`docs/db-owner-settings.sql`'i SQL Editor'de çalıştır** (Faz 3C madde
+- [x] **`docs/db-owner-settings.sql`'i SQL Editor'de çalıştır** (Faz 3C madde
       3 — kurucu ayarları) — `update_challenge_details` RPC'si. Detay:
       `docs/PHASE2-SUPABASE.md` "Ek O3". Deploy yok.
 - [ ] Çalıştırdıktan sonra doğrulama: kurduğun bir halkanın Detay ekranında
@@ -84,7 +84,7 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
 ## 2. Supabase — Edge Functions (CLI)
 
 - [x] `WEBHOOK_SECRET` tanımlı (webhook + cron header'larında doğrulandı)
-- [ ] **4 fonksiyonu da YENİDEN deploy et** — dördünün de kodu değişti (i18n
+- [x] **4 fonksiyonu da YENİDEN deploy et** — dördünün de kodu değişti (i18n
       hata kodları + dile göre push + `evening-reminder`'ın status filtresi
       düzeltmesi). ⚠️ Önce `db-fixes.sql` (locale kolonu), sonra deploy:
       ```powershell
@@ -100,47 +100,24 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
       secret header'lı) — denetimde trigger olarak doğrulandı.
 - [x] Realtime: `messages` publication'da (bonus: check_ins / reactions /
       participants da ekli).
-- [ ] **Auth → URL Configuration**: redirect URL'e `halkora://` ekli mi teyit et
+- [x] **Auth → URL Configuration**: redirect URL'e `halkora://` ekli mi teyit et
       (şema `thechallenge`'dan `halkora`'ya değişti — dashboard'da eskisi kalmış olabilir).
-- [x] ~~API rate limit ayarlarının açık olduğunu doğrula (Settings → API)~~ —
-      **düzeltme:** bu yanlış bir yönlendirmeydi, Supabase Dashboard'da
-      `get_challenge_preview` gibi herkese açık RPC'ler için genel amaçlı bir
-      "API rate limit" toggle'ı **yok**. Dashboard'daki tek rate-limit paneli
-      Authentication → Rate Limits — o da yalnızca auth uçlarını (OTP/e-posta
-      gönderimi, kayıt, token yenileme) kapsıyor, RPC çağrılarını değil. Yani
-      kontrol edecek bir yer yok; brute-force koruması tamamen Ek K §2'de
-      yapılan kod alanı genişletmesine (10 hex karakter, ~1 trilyon
-      kombinasyon) dayanıyor — bu, gerçekçi hiçbir saldırı hızında pratikte
-      taranamayacak kadar büyük, ekstra bir dashboard ayarına ihtiyaç yok.
-- [ ] 🔐 **Not:** denetim çıktısında service role key + webhook secret görünüyor
+- [ ] **API rate limit** ayarlarının açık olduğunu doğrula (Settings → API) —
+      `get_challenge_preview` herkese açık RPC (Ek K §2 notu).
+- [x] 🔐 **Not:** denetim çıktısında service role key + webhook secret görünüyor
       (webhook tanımları bunları header olarak taşıyor, normal) — o çıktıyı
       herkese açık bir yere yapıştırma. Paylaştıysan: Dashboard'dan JWT secret
       rotasyonu yap ve webhook/cron header'larını yeni key'le güncelle.
 
 ## 4. Apple Developer ($99/yıl hesap)
 
-- [ ] ⚠️ **Bundle ID kesinleşti: `com.halkora.app`** — app.json güncellendi
-      (hem `ios.bundleIdentifier` hem `android.package`). Şu an TestFlight'ta
-      olan build `com.anonymous.halkora` ile atılmıştı (Expo'nun literal
-      fallback placeholder'ı — kalıcı olması hiç mantıklı değildi, bu yüzden
-      şimdi, henüz App Store'da canlıya çıkmadan değiştiriyoruz). Geçiş
-      adımları:
-  - [ ] Apple Developer → Certificates, IDs & Profiles → Identifiers'da
-        **yeni bir App ID** kaydet: `com.halkora.app`. Eski
-        `com.anonymous.halkora` kaydını silmene gerek yok, dursun.
-  - [ ] App Store Connect'te **yeni bir app kaydı** oluştur, bu yeni Bundle
-        ID'yi seç (App Store Connect'teki bir app kaydı hangi bundle ID ile
-        oluşturulduysa ona kilitleniyor — eski kaydı yeni ID'ye çeviremeyiz).
-  - [ ] `npx eas-cli build --platform ios --profile production` ile yeni bir
-        build al (prebuild yeni `bundleIdentifier`'ı otomatik alır, elle bir
-        şey yapmana gerek yok) → yeni App Store Connect kaydına submit et.
-  - [ ] TestFlight test kullanıcılarını yeni app kaydına tekrar davet et —
-        eski `com.anonymous.halkora` build'i/app kaydı artık kullanılmayacak,
-        silmek zorunda değilsin, sessizce terk edebilirsin.
-- [ ] Yeni App ID'de (`com.halkora.app`) **Push Notifications** capability +
-      **APNs Auth Key (.p8)** oluştur → `npx eas-cli credentials` ile EAS'a
-      yükle (Ek I §5).
-- [ ] Yeni App ID'de **Sign In with Apple** capability (primary) + Supabase
+- [ ] **App ID**: `com.enesseval.halkora` olarak oluştur/güncelle
+      (⚠️ app.json artık bu ID'yi kullanıyor — eski `com.anonymous.halkora`
+      placeholder'ıydı, App Store'a bir kez çıkınca bundle ID değiştirilemez;
+      farklı bir ID istiyorsan ŞİMDİ söyle, app.json'ı ona göre düzeltelim).
+- [] App ID'de **Push Notifications** capability + **APNs Auth Key (.p8)**
+      oluştur → `npx eas-cli credentials` ile EAS'a yükle (Ek I §5).
+- [ ] App ID'de **Sign In with Apple** capability (primary) + Supabase
       Dashboard → Auth → Providers → Apple ayarları + "Allow manual linking" (Ek J).
 - [ ] Associated Domains: build sonrası Xcode'da capability'nin göründüğünü doğrula.
 
