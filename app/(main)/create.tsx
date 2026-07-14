@@ -3,6 +3,8 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View 
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -125,42 +127,89 @@ function DayPickerTrigger({
   );
 }
 
-/** The real native wheel (UIPickerView on iOS, a dropdown/dialog on Android —
- * each platform's own convention, matching how DateTimePicker below already
- * varies by platform) for the custom day count (1..max). Replaces an earlier
- * hand-rolled ScrollView-snap approximation that didn't look/feel like
- * Apple's actual picker. */
-function DayWheelPicker({
+/**
+ * Native wheel (UIPickerView on iOS, a dropdown/dialog on Android — each
+ * platform's own convention, matching DateTimePicker below) for the custom
+ * day count (1..max), presented as a real modal: blurred/dimmed backdrop +
+ * slide-up sheet, same as every other picker/action in this app (Ek
+ * MomentumSheet/UsernameSheet) — not an inline panel wedged into the page
+ * that pushes everything below it down.
+ */
+function DayPickerSheet({
+  visible,
   max,
   value,
   onChange,
+  onClose,
 }: {
+  visible: boolean;
   max: number;
   value: number;
   onChange: (n: number) => void;
+  onClose: () => void;
 }) {
   const { t } = useT();
   const days = useMemo(() => Array.from({ length: max }, (_, i) => i + 1), [max]);
 
+  if (!visible) return null;
+
   return (
-    <Picker
-      selectedValue={value}
-      onValueChange={(v) => {
-        Haptics.selectionAsync().catch(() => {});
-        onChange(Number(v));
-      }}
-      itemStyle={{
-        color: colors.textPrimary,
-        fontFamily: fonts.bodyMedium,
-        fontSize: 19,
-      }}
-      style={Platform.OS !== 'ios' ? { color: colors.textPrimary } : undefined}
-      dropdownIconColor={colors.textPrimary}
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}
     >
-      {days.map((d) => (
-        <Picker.Item key={d} label={t.common.dayCount(d)} value={d} />
-      ))}
-    </Picker>
+      <BlurView intensity={40} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 12,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22, marginBottom: 4 }}>
+            {t.create.titles[1]}
+          </AppText>
+          <Picker
+            selectedValue={value}
+            onValueChange={(v) => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(Number(v));
+            }}
+            itemStyle={{
+              color: colors.textPrimary,
+              fontFamily: fonts.bodyMedium,
+              fontSize: 19,
+            }}
+            style={Platform.OS !== 'ios' ? { color: colors.textPrimary } : undefined}
+            dropdownIconColor={colors.textPrimary}
+          >
+            {days.map((d) => (
+              <Picker.Item key={d} label={t.common.dayCount(d)} value={d} />
+            ))}
+          </Picker>
+          <View style={{ marginTop: 12 }}>
+            <Button label={t.common.done} onPress={onClose} />
+          </View>
+        </Animated.View>
+      </BlurView>
+    </Animated.View>
   );
 }
 
@@ -373,31 +422,9 @@ export default function CreateScreen() {
               <DayPickerTrigger
                 label={customDays ? t.common.dayCount(totalDays) : t.create.custom}
                 selected={customDays}
-                onPress={() => setShowDayPicker((v) => !v)}
+                onPress={() => setShowDayPicker(true)}
               />
             </View>
-
-            {showDayPicker ? (
-              <View
-                style={{
-                  marginTop: 12,
-                  backgroundColor: colors.bgSurface,
-                  borderRadius: radius.card,
-                  borderWidth: hairline,
-                  borderColor: colors.strokeSubtle,
-                  paddingHorizontal: 8,
-                }}
-              >
-                <DayWheelPicker
-                  max={MAX_CUSTOM_DAYS}
-                  value={totalDays}
-                  onChange={pickCustomDays}
-                />
-                <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>
-                  <Button label={t.common.done} variant="secondary" onPress={() => setShowDayPicker(false)} />
-                </View>
-              </View>
-            ) : null}
 
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 8 }}>
               {t.create.start}
@@ -554,6 +581,14 @@ export default function CreateScreen() {
         />
       </View>
       </KeyboardAvoidingView>
+
+      <DayPickerSheet
+        visible={showDayPicker}
+        max={MAX_CUSTOM_DAYS}
+        value={totalDays}
+        onChange={pickCustomDays}
+        onClose={() => setShowDayPicker(false)}
+      />
     </Screen>
   );
 }
