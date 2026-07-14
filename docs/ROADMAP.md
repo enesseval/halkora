@@ -238,6 +238,67 @@ ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
 
 ---
 
+## 🆔 Faz 3C — @kullanıcıadı + kurucu ayarları (kullanıcı isteği, 14 Tem 2026)
+
+İki üründen çıkma istek: (a) her kullanıcının `@enesseval` tarzı benzersiz bir
+adı olsun ve bununla davet edilebilsin, (b) challenge kurucusu Detay
+ekranından akışı etkilemeyen alanları düzenleyebilsin. Uygulama sırası da bu —
+handle sistemi davet özelliğinin ön koşulu.
+
+### 1. @kullanıcıadı (handle) altyapısı
+
+- [ ] 🧑‍💻 Şema: `profiles.username` (unique, `^[a-z0-9_]{3,20}$` check,
+      `lower()` üzerinde unique index — "Enes" ile "enes" çakışır) + küçük bir
+      rezerve liste (`halkora`, `admin`, `destek`...). SQL migration'ı
+      `docs/`'a, çalıştırması 🔑.
+- [ ] 🧑‍💻 Herkese otomatik handle: onboarding'de isimden türet
+      (`enes seval` → `@enesseval`, doluysa `@enesseval3` gibi ekle) —
+      kullanıcıya ekstra adım YOK, sürtünme sıfır. Onboarding'de göster,
+      istersen değiştir de.
+- [ ] 🧑‍💻 Ayarlar'da "Kullanıcı adı" satırı: düzenlenebilir; çakışmada
+      localized hata (`USERNAME_TAKEN` kodu). Eski handle serbest kalır —
+      davetler koda bağlı olduğu için hiçbir şey kırılmaz.
+- [ ] 🧑‍💻 Görünürlük: co-participant RLS politikası `profiles` satırını zaten
+      okutuyor → halka arkadaşların handle'ı otomatik görür. Halka DIŞI arama
+      için dar bir RPC: `find_user_by_username(text)` — yalnızca TAM eşleşme
+      (prefix araması bilerek yok: kullanıcı listesini enumerate etmeyi
+      zorlaştırır), `(id, name, initials, username)` döner.
+- [ ] 🧑‍💻 i18n: tüm yeni string'ler tr+en (AGENTS.md kuralı).
+
+### 2. Handle ile davet
+
+- [ ] 🧑‍💻 `invites` tablosu: `(challenge_id, from_user, to_user, created_at,
+      unique(challenge_id, to_user))` + RLS (gönderen yazar — üyelik şartıyla,
+      alıcı okur). Nudge'la aynı desen.
+- [ ] 🧑‍💻 `notify` Edge Function'a 4. tablo: `invites` INSERT → alıcıya
+      dilinde push: "Enes seni 30 Gün Kitap Okuma halkasına davet etti" +
+      `data.challengeId`/davet koduyla join önizlemesine deep link. Yeni DB
+      webhook kurulumu 🔑.
+- [ ] 🧑‍💻 Davet ekranına "@kullanıcıadıyla davet et" alanı: yaz → bul
+      (RPC) → gönder; "bulunamadı" ve "zaten üye/davetli" durumları.
+- [ ] 💡 MVP sonrası: uygulama içi "davetlerim" kutusu (push kaçarsa davet
+      kaybolmasın diye Home'da bir satır) — v1'de push + link yeterli.
+
+### 3. Kurucu ayarları (Detay ekranında ⚙️)
+
+- [ ] 🧑‍💻 Detay ekranında yalnızca kurucuya görünen ayarlar girişi → sheet:
+      **başlık, günlük eylem, bahis metni** düzenlenebilir. Gün sayısı, joker,
+      başlangıç tarihi, katılım penceresi bilinçli olarak DÜZENLENEMEZ —
+      bunlar geçmiş check-in'lerin anlamını/adaleti değiştirir (grup 10 gün
+      koştuktan sonra 30 günü 15'e çekmek gibi).
+- [ ] 🧑‍💻 Dar RPC: `update_challenge_details(p_challenge_id, p_title,
+      p_daily_action, p_stake_text)` — owner-only, SECURITY DEFINER. Genel bir
+      UPDATE RLS politikası yerine (Ek G'deki gerekçeyle aynı: geniş policy
+      title/owner dahil her alanı açardı).
+- [ ] 🧑‍💻 Başlık değişince sohbete system message ("Kurucu halkanın adını
+      '...' yaptı") — grup neyin değiştiğini görsün, sessiz değişiklik olmasın.
+- [ ] 💡 Pro bağlantısı (beta sonrası, Faz 4 ile): aynı ayarlar alanına
+      "İstatistikler" bölümü — grup tamamlama eğrisi, en istikrarlı üye, gün
+      gün katılım — `is_pro` kapısının arkasında. Ücretsizde bugünkü basit
+      özet kalır.
+
+---
+
 ## 💰 Faz 4 — Monetizasyon: "Halkora Pro"
 
 **İlke: check-in / katılma / temel grup asla paywall arkasına girmez** —
