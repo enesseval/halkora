@@ -11,6 +11,26 @@
 
 ---
 
+## 0. Yerel test artık Expo Go'da ÇALIŞMIYOR — development build şart
+
+`@react-native-picker/picker` + `expo-blur` eklendi (native modüller) — Expo
+Go (App Store'daki genel uygulama) yalnızca Expo'nun kendi resmi modül
+setini çalıştırabiliyor, üçüncü parti/bazı native modüllerle kırmızı ekran
+verip çöküyor. `expo-notifications`'ın Android'de zaten Expo Go'da tam
+çalışmadığı (yalnızca uyarı veriyordu) noktadan, artık gerçek bir çökmeye
+geldik.
+
+- [ ] `npx eas-cli build --platform ios --profile development` — bir kere
+      çalıştır, EAS'ın bulutunda derlenir (Mac gerekmez, Windows'tan çalışır).
+      Bitince EAS bir kurulum linki verir, telefona kur.
+- [ ] Bundan sonra `npx expo start --dev-client` ile başlat, projeyi
+      **Expo Go değil, az önce kurduğun özel uygulamadan** aç.
+- [ ] Yalnızca JS/TS değişikliklerinde (ekran, mantık, metin) bu build'i
+      tekrar almana gerek yok — fast refresh çalışır. Yeni bir native modül
+      eklendiğinde (yeni `expo-*` paketi veya üçüncü parti native paket)
+      dev build'i tekrar almak gerekir — böyle bir değişiklik yaptığımda
+      ayrıca söylerim.
+
 ## 1. Supabase — SQL Editor
 
 - [ ] **`docs/db-fixes.sql`'i baştan sona çalıştır** — denetimde eksik çıkan
