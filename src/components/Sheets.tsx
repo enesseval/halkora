@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
+import { errMessage } from '@/lib/errors';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Button } from './ui';
@@ -193,6 +194,151 @@ export function MomentumSheet({
           {t.detail.daysTogether(momentum.daysTogether)}
         </AppText>
       </Animated.View>
+    </Animated.View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Ayarlar — @kullanıcıadı düzenleme (Faz 3C, docs "Ek O")             */
+/* ------------------------------------------------------------------ */
+export function UsernameSheet({
+  visible,
+  current,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  current: string | null;
+  onClose: () => void;
+  onSave: (username: string) => Promise<void>;
+}) {
+  const { t } = useT();
+  const [value, setValue] = useState(current ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setValue(current ?? '');
+      setError(null);
+    }
+  }, [visible, current]);
+
+  if (!visible) return null;
+
+  // Strip anything the server would reject anyway, live — friendlier than
+  // letting an invalid character through and rejecting it after Save.
+  const sanitize = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
+
+  const canSave = value.length >= 3 && value !== current && !saving;
+
+  const submit = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(value);
+      onClose();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        justifyContent: 'flex-end',
+        zIndex: 30,
+      }}
+    >
+      <Pressable style={{ flex: 1 }} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 20,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+            {t.settings.usernameEditTitle}
+          </AppText>
+          <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
+            {t.settings.usernameEditHint}
+          </AppText>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              marginTop: 18,
+              backgroundColor: colors.bgElevated,
+              borderRadius: radius.pill,
+              borderWidth: hairline,
+              borderColor: error ? colors.joker : colors.strokeSubtle,
+              paddingHorizontal: 16,
+              height: 52,
+            }}
+          >
+            <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.textTertiary }}>
+              @
+            </AppText>
+            <TextInput
+              value={value}
+              onChangeText={(raw) => setValue(sanitize(raw))}
+              placeholder={t.settings.usernamePlaceholder}
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={20}
+              returnKeyType="done"
+              onSubmitEditing={submit}
+              style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
+            />
+          </View>
+
+          {error ? (
+            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+              {error}
+            </AppText>
+          ) : null}
+
+          <View style={{ marginTop: 20 }}>
+            <Button
+              label={saving ? t.settings.usernameSaving : t.settings.usernameSave}
+              onPress={submit}
+              disabled={!canSave}
+            />
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 }

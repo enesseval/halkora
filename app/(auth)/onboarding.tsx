@@ -13,6 +13,7 @@ import type { SegmentState } from '@/hooks';
 import { ProgressRing } from '@/components/ProgressRing';
 import { registerForPushToken } from '@/lib/push';
 import { takePendingInviteCode } from '@/lib/pendingInvite';
+import { slugifyUsername } from '@/lib/username';
 import { AppText, Avatar, AvatarStack, Button, Chip, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
 
@@ -194,6 +195,15 @@ function NameStep({
       <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10 }}>
         {t.onboarding.name.footnote}
       </AppText>
+      {name.trim() ? (
+        // Preview only — the real handle is assigned by ensureUsername() once
+        // the name is submitted (candidates may shift if this exact one is
+        // taken), but showing it live here answers "wait, what handle do I
+        // get?" without adding an extra step.
+        <AppText variant="meta" color={colors.textSecondary} style={{ marginTop: 4 }}>
+          {t.onboarding.name.handlePreview(slugifyUsername(name))}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -227,7 +237,7 @@ function NotifStep() {
 export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useT();
-  const { saveName } = useAuth();
+  const { saveName, ensureUsername } = useAuth();
   const [step, setStep] = useState(0); // 0,1,2 intro · 3 name · 4 notifications
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -244,6 +254,9 @@ export default function OnboardingScreen() {
     setErr(null);
     try {
       await saveName(name);
+      // Best-effort, never blocks onboarding — a slow/failed attempt just
+      // leaves the handle unset for now (Ayarlar has a manual fallback).
+      ensureUsername(name).catch(() => {});
       setStep(4);
     } catch {
       setErr(t.errors.saveFailed);

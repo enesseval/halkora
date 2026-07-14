@@ -10,6 +10,7 @@ import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
+import { UsernameSheet } from '@/components/Sheets';
 import { useT, type Locale } from '@/i18n';
 
 /** null while the initial permission check is in flight. Push is native-only —
@@ -99,14 +100,17 @@ export default function SettingsScreen() {
   const {
     configured,
     name,
+    username,
     isAnonymous,
     linkAppleIdentity,
+    saveUsername,
     signOut,
     deleteAccount,
     resetOnboarding,
   } = useAuth();
   const [linking, setLinking] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -230,6 +234,13 @@ export default function SettingsScreen() {
                   tint={isAnonymous ? colors.ember : undefined}
                   onPress={isAnonymous ? secureAccount : undefined}
                 />
+                <Divider />
+                <Row
+                  icon="at-sign"
+                  label={t.settings.username}
+                  value={username ? `@${username}` : t.settings.usernameNotSet}
+                  onPress={() => setEditingUsername(true)}
+                />
               </>
             ) : null}
             <Divider />
@@ -295,6 +306,13 @@ export default function SettingsScreen() {
           {t.settings.version(Constants.expoConfig?.version ?? '—')}
         </AppText>
       </ScrollView>
+
+      <UsernameSheet
+        visible={editingUsername}
+        current={username}
+        onClose={() => setEditingUsername(false)}
+        onSave={saveUsername}
+      />
     </Screen>
   );
 }

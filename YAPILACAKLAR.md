@@ -32,6 +32,19 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
 - [x] `handle_new_user` trigger'ı, `is_member`, tüm tablolarda RLS açık
 - [x] pg_cron + pg_net açık, `evening-reminder-hourly` cron'u kurulu ve aktif
 
+## 1,5. Supabase — @kullanıcıadı sistemi (Faz 3C madde 1, yeni)
+
+- [ ] **`docs/db-username.sql`'i SQL Editor'de baştan sona çalıştır** —
+      `reserved_usernames` tablosu, `profiles.username` kolonu + format/
+      benzersizlik kısıtları, rezerve-isim trigger'ı, `set_username` ve
+      `find_user_by_username` RPC'leri. Detay: `docs/PHASE2-SUPABASE.md`
+      "Ek O". Deploy gerekmiyor — istemci kodu zaten `main`'de, bu SQL
+      çalışınca özellik anında aktif olur.
+- [ ] Çalıştırdıktan sonra hızlı doğrulama: Ayarlar → "Kullanıcı adı" satırı
+      artık `@` ile bir değer göstermeli (onboarding'de otomatik atanmış
+      olmalı); satıra dokunup değiştirmeyi dene, rezerve bir isim (`admin`
+      gibi) veya zaten alınmış bir isim denenince anlamlı hata görmelisin.
+
 ## 2. Supabase — Edge Functions (CLI)
 
 - [x] `WEBHOOK_SECRET` tanımlı (webhook + cron header'larında doğrulandı)

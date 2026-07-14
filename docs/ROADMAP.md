@@ -245,25 +245,29 @@ adı olsun ve bununla davet edilebilsin, (b) challenge kurucusu Detay
 ekranından akışı etkilemeyen alanları düzenleyebilsin. Uygulama sırası da bu —
 handle sistemi davet özelliğinin ön koşulu.
 
-### 1. @kullanıcıadı (handle) altyapısı
+### 1. @kullanıcıadı (handle) altyapısı — ✅ kod tamam, SQL senin işin
 
-- [ ] 🧑‍💻 Şema: `profiles.username` (unique, `^[a-z0-9_]{3,20}$` check,
-      `lower()` üzerinde unique index — "Enes" ile "enes" çakışır) + küçük bir
-      rezerve liste (`halkora`, `admin`, `destek`...). SQL migration'ı
-      `docs/`'a, çalıştırması 🔑.
-- [ ] 🧑‍💻 Herkese otomatik handle: onboarding'de isimden türet
-      (`enes seval` → `@enesseval`, doluysa `@enesseval3` gibi ekle) —
-      kullanıcıya ekstra adım YOK, sürtünme sıfır. Onboarding'de göster,
-      istersen değiştir de.
-- [ ] 🧑‍💻 Ayarlar'da "Kullanıcı adı" satırı: düzenlenebilir; çakışmada
-      localized hata (`USERNAME_TAKEN` kodu). Eski handle serbest kalır —
-      davetler koda bağlı olduğu için hiçbir şey kırılmaz.
-- [ ] 🧑‍💻 Görünürlük: co-participant RLS politikası `profiles` satırını zaten
-      okutuyor → halka arkadaşların handle'ı otomatik görür. Halka DIŞI arama
-      için dar bir RPC: `find_user_by_username(text)` — yalnızca TAM eşleşme
-      (prefix araması bilerek yok: kullanıcı listesini enumerate etmeyi
-      zorlaştırır), `(id, name, initials, username)` döner.
-- [ ] 🧑‍💻 i18n: tüm yeni string'ler tr+en (AGENTS.md kuralı).
+- [x] 🧑‍💻 Şema: `profiles.username` (unique, `^[a-z0-9_]{3,20}$` check) +
+      `reserved_usernames` tablosu + rezerve-isim trigger'ı (defense-in-depth
+      — "own profile" RLS politikası RPC'yi atlayan doğrudan yazımı da
+      kapsasın diye). Tek dosyada: `docs/db-username.sql` — 🔑 SQL Editor'de
+      çalıştırman gerekiyor, `YAPILACAKLAR.md` §1,5'e eklendi.
+- [x] 🧑‍💻 Herkese otomatik handle: `src/lib/username.ts` (Türkçe karakter +
+      aksan temizleme, kısa isimler için dolgu) + `useAuth().ensureUsername`
+      onboarding'de isim kaydedilince best-effort çalışır (ağ hatası
+      onboarding'i asla bloklamaz). Onboarding'de isim adımının altında canlı
+      `@handle` önizlemesi var.
+- [x] 🧑‍💻 Ayarlar'da "Kullanıcı adı" satırı: `UsernameSheet` ile
+      düzenlenebilir; format/rezerve/çakışma hataları `USERNAME_INVALID` /
+      `USERNAME_RESERVED` / `USERNAME_TAKEN` kodlarıyla lokalize gösteriliyor.
+      Eski handle serbest kalır — davetler koda bağlı olduğu için hiçbir şey
+      kırılmaz.
+- [x] 🧑‍💻 Görünürlük: co-participant RLS politikası `profiles` satırını zaten
+      okutuyor → halka arkadaşların handle'ı otomatik görülür. Halka DIŞI
+      arama için `find_user_by_username(text)` RPC'si — yalnızca TAM eşleşme
+      (prefix araması bilerek yok), `(id, name, initials, username)` döner.
+      Madde 2 (davet) bunu henüz çağırmıyor — o ekranın işi.
+- [x] 🧑‍💻 i18n: tüm yeni string'ler tr+en (AGENTS.md kuralı).
 
 ### 2. Handle ile davet
 

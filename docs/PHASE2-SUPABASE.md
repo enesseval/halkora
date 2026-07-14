@@ -1009,3 +1009,37 @@ supabase functions deploy delete-account
 > delete-account artık kod döndürüyor, notify ve evening-reminder artık
 > alıcının diline bakıyor) — dördünü de yeniden deploy etmen gerekiyor,
 > sadece yeni eklenenleri değil.
+
+## Ek O — @kullanıcıadı (handle) sistemi (Faz 3C madde 1)
+
+Her kullanıcının artık benzersiz bir `@handle`'ı var (`docs/ROADMAP.md`
+"Faz 3C"). Onboarding'de isimden otomatik türetiliyor (`Enes Seval` →
+`enesseval`, doluysa `enesseval2` gibi ekleniyor) — kullanıcıya ekstra adım
+yok. Ayarlar'dan istediği zaman değiştirebilir.
+
+**Tüm SQL tek dosyada:** [`docs/db-username.sql`](./db-username.sql) — SQL
+Editor'de baştan sona çalıştır (idempotent). İçinde:
+
+- `reserved_usernames` tablosu (`halkora`, `admin`, `destek`... hiç kimseye
+  verilmiyor — yeni bir isim eklemek yalnızca bu tabloya `insert`, kod/RPC
+  değişikliği gerekmiyor).
+- `profiles.username` kolonu: format CHECK'i (`^[a-z0-9_]{3,20}$`, her zaman
+  küçük harf) + unique constraint.
+- Rezerve-liste kontrolünü `set_username` RPC'sinin ÖTESİNDE de garanti eden
+  bir trigger — "own profile" RLS politikası (Ek A) tüm kolonlara ALL izni
+  verdiği için biri RPC'yi atlayıp doğrudan `update profiles set
+  username=...` çalıştırabilir; format CHECK'i zaten bunu format açısından
+  kapatıyor, trigger da rezerve isimler için aynısını yapıyor.
+- `set_username(p_username)` — istemcinin TEK yazma yolu. Format/rezerve/
+  benzersizlik hatalarını `USERNAME_INVALID` / `USERNAME_RESERVED` /
+  `USERNAME_TAKEN` kodlarıyla fırlatır (istemci `src/lib/errors.ts` üzerinden
+  lokalize eder), yalnızca çağıranın kendi satırını değiştirir.
+- `find_user_by_username(p_username)` — davet için TAM eşleşme arama.
+  Bilinçli olarak prefix/ILIKE arama YOK: aksi halde biri `a`, `b`, `c`...
+  deneyerek tüm kullanıcı tablosunu enumerate edebilirdi.
+
+İstemci tarafı (kod, zaten yapıldı): `src/lib/username.ts` (slugify + aday
+üretimi), `useAuth()`'a `ensureUsername`/`saveUsername`, onboarding'de isim
+adımının altında canlı `@handle` önizlemesi, Ayarlar'da düzenlenebilir
+"Kullanıcı adı" satırı. Deploy gerektirmiyor — yalnızca SQL, kod zaten
+`main`'de.
