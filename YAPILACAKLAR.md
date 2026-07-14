@@ -104,6 +104,25 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
       bunu gerçekten test ediyor) — `delete-account` fonksiyonu deploy edilmiş olmalı.
 - [ ] TestFlight'a yükle → küçük bir gerçek grupla 2-3 günlük smoke test.
 
+## 7,5. Test modu: 1 dakikalık günler (geçici, prod'a ÇIKMADAN KAPAT)
+
+Challenge döngüsünü hızlı test etmek için "1 gün = 1 dakika" modu eklendi
+(`src/lib/fastDays.ts`). İki tarafı BİRLİKTE aç/kapat:
+
+- [ ] **Aç (istemci):** `.env`'e `EXPO_PUBLIC_FAST_DAYS=1` ekle, dev server'ı
+      yeniden başlat (EAS build'de test edeceksen aynı değişkeni
+      `--environment preview`'a da ekle).
+- [ ] **Aç (sunucu):** `supabase secrets set FAST_DAYS=1` +
+      `supabase functions deploy check-in`
+- [ ] **Kapat (test bitince, prod build ÖNCESİ):** `.env`'den satırı sil,
+      `supabase secrets unset FAST_DAYS` + `check-in`'i tekrar deploy et.
+
+Bilinen test-modu tuhaflıkları (kabul edildi, prod'a hiç çıkmıyor):
+"Yarın başla" ve "sadece ilk gün katılım" penceresi gerçek takvimle çalışmaya
+devam eder (SQL tarafında hız modu yok); akşam hatırlatması dakika-günlere
+uymaz. Gün çapası `created_at` olduğu için "Yeniden başlat" hızlı modda
+challenge'ı 1. güne değil, oluşturulmasından bu yana geçen dakikaya döndürür.
+
 ## 8. Opsiyonel ama şiddetle önerilen (prod'a çıkmadan)
 
 - [ ] **Sentry** hesabı aç (ücretsiz tier yeter) — DSN'i ver, `@sentry/react-native`

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
 import { buildDays, formatShortDate } from '@/lib/day';
+import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
 import { getDict } from '@/i18n';
 
 export interface InsertedChallenge {
@@ -75,6 +76,7 @@ interface ChallengeRow {
   invite_code: string;
   joker_allowance: number;
   first_day_join_only: boolean;
+  created_at: string;
 }
 
 interface ParticipantRow {
@@ -126,7 +128,10 @@ function todayInTimezone(timezone: string): string {
  * Function's day math (docs/PHASE2-SUPABASE.md "Ek F") exactly, or a
  * participant in a different timezone than the challenge can see "bugün
  * işaretlenebilir" on screen and get rejected server-side. 0 === starts today. */
-function daysSinceStart(startISO: string, timezone: string): number {
+function daysSinceStart(startISO: string, timezone: string, createdAtISO: string): number {
+  // Test-only acceleration: 1 day == 1 minute, anchored to created_at
+  // because start_date has no time-of-day (see src/lib/fastDays.ts).
+  if (FAST_DAYS) return fastDaysSince(createdAtISO);
   const todayStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -152,7 +157,7 @@ function mapRow(
   nudgedToday: Set<string>,
   stake?: StakeRow,
 ): Challenge {
-  const diff = daysSinceStart(row.start_date, row.timezone);
+  const diff = daysSinceStart(row.start_date, row.timezone, row.created_at);
   const rawDay = diff + 1; // day 1 == start day
   const dateBasedStatus: Challenge['status'] =
     rawDay <= 0 ? 'upcoming' : rawDay > row.total_days ? 'completed' : 'active';
@@ -300,7 +305,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
     supabase
       .from('challenges')
       .select(
-        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only',
+        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at',
       )
       .in('id', ids),
     supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),

@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
 
     const { data: challenge, error: chErr } = await admin
       .from('challenges')
-      .select('id, start_date, timezone, total_days, status, joker_allowance')
+      .select('id, start_date, timezone, total_days, status, joker_allowance, created_at')
       .eq('id', challengeId)
       .single();
     if (chErr || !challenge) return fail('CHALLENGE_NOT_FOUND', 404);
@@ -70,16 +70,26 @@ Deno.serve(async (req) => {
 
     // "Today" in the CHALLENGE's own timezone — not the caller's device
     // clock — so every participant shares the same day boundary.
-    const todayStr = new Intl.DateTimeFormat('en-CA', {
-      timeZone: challenge.timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date()); // "YYYY-MM-DD"
-    const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
-    const today = new Date(`${todayStr}T00:00:00Z`);
-    const daysSinceStart = Math.round((today.getTime() - startDate.getTime()) / 86_400_000);
-    const currentDay = daysSinceStart + 1;
+    //
+    // FAST_DAYS (test-only): 1 day == 1 minute, anchored to created_at —
+    // must mirror the client's src/lib/fastDays.ts exactly, and both sides
+    // must be toggled together (supabase secrets set FAST_DAYS=1 + redeploy
+    // here, EXPO_PUBLIC_FAST_DAYS=1 on the client). Never in production.
+    let currentDay: number;
+    if (Deno.env.get('FAST_DAYS') === '1') {
+      currentDay =
+        Math.floor((Date.now() - new Date(challenge.created_at as string).getTime()) / 60_000) + 1;
+    } else {
+      const todayStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: challenge.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date()); // "YYYY-MM-DD"
+      const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
+      const today = new Date(`${todayStr}T00:00:00Z`);
+      currentDay = Math.round((today.getTime() - startDate.getTime()) / 86_400_000) + 1;
+    }
 
     if (currentDay < 1) return fail('CHALLENGE_NOT_STARTED');
     if (currentDay > challenge.total_days) return fail('CHALLENGE_ENDED');
