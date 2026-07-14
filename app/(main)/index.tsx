@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { colors, spacing } from '@/theme/tokens';
-import { useTodayStatus, useCheckIn, useRefreshChallenges } from '@/hooks';
+import { useTodayStatus, useCheckIn, useRefreshChallenges, useCompletedChallenges } from '@/hooks';
 import type { Challenge, SegmentState } from '@/hooks';
 import { errMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
@@ -54,10 +54,17 @@ export default function HomeScreen() {
   const { t } = useT();
   const { dateLabel, pending, done, upcoming, loading, firstLoadError, backgroundError, error, retry } =
     useTodayStatus();
+  // Genuinely FINISHED challenges (status === 'completed') — distinct from
+  // `done` above, which despite its section label really means "checked in
+  // today" on a still-ongoing challenge. Without this, a challenge that
+  // finishes has no section it belongs to on Home at all — it just quietly
+  // stops appearing anywhere, even though its data/history is still there.
+  const finished = useCompletedChallenges();
   const { refreshing, refresh } = useRefreshChallenges();
   const [showStart, setShowStart] = useState(false);
 
   const goDetail = (id: string) => router.push(`/challenge/${id}`);
+  const goComplete = (id: string) => router.push(`/challenge/${id}/complete`);
 
   // A poll/pull-to-refresh failing after we already have real data shouldn't
   // blank the list — just say so once per failure streak (not every 5s poll).
@@ -117,7 +124,7 @@ export default function HomeScreen() {
               detail={errMessage(error)}
               onRetry={retry}
             />
-          ) : pending.length === 0 && done.length === 0 && upcoming.length === 0 ? (
+          ) : pending.length === 0 && done.length === 0 && upcoming.length === 0 && finished.length === 0 ? (
             <EmptyHome onStart={() => setShowStart(true)} />
           ) : (
             <>
@@ -156,6 +163,21 @@ export default function HomeScreen() {
                   <View style={{ marginTop: 4 }}>
                     {upcoming.map((c) => (
                       <UpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {/* finished — history, links to the celebration/stats screen
+                  rather than Detail (check-in/chat don't make sense anymore) */}
+              {finished.length > 0 ? (
+                <View style={{ marginTop: spacing.section }}>
+                  <SectionLabel>{t.home.history}</SectionLabel>
+                  <View style={{ gap: 10, marginTop: 12 }}>
+                    {finished.map((c) => (
+                      <Animated.View key={c.id} layout={LinearTransition} entering={FadeIn}>
+                        <CompletedCard challenge={c} onPress={() => goComplete(c.id)} />
+                      </Animated.View>
                     ))}
                   </View>
                 </View>

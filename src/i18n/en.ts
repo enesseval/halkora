@@ -158,6 +158,9 @@ export const en: Dictionary = {
     title: 'Today',
     completed: 'Completed',
     upcoming: 'Upcoming',
+    // "Completed" (above) really means "checked in today" — this section is
+    // for rings that are genuinely FINISHED (multi-day challenge is over).
+    history: 'History',
     challengesLoadFailed: "Couldn't load your challenges.",
     emptyTitle: "You don't have a ring yet.",
     emptySubtitle: 'Start a challenge, call your group — or join with an invite.',

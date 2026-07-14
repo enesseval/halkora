@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Picker } from '@react-native-picker/picker';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -124,12 +125,11 @@ function DayPickerTrigger({
   );
 }
 
-const DAY_ITEM_HEIGHT = 40;
-const DAY_VISIBLE_ROWS = 5; // odd, so one row sits dead-center
-
-/** iOS-style wheel picker for the custom day count (1..max) — replaces a
- * keyboard-and-type text field with something that can't produce an
- * out-of-range value in the first place. */
+/** The real native wheel (UIPickerView on iOS, a dropdown/dialog on Android —
+ * each platform's own convention, matching how DateTimePicker below already
+ * varies by platform) for the custom day count (1..max). Replaces an earlier
+ * hand-rolled ScrollView-snap approximation that didn't look/feel like
+ * Apple's actual picker. */
 function DayWheelPicker({
   max,
   value,
@@ -140,92 +140,27 @@ function DayWheelPicker({
   onChange: (n: number) => void;
 }) {
   const { t } = useT();
-  const scrollRef = useRef<ScrollView>(null);
   const days = useMemo(() => Array.from({ length: max }, (_, i) => i + 1), [max]);
-  const [centerIndex, setCenterIndex] = useState(() => Math.max(0, Math.min(max - 1, value - 1)));
-  const padTop = DAY_ITEM_HEIGHT * Math.floor(DAY_VISIBLE_ROWS / 2);
-
-  // The `contentOffset` prop alone isn't reliably honored on first mount
-  // (react-native-web in particular ignores it), so force the initial
-  // scroll position imperatively once the ScrollView actually exists.
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ y: centerIndex * DAY_ITEM_HEIGHT, animated: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Re-sync the wheel if `value` changed from outside (a 7/30 preset chip
-  // tapped while this panel is still open).
-  useEffect(() => {
-    const idx = Math.max(0, Math.min(days.length - 1, value - 1));
-    if (idx !== centerIndex) {
-      setCenterIndex(idx);
-      scrollRef.current?.scrollTo({ y: idx * DAY_ITEM_HEIGHT, animated: false });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-
-  // Tracks + commits the centered value continuously as the wheel moves, not
-  // just when a scroll-end event fires — momentum-end detection can be
-  // unreliable across platforms/input methods (e.g. web mouse-wheel), so the
-  // visible highlighted row and the actual committed value must never
-  // depend on catching one specific event just right.
-  const commit = (offsetY: number) => {
-    const idx = Math.max(0, Math.min(days.length - 1, Math.round(offsetY / DAY_ITEM_HEIGHT)));
-    if (idx !== centerIndex) {
-      Haptics.selectionAsync().catch(() => {});
-      setCenterIndex(idx);
-      onChange(days[idx]);
-    }
-  };
 
   return (
-    <View style={{ height: DAY_ITEM_HEIGHT * DAY_VISIBLE_ROWS }}>
-      {/* selection band — fixed in place, marks the centered (selected) row */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          top: padTop,
-          left: 0,
-          right: 0,
-          height: DAY_ITEM_HEIGHT,
-          borderTopWidth: hairline,
-          borderBottomWidth: hairline,
-          borderColor: colors.strokeSubtle,
-        }}
-      />
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={DAY_ITEM_HEIGHT}
-        decelerationRate="fast"
-        contentOffset={{ x: 0, y: centerIndex * DAY_ITEM_HEIGHT }}
-        contentContainerStyle={{ paddingVertical: padTop }}
-        scrollEventThrottle={16}
-        onScroll={(e) => commit(e.nativeEvent.contentOffset.y)}
-        onMomentumScrollEnd={(e) => commit(e.nativeEvent.contentOffset.y)}
-        onScrollEndDrag={(e) => commit(e.nativeEvent.contentOffset.y)}
-      >
-        {days.map((d, i) => {
-          const dist = Math.abs(i - centerIndex);
-          return (
-            <View key={d} style={{ height: DAY_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' }}>
-              <AppText
-                tabular
-                style={{
-                  fontFamily: dist === 0 ? fonts.displaySemibold : fonts.bodyMedium,
-                  fontSize: dist === 0 ? 19 : 16,
-                  color:
-                    dist === 0 ? colors.textPrimary : dist === 1 ? colors.textSecondary : colors.textTertiary,
-                }}
-              >
-                {t.common.dayCount(d)}
-              </AppText>
-            </View>
-          );
-        })}
-      </ScrollView>
-    </View>
+    <Picker
+      selectedValue={value}
+      onValueChange={(v) => {
+        Haptics.selectionAsync().catch(() => {});
+        onChange(Number(v));
+      }}
+      itemStyle={{
+        color: colors.textPrimary,
+        fontFamily: fonts.bodyMedium,
+        fontSize: 19,
+      }}
+      style={Platform.OS !== 'ios' ? { color: colors.textPrimary } : undefined}
+      dropdownIconColor={colors.textPrimary}
+    >
+      {days.map((d) => (
+        <Picker.Item key={d} label={t.common.dayCount(d)} value={d} />
+      ))}
+    </Picker>
   );
 }
 

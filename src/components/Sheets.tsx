@@ -256,12 +256,18 @@ export function UsernameSheet({
         right: 0,
         bottom: 0,
         backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
         zIndex: 30,
       }}
     >
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* The backdrop Pressable + sheet both live INSIDE the
+          KeyboardAvoidingView (not as a sibling before it) — otherwise
+          'padding' has no flex:1 box to measure against and the keyboard
+          just covers the input instead of pushing the sheet up. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
           style={{
@@ -441,12 +447,17 @@ export function OwnerSettingsSheet({
         right: 0,
         bottom: 0,
         backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
         zIndex: 30,
       }}
     >
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* See UsernameSheet's comment: backdrop + sheet live INSIDE the
+          KeyboardAvoidingView, not before it, or 'padding' has nothing to
+          measure against and the keyboard covers the inputs instead. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
           style={{

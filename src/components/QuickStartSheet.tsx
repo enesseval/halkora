@@ -122,12 +122,18 @@ export function QuickStartSheet({
         right: 0,
         bottom: 3,
         backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
         zIndex: 30,
       }}
     >
+      {/* Backdrop + sheet live INSIDE the KeyboardAvoidingView (not before
+          it) so 'padding' has a flex:1 box to measure against — otherwise
+          the keyboard just covers the join-code input instead of pushing
+          the sheet up. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <Animated.View
         entering={SlideInDown.duration(260)}
         style={{

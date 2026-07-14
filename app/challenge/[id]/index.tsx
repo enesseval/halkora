@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -81,6 +81,26 @@ export default function DetailScreen() {
     return out;
   }, [challenge, chatError, t]);
 
+  // Auto-finish: once everyone's checked in on the LAST day, there's no
+  // reason to sit around waiting for the calendar date to roll over —
+  // close it out now and take whoever's here straight to the celebration
+  // screen, instead of the challenge just quietly flipping to 'completed'
+  // overnight with nobody ever seeing E9.
+  const isLastDayFullyDone =
+    !!challenge &&
+    challenge.status === 'active' &&
+    challenge.currentDay === challenge.totalDays &&
+    challenge.participants.length > 0 &&
+    completedCount(challenge) === challenge.participants.length;
+  useEffect(() => {
+    if (!isLastDayFullyDone || !challenge) return;
+    actions.endEarly();
+    router.replace(`/challenge/${challenge.id}/complete`);
+    // Deliberately only watches isLastDayFullyDone — actions/router/challenge
+    // are stable enough here and re-running this on every challenge poll
+    // tick would just re-fire the (idempotent) endEarly + replace call.
+  }, [isLastDayFullyDone]);
+
   if (!challenge) {
     // Not in the store yet — tell "still loading" and "genuinely failed" apart
     // from an actual 404, instead of always showing the same blunt message
@@ -127,7 +147,13 @@ export default function DetailScreen() {
   const doneAvatars = challenge.participants
     .filter((p) => p.checkedInToday)
     .map((p) => ({ id: p.id, initials: p.initials }));
-  const showMissed = challenge.hasMissedYesterday && !challenge.missedAcknowledged;
+  // `missedAcknowledged` isn't persisted server-side (mapRow never sets it
+  // for real challenges — see src/data/challenges.ts) so it resets to falsy
+  // on every poll-driven refetch; without the meCheckedInToday check this
+  // gate kept reappearing on every visit even after actually checking in
+  // for today, which makes no sense — there's nothing left to acknowledge
+  // once today is done.
+  const showMissed = challenge.hasMissedYesterday && !challenge.missedAcknowledged && !meCheckedInToday;
   const showMomentum = momentumDemoId === challenge.id;
 
   const topBar = (

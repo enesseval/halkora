@@ -172,9 +172,16 @@ export function useRefreshChallenges() {
   return { refreshing, refresh };
 }
 
-/** Archived / completed challenges (drives E9 entry from Settings). */
+/** Archived / completed challenges (drives Home's "history" section + E9
+ * entry from Settings). Reads the raw array and filters in a useMemo rather
+ * than inside the Zustand selector — a selector that returns `.filter(...)`
+ * directly hands back a brand-new array reference on every single read,
+ * which useSyncExternalStore sees as "changed" and re-renders for, which
+ * calls the selector again, forever (infinite render loop / "Maximum update
+ * depth exceeded" — same pattern useTodayStatus above already avoids). */
 export function useCompletedChallenges(): Challenge[] {
-  return useMockStore((s) => s.challenges.filter((c) => c.status === 'completed'));
+  const challenges = useMockStore((s) => s.challenges);
+  return useMemo(() => challenges.filter((c) => c.status === 'completed'), [challenges]);
 }
 
 /** Preview lookup by invite code (E5 deep-link welcome) — Phase 1 mock only. */

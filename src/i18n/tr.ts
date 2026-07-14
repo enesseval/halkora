@@ -162,6 +162,9 @@ export const tr = {
     title: 'Bugün',
     completed: 'Tamamlandı',
     upcoming: 'Yakında',
+    // "Tamamlandı" (yukarıdaki) aslında "bugün check-in yaptığın" demek —
+    // bu ayrı bölüm gerçekten BİTMİŞ (çok günlü) halkalar için.
+    history: 'Geçmiş',
     challengesLoadFailed: "Challenge'ların yüklenemedi.",
     emptyTitle: 'Henüz bir halkan yok.',
     emptySubtitle: 'Bir challenge kur, grubunu çağır — ya da bir davetle katıl.',
