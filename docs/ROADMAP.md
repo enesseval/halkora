@@ -297,6 +297,23 @@ handle sistemi davet özelliğinin ön koşulu.
       gün katılım — `is_pro` kapısının arkasında. Ücretsizde bugünkü basit
       özet kalır.
 
+### 4. Bitiş ekranı istatistikleri — gerçek veriden
+
+Ek G'deki bilinen eksik: E9 (Bitiş & Kutlama) ekranındaki `finishStats`
+(kişi / toplam check-in / tamamlama %) ve katılımcı sıralaması yalnızca mock
+arşiv verisinde dolu; gerçek bir challenge bitince boş/eksik görünüyor.
+Fast-days testinde ilk göze çarpacak şey bu.
+
+- [ ] 🧑‍💻 Gerçek challenge için `check_ins`'ten hesapla: katılımcı başına
+      done+joker sayısı, grup tamamlama yüzdesi (payda `total_days ×
+      katılımcı`), sıralama (done > joker tie-break). Veri zaten
+      `fetchMyChallenges`'ın çektiği satırlarda var — yeni sorgu gerekmeyebilir,
+      `mapRow`'da `finishStats`'ı 'completed' durumunda doldurmak yetebilir.
+- [ ] 🧑‍💻 "Aynı grupla yeni challenge başlat" butonunun boş create'e gittiği
+      biliniyor (Faz 3B "Rematch") — bu iş kapsamında DEĞİL, ama bitiş ekranı
+      elden geçerken buton en azından gizlenmeli/etiketlenmeli ki test
+      kullanıcısı kırık akış sanmasın.
+
 ---
 
 ## 💰 Faz 4 — Monetizasyon: "Halkora Pro"
