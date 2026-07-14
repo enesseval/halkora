@@ -65,6 +65,13 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
         alignItems: 'center',
         gap: 12,
         paddingVertical: 12,
+        // A raised card-within-the-list for "you" — a neutral highlight (not
+        // the ember accent, which already means "checked in" elsewhere) so
+        // your own row reads at a glance without implying a status.
+        paddingHorizontal: participant.isMe ? 10 : 0,
+        marginHorizontal: participant.isMe ? -10 : 0,
+        borderRadius: participant.isMe ? radius.card : 0,
+        backgroundColor: participant.isMe ? colors.bgElevated : 'transparent',
       }}
     >
       <Avatar
@@ -75,6 +82,11 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
       <View style={{ flex: 1 }}>
         <AppText variant="bodyMedium" style={{ fontSize: 16 }}>
           {participant.name}
+          {participant.isMe ? (
+            <AppText variant="meta" color={colors.textTertiary}>
+              {' '}(Sen)
+            </AppText>
+          ) : null}
         </AppText>
         <AppText
           variant="meta"

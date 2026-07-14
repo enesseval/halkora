@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -78,20 +78,25 @@ function DatePill({
   );
 }
 
-/** Editable "gün sayısı" pill — sits next to the 7/30 quick-pick chips so the
- * user can type any custom day count (3, 5, 15, ...). */
-function DayInput({
-  value,
-  onChangeText,
+/** Pill that opens the day-count wheel below (mirrors the "Takvim" DatePill's
+ * open/close-a-panel pattern) — shows "Özel" until a custom count is active,
+ * then shows the chosen count. */
+function DayPickerTrigger({
+  label,
   selected,
+  onPress,
 }: {
-  value: string;
-  onChangeText: (t: string) => void;
+  label: string;
   selected: boolean;
+  onPress: () => void;
 }) {
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
+      style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
@@ -101,31 +106,123 @@ function DayInput({
         borderRadius: radius.badge,
         paddingHorizontal: 14,
         paddingVertical: 9,
-      }}
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
-      <TextInput
-        value={value}
-        onChangeText={(t) => onChangeText(t.replace(/[^0-9]/g, '').slice(0, 3))}
-        placeholder="Özel"
-        placeholderTextColor={colors.textTertiary}
-        keyboardType="number-pad"
-        maxLength={3}
-        style={{
-          minWidth: 26,
-          padding: 0,
-          fontFamily: fonts.bodyMedium,
-          fontSize: 15,
-          color: selected ? colors.textPrimary : colors.textSecondary,
-        }}
-      />
       <AppText
         style={{
           ...type.secondary,
+          fontFamily: selected ? fonts.bodyMedium : type.secondary.fontFamily,
           color: selected ? colors.textPrimary : colors.textSecondary,
         }}
       >
-        gün
+        {label}
       </AppText>
+      <Feather name="chevron-down" size={14} color={selected ? colors.ember : colors.textTertiary} />
+    </Pressable>
+  );
+}
+
+const DAY_ITEM_HEIGHT = 40;
+const DAY_VISIBLE_ROWS = 5; // odd, so one row sits dead-center
+
+/** iOS-style wheel picker for the custom day count (1..max) — replaces a
+ * keyboard-and-type text field with something that can't produce an
+ * out-of-range value in the first place. */
+function DayWheelPicker({
+  max,
+  value,
+  onChange,
+}: {
+  max: number;
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const days = useMemo(() => Array.from({ length: max }, (_, i) => i + 1), [max]);
+  const [centerIndex, setCenterIndex] = useState(() => Math.max(0, Math.min(max - 1, value - 1)));
+  const padTop = DAY_ITEM_HEIGHT * Math.floor(DAY_VISIBLE_ROWS / 2);
+
+  // The `contentOffset` prop alone isn't reliably honored on first mount
+  // (react-native-web in particular ignores it), so force the initial
+  // scroll position imperatively once the ScrollView actually exists.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: centerIndex * DAY_ITEM_HEIGHT, animated: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-sync the wheel if `value` changed from outside (a 7/30 preset chip
+  // tapped while this panel is still open).
+  useEffect(() => {
+    const idx = Math.max(0, Math.min(days.length - 1, value - 1));
+    if (idx !== centerIndex) {
+      setCenterIndex(idx);
+      scrollRef.current?.scrollTo({ y: idx * DAY_ITEM_HEIGHT, animated: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  // Tracks + commits the centered value continuously as the wheel moves, not
+  // just when a scroll-end event fires — momentum-end detection can be
+  // unreliable across platforms/input methods (e.g. web mouse-wheel), so the
+  // visible highlighted row and the actual committed value must never
+  // depend on catching one specific event just right.
+  const commit = (offsetY: number) => {
+    const idx = Math.max(0, Math.min(days.length - 1, Math.round(offsetY / DAY_ITEM_HEIGHT)));
+    if (idx !== centerIndex) {
+      Haptics.selectionAsync().catch(() => {});
+      setCenterIndex(idx);
+      onChange(days[idx]);
+    }
+  };
+
+  return (
+    <View style={{ height: DAY_ITEM_HEIGHT * DAY_VISIBLE_ROWS }}>
+      {/* selection band — fixed in place, marks the centered (selected) row */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: padTop,
+          left: 0,
+          right: 0,
+          height: DAY_ITEM_HEIGHT,
+          borderTopWidth: hairline,
+          borderBottomWidth: hairline,
+          borderColor: colors.strokeSubtle,
+        }}
+      />
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={DAY_ITEM_HEIGHT}
+        decelerationRate="fast"
+        contentOffset={{ x: 0, y: centerIndex * DAY_ITEM_HEIGHT }}
+        contentContainerStyle={{ paddingVertical: padTop }}
+        scrollEventThrottle={16}
+        onScroll={(e) => commit(e.nativeEvent.contentOffset.y)}
+        onMomentumScrollEnd={(e) => commit(e.nativeEvent.contentOffset.y)}
+        onScrollEndDrag={(e) => commit(e.nativeEvent.contentOffset.y)}
+      >
+        {days.map((d, i) => {
+          const dist = Math.abs(i - centerIndex);
+          return (
+            <View key={d} style={{ height: DAY_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' }}>
+              <AppText
+                tabular
+                style={{
+                  fontFamily: dist === 0 ? fonts.displaySemibold : fonts.bodyMedium,
+                  fontSize: dist === 0 ? 19 : 16,
+                  color:
+                    dist === 0 ? colors.textPrimary : dist === 1 ? colors.textSecondary : colors.textTertiary,
+                }}
+              >
+                {d} gün
+              </AppText>
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -207,22 +304,18 @@ export default function CreateScreen() {
   const [title, setTitle] = useState('');
   const [action, setAction] = useState('');
   const [totalDays, setTotalDays] = useState(14);
-  // Empty when a 7/30 preset chip is active; holds the raw typed text
-  // whenever a custom day count is in use (initially the 14-day default).
-  const [daysText, setDaysText] = useState('14');
+  // False while a 7/30 preset chip is active; true once the wheel picker has
+  // been used to pick a custom count (starts already "custom" — 14 isn't a preset).
+  const [customDays, setCustomDays] = useState(true);
+  const [showDayPicker, setShowDayPicker] = useState(false);
   const pickPresetDays = (d: number) => {
     setTotalDays(d);
-    setDaysText('');
+    setCustomDays(false);
+    setShowDayPicker(false);
   };
-  const changeCustomDays = (raw: string) => {
-    const n = parseInt(raw, 10);
-    if (!Number.isNaN(n) && n > MAX_CUSTOM_DAYS) {
-      setDaysText(String(MAX_CUSTOM_DAYS));
-      setTotalDays(MAX_CUSTOM_DAYS);
-      return;
-    }
-    setDaysText(raw);
-    if (!Number.isNaN(n) && n > 0) setTotalDays(n);
+  const pickCustomDays = (n: number) => {
+    setTotalDays(n);
+    setCustomDays(true);
   };
   const today = new Date();
   const tomorrow = addDays(today, 1);
@@ -341,12 +434,39 @@ export default function CreateScreen() {
                 <Chip
                   key={d}
                   label={`${d}`}
-                  selected={totalDays === d && !daysText}
+                  selected={totalDays === d && !customDays}
                   onPress={() => pickPresetDays(d)}
                 />
               ))}
-              <DayInput value={daysText} onChangeText={changeCustomDays} selected={!!daysText} />
+              <DayPickerTrigger
+                label={customDays ? `${totalDays} gün` : 'Özel'}
+                selected={customDays}
+                onPress={() => setShowDayPicker((v) => !v)}
+              />
             </View>
+
+            {showDayPicker ? (
+              <View
+                style={{
+                  marginTop: 12,
+                  backgroundColor: colors.bgSurface,
+                  borderRadius: radius.card,
+                  borderWidth: hairline,
+                  borderColor: colors.strokeSubtle,
+                  paddingHorizontal: 8,
+                }}
+              >
+                <DayWheelPicker
+                  max={MAX_CUSTOM_DAYS}
+                  value={totalDays}
+                  onChange={pickCustomDays}
+                />
+                <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>
+                  <Button label="Tamam" variant="secondary" onPress={() => setShowDayPicker(false)} />
+                </View>
+              </View>
+            ) : null}
+
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 8 }}>
               Başlangıç
             </AppText>
