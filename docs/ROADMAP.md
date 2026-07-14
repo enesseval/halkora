@@ -153,10 +153,12 @@ ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
       gönderebilirdi. Sunucu tarafında "aynı kişiye günde 1 nudge" kısıtı
       eklendi (unique index — `docs/PHASE2-SUPABASE.md` "Ek K", SQL Editor'de
       çalıştırman gerekiyor).
-- [ ] 🔑 **Davet kodu brute-force riski:** `get_challenge_preview` herkese
+- [x] 🔑 **Davet kodu brute-force riski:** `get_challenge_preview` herkese
       açık bir RPC. Kod uzunluğu 6 hex karakterden 10'a çıkarıldı (Ek K —
-      SQL Editor'de çalıştırman gerekiyor), ayrıca Supabase Dashboard'da API
-      rate limit ayarlarının açık olduğunu doğrulaman gerekiyor.
+      SQL Editor'de çalıştırman gerekiyor, `docs/db-fixes.sql` içinde).
+      ~~Ayrıca Dashboard'da API rate limit'i doğrula~~ — düzeltme: böyle bir
+      dashboard ayarı yok (Ek K'ye eklenen not), 10 karakterlik kod alanı
+      tek başına yeterli koruma.
 - [x] 🧑‍💻 **Çıkışta push token temizlenmiyordu:** `signOut()` artık çıkıştan
       önce `push_tokens` satırını siliyor — kullanıcı çıkış yaptığında cihaz o
       hesabın bildirimlerini almayı bırakıyor (push_token tablosu taşınırken

@@ -823,9 +823,17 @@ alter table challenges
 > ile yenileyebilirsin, ama bu paylaşılmış eski davet linklerini kıracağı için
 > zorunlu değil.
 
-- [ ] 🔑 **Ayrıca doğrula:** Supabase Dashboard → Settings → API'de rate
-      limiting'in açık olduğunu kontrol et — kod alanı büyüse de sınırsız
-      istek atılabiliyorsa brute-force yine de (çok daha yavaş) mümkün kalır.
+> ✅ **Düzeltme (14 Tem 2026):** burada önceden "Dashboard → Settings → API'de
+> rate limiting'i doğrula" diye bir madde vardı — yanlıştı. Supabase
+> Dashboard'da `get_challenge_preview` gibi herkese açık RPC'ler için genel
+> amaçlı bir rate-limit ayarı **yok**; tek panel Authentication → Rate
+> Limits, o da yalnızca auth uçlarını (OTP, kayıt, token yenileme) kapsıyor.
+> Yani buradaki tek gerçek koruma yukarıdaki 10 karakterlik kod alanı
+> (~1 trilyon kombinasyon) — kontrol edilecek bir dashboard ayarı yok.
+> İstersen ileride `get_challenge_preview`/`join_challenge_by_code` içine
+> `current_setting('request.headers', true)`'dan IP okuyup bir
+> rate-limit tablosuna yazan ek bir kontrol eklenebilir (ayrı bir iş,
+> şu an entropi tek başına yeterli).
 
 ## Ek L — Hesap silme (App Store zorunluluğu)
 

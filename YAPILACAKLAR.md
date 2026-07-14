@@ -82,8 +82,16 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
       participants da ekli).
 - [ ] **Auth → URL Configuration**: redirect URL'e `halkora://` ekli mi teyit et
       (şema `thechallenge`'dan `halkora`'ya değişti — dashboard'da eskisi kalmış olabilir).
-- [ ] **API rate limit** ayarlarının açık olduğunu doğrula (Settings → API) —
-      `get_challenge_preview` herkese açık RPC (Ek K §2 notu).
+- [x] ~~API rate limit ayarlarının açık olduğunu doğrula (Settings → API)~~ —
+      **düzeltme:** bu yanlış bir yönlendirmeydi, Supabase Dashboard'da
+      `get_challenge_preview` gibi herkese açık RPC'ler için genel amaçlı bir
+      "API rate limit" toggle'ı **yok**. Dashboard'daki tek rate-limit paneli
+      Authentication → Rate Limits — o da yalnızca auth uçlarını (OTP/e-posta
+      gönderimi, kayıt, token yenileme) kapsıyor, RPC çağrılarını değil. Yani
+      kontrol edecek bir yer yok; brute-force koruması tamamen Ek K §2'de
+      yapılan kod alanı genişletmesine (10 hex karakter, ~1 trilyon
+      kombinasyon) dayanıyor — bu, gerçekçi hiçbir saldırı hızında pratikte
+      taranamayacak kadar büyük, ekstra bir dashboard ayarına ihtiyaç yok.
 - [ ] 🔐 **Not:** denetim çıktısında service role key + webhook secret görünüyor
       (webhook tanımları bunları header olarak taşıyor, normal) — o çıktıyı
       herkese açık bir yere yapıştırma. Paylaştıysan: Dashboard'dan JWT secret
