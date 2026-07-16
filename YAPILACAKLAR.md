@@ -87,6 +87,19 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
 - [ ] `supabase functions deploy message-digest --no-verify-jwt` — yeni
       fonksiyonu deploy et.
 
+## 1,7. Supabase — Halkora Pro (Faz 4, monetizasyon) — Faz A
+
+- [ ] **`docs/db-pro.sql`'i çalıştır** — `profiles.is_pro` kolonu + challenges'a
+      INSERT-öncesi limit trigger'ı (ücretsiz: en fazla 2 aktif halka; Pro:
+      sınırsız). Deploy/webhook gerektirmiyor. Detay: `docs/PHASE2-SUPABASE.md`
+      "Ek R".
+- [ ] Test: uygulamada Ayarlar → DEV → "Pro'yu aç/kapat" ile gate'i dene
+      (RevenueCat henüz yok, gerçek satın alma Faz B). Alternatif elle:
+      `update profiles set is_pro = true where id = '<user-id>';`
+- [ ] **Faz B (sonra, App Store abonelik ürünleri hazır olunca):** RevenueCat
+      + `react-native-purchases` + satın-alma/restore + webhook→`is_pro`
+      senkronu. Ayrı iş — `docs/PHASE2-SUPABASE.md` "Ek R → Faz B".
+
 ## 2. Supabase — Edge Functions (CLI)
 
 - [x] `WEBHOOK_SECRET` tanımlı (webhook + cron header'larında doğrulandı)

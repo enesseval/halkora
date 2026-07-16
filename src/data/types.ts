@@ -89,5 +89,17 @@ export interface Challenge {
   momentum?: Momentum;
   // finish/E9
   finishStats?: { people: number; checkins: number; completionPct: number };
+  // Halkora Pro — gelişmiş istatistikler (Faz 4). Yalnızca tamamlanmış
+  // challenge'larda dolu; mevcut check_ins'ten hesaplanır, ekstra veri yok.
+  advancedStats?: {
+    perfectDays: number; // herkesin check-in yaptığı gün sayısı
+    leaderboard: {
+      name: string;
+      initials: string;
+      completedDays: number;
+      completionPct: number;
+      longestStreak: number;
+    }[];
+  };
   stakeResult?: string; // "☕ Kahveler Mehmet'ten"
 }

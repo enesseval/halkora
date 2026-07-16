@@ -1227,3 +1227,46 @@ tercihine kalıyor):
 - Push: gerçek cihazda bildirim gelmeli (simülatörde asla gelmez).
 - Apple girişi: Welcome → "Apple ile devam et" → sistem Apple sheet'i açılıp
   bağlanmalı, Ayarlar → "Hesap" satırı "Apple ile bağlı"ya dönmeli.
+
+## Ek R — Halkora Pro (Faz 4, monetizasyon) — Faz A
+
+**Kapsam kararı (Faz A):** Pro yalnızca **limit kaldırma + gelişmiş
+istatistik** sunuyor. Grup boyutu gate'lenMİYOR (bilinçli — viral döngü).
+Fotoğraflı check-in yok (storage maliyetine girilmedi). "Kaptan öder"
+(kurucu Pro ise tüm grup Pro) v1.1'e ertelendi. Faturalama RevenueCat
+(aşağıda Faz B).
+
+**İstemci tarafı (kod, zaten yapıldı):**
+- `profiles.is_pro` auth store'a okunuyor (`useAuth().isPro`).
+- Ücretsiz kullanıcı 3. aktif halkayı kurmaya çalışınca sunucu reddediyor
+  (`CHALLENGE_LIMIT_REACHED`), istemci bunu yakalayıp **paywall**'a
+  yönlendiriyor (`app/paywall.tsx`, `reason=challengeLimit`).
+- Bitiş ekranında (`complete.tsx`) gelişmiş istatistikler: Pro ise kusursuz
+  günler + kişi kişi seri/oran; değilse kilitli teaser → paywall
+  (`reason=advancedStats`).
+- Ayarlar'da "Halkora Pro" satırı (paywall'ı açar) + **DEV-only** bir
+  "Pro'yu aç/kapat" toggle'ı (`__DEV__`, release build'de yok) — RevenueCat
+  gelmeden gate'i test etmek için.
+- Paywall'ın satın-alma butonu Faz A'da placeholder ("yakında" uyarısı) —
+  gerçek satın alma Faz B.
+
+**🔑 Senin yapman gereken (Faz A):**
+[`docs/db-pro.sql`](./db-pro.sql)'i SQL Editor'de çalıştır — `profiles.is_pro`
+kolonu + challenges'a INSERT-öncesi limit trigger'ı. Deploy/webhook
+gerektirmiyor. Test için bir kullanıcıyı elle Pro yapmak:
+`update profiles set is_pro = true where id = '<user-id>';` (ya da uygulamada
+DEV toggle).
+
+### Faz B — RevenueCat + gerçek satın alma (App Store abonelik ürünleri hazır olunca)
+
+Henüz YAPILMADI (senin App Store Connect kurulumuna bağlı — Ek Q):
+1. App Store Connect → Subscriptions → bir abonelik grubu + ürünler (aylık +
+   yıllık, ROADMAP: ~₺49-79 / $2.99-4.99).
+2. RevenueCat hesabı → App Store bağla → ürünleri "entitlement"a (örn. `pro`)
+   eşle.
+3. `react-native-purchases` entegrasyonu (native modül — dev/native build
+   gerekir, Expo Go'da çalışmaz), paywall'ın gerçek satın-alma + restore
+   akışı.
+4. RevenueCat webhook → yeni bir Edge Function → `profiles.is_pro`'yu satın
+   alma/iptal olaylarına göre senkron tut (WEBHOOK_SECRET ile korunur, Ek I
+   ile aynı desen).

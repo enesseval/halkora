@@ -102,11 +102,13 @@ export default function SettingsScreen() {
     name,
     username,
     isAnonymous,
+    isPro,
     linkAppleIdentity,
     saveUsername,
     signOut,
     deleteAccount,
     resetOnboarding,
+    setProDev,
   } = useAuth();
   const [linking, setLinking] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -214,6 +216,22 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Halkora Pro — always reachable (a door, not a nag). Free: ember-
+            tinted, opens the paywall. Pro: neutral, shows "Aktif". */}
+        {configured ? (
+          <View style={{ marginTop: 20 }}>
+            <Group>
+              <Row
+                icon="zap"
+                label={t.pro.title}
+                value={isPro ? t.pro.settingsSubActive : undefined}
+                tint={isPro ? undefined : colors.ember}
+                onPress={isPro ? undefined : () => router.push('/paywall?reason=generic')}
+              />
+            </Group>
+          </View>
+        ) : null}
+
         <View style={{ marginTop: 20 }}>
           <Group>
             <Row icon="user" label={t.settings.name} value={displayName} />
@@ -300,6 +318,28 @@ export default function SettingsScreen() {
               {deleting ? t.settings.deleting : t.settings.deleteAccount}
             </AppText>
           </Pressable>
+        ) : null}
+
+        {/* DEV-only: flip is_pro before RevenueCat (Faz B) exists, so the
+            paywall + advanced-stats gating can be exercised. __DEV__ is false
+            in every release build, so this row never ships. */}
+        {__DEV__ && configured ? (
+          <View style={{ marginBottom: 24 }}>
+            <SectionLabel>DEV</SectionLabel>
+            <View style={{ marginTop: 10 }}>
+              <Group>
+                <Row
+                  icon="zap"
+                  label={t.pro.devToggle}
+                  value={isPro ? 'Pro' : 'Free'}
+                  tint={isPro ? colors.ember : undefined}
+                  onPress={() => {
+                    void setProDev(!isPro);
+                  }}
+                />
+              </Group>
+            </View>
+          </View>
         ) : null}
 
         <AppText variant="meta" color={colors.textTertiary} tabular style={{ textAlign: 'center' }}>

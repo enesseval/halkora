@@ -342,19 +342,29 @@ görmen gerekir; görmezsen bana söyle, o zaman gerçek bir bug'dır.
 **İlke: check-in / katılma / temel grup asla paywall arkasına girmez** —
 viral döngü ücretsiz katmanda yaşar.
 
-- [ ] 🔑 💰 RevenueCat hesabı + App Store Connect'te abonelik ürünleri
+**Kesinleşen kapsam (16 Tem 2026):** Faz A = limit kaldırma + gelişmiş
+istatistik. Grup boyutu gate'lenMEZ (viral döngü). Fotoğraflı check-in YOK
+(storage maliyeti). "Kaptan öder" v1.1'e ertelendi. Faturalama = RevenueCat.
+
+- [x] 🧑‍💻 Ücretsiz limit: **2 aktif challenge** (grup boyutu ve joker
+      gate'lenmiyor). Limit kontrolü **sunucuda** — `challenges` INSERT
+      trigger'ı (`docs/db-pro.sql`, `CHALLENGE_LIMIT_REACHED`).
+- [x] 🧑‍💻 `profiles.is_pro` + auth store okuması (`useAuth().isPro`). DEV
+      toggle ile test edilebilir (RevenueCat'siz).
+- [x] 🧑‍💻 Pro açılımları (Faz A): **sınırsız challenge** + **gelişmiş
+      istatistikler** (kusursuz günler, kişi kişi seri/oran — mevcut
+      check_ins'ten, ekstra storage yok).
+- [x] 🧑‍💻 Paywall ekranı (`app/paywall.tsx`) — utandırmayan dil, bağlamsal
+      (limit / gelişmiş istatistik / genel), genel nag yok.
+- [ ] 🔑 💰 **Faz B:** RevenueCat hesabı + App Store Connect abonelik ürünleri
       (aylık ~₺49-79 / $2.99-4.99 + yıllık indirimli).
-- [ ] 🧑‍💻 `react-native-purchases` entegrasyonu + `profiles.is_pro` senkronu.
-- [ ] 🧑‍💻 Ücretsiz limitler: 2 aktif challenge · 8 kişilik grup · 1 joker.
-      Limit kontrolü **sunucuda** (RPC/Edge Function — istemci hilelenebilir).
-- [ ] 🧑‍💻 Pro açılımları: sınırsız challenge, büyük grup, ekstra joker tanımlama,
-      fotoğraflı check-in, gelişmiş istatistik, widget temaları.
-- [ ] 🧑‍💻 **"Kaptan öder":** grubu kuran Pro ise o challenge'da tüm grup Pro
-      özellikleri kullanır — dönüşümün asıl motoru.
-- [ ] 🧑‍💻 Paywall ekranı — utandırmayan dilde ("Halkanı büyüt"), limit anında
-      bağlamsal gösterim (genel nag yok).
+- [ ] 🧑‍💻 **Faz B:** `react-native-purchases` + gerçek satın-alma/restore +
+      RevenueCat webhook → `profiles.is_pro` senkronu.
+- [ ] 🧑‍💻 **v1.1:** "Kaptan öder" — grubu kuran Pro ise o challenge'da tüm
+      grup Pro özellikleri kullanır (dönüşümün asıl motoru).
 - [ ] ❌ Yapılmayacaklar: gerçek para bahsi/escrow (regülasyon riski),
-      reklam (ürün ruhunu öldürür).
+      reklam (ürün ruhunu öldürür), fotoğraflı check-in (storage — şimdilik),
+      büyük-grup gate'i (viral döngüyü kısar).
 
 ---
 
