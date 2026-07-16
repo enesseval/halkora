@@ -80,6 +80,12 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
 - [ ] Çalıştırdıktan sonra doğrulama: kurduğun bir halkanın Detay ekranında
       sağ üstte ⚙️ görünmeli, başlık/günlük eylem/bahis metnini değiştirip
       kaydedebilmelisin; kurmadığın bir halkada ⚙️ hiç görünmemeli.
+- [ ] **`docs/db-message-digest.sql`'i çalıştır** (mesaj bildirimi artık anlık
+      değil, aralıklı özet — "3 yeni mesaj" gibi). Dosyada TEST (1 dakika) ve
+      PROD (saatlik) iki seçenek var, şimdilik TEST'i çalıştır. Detay:
+      `docs/PHASE2-SUPABASE.md` "Ek P".
+- [ ] `supabase functions deploy message-digest --no-verify-jwt` — yeni
+      fonksiyonu deploy et.
 
 ## 2. Supabase — Edge Functions (CLI)
 
@@ -93,6 +99,11 @@ Denetimde canlıda ZATEN DOĞRU çıkanlar (bir şey yapmana gerek yok):
       supabase functions deploy check-in
       supabase functions deploy delete-account
       ```
+- [ ] ⚠️ **`notify`'ı BİR KEZ DAHA deploy et** — `messages` tablosunu artık
+      görmezden geliyor (mesaj bildirimi `message-digest`'e taşındı, Ek P):
+      `supabase functions deploy notify --no-verify-jwt`
+- [ ] **`message-digest`'i deploy et** (yeni fonksiyon, Ek P):
+      `supabase functions deploy message-digest --no-verify-jwt`
 
 ## 3. Supabase — Dashboard ayarları
 

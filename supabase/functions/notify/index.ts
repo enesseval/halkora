@@ -1,12 +1,18 @@
 // Supabase Edge Function — pushes a notification to the OTHER participants of
-// a challenge whenever a check-in, chat message, or nudge is inserted.
+// a challenge whenever a check-in or nudge is inserted (invites too — see
+// below). Chat messages do NOT page through here anymore: per-message push
+// was too noisy, so new messages are batched into a periodic digest instead
+// (supabase/functions/message-digest, docs/PHASE2-SUPABASE.md "Ek P"). If
+// you still have the old "notify-message" DB Webhook configured, it's
+// harmless to leave it (this function now just no-ops on that table) but
+// you can delete it in the Dashboard to save the wasted invocation.
 //
 // Deploy + wiring (DB Webhooks + the shared secret below): see
 // docs/PHASE2-SUPABASE.md "Ek I". Locale-aware copy: see "Ek N".
 //
-// Invoked by four Database Webhooks (one per table), each posting the
-// standard Supabase webhook payload:
-//   { type: 'INSERT', table: 'check_ins' | 'messages' | 'nudges' | 'invites', record: {...} }
+// Invoked by Database Webhooks (one per table), each posting the standard
+// Supabase webhook payload:
+//   { type: 'INSERT', table: 'check_ins' | 'nudges' | 'invites', record: {...} }
 //
 // Deployed with --no-verify-jwt (the caller is Supabase's own webhook
 // dispatcher, not a signed-in user) — WEBHOOK_SECRET is what stands in for
@@ -95,12 +101,13 @@ Deno.serve(async (req) => {
 
     const { table, record } = payload;
 
+    // Messages are batched into the periodic digest now, not pushed
+    // instantly — see the file header comment.
+    if (table === 'messages') return ok();
+
     let challengeId: string | undefined;
     let actorUserId: string | undefined;
-    // Chat messages carry their own free-text body (never translated); the
-    // other two kinds get locale-aware copy composed per recipient below.
-    let messageBody: string | undefined;
-    // nudges and invites target exactly one recipient; the other two notify
+    // nudges and invites target exactly one recipient; check_ins notifies
     // every other participant in the challenge.
     let onlyRecipient: string | undefined;
 
@@ -112,11 +119,6 @@ Deno.serve(async (req) => {
         .eq('id', record.participant_id as string)
         .single();
       actorUserId = participant?.user_id as string | undefined;
-    } else if (table === 'messages') {
-      if (record.kind !== 'message') return ok(); // skip system messages
-      challengeId = record.challenge_id as string;
-      actorUserId = record.user_id as string;
-      messageBody = String(record.text ?? '').slice(0, 120);
     } else if (table === 'nudges') {
       challengeId = record.challenge_id as string;
       actorUserId = record.from_user as string;
@@ -175,12 +177,9 @@ Deno.serve(async (req) => {
         } else if (table === 'nudges') {
           title = c.nudgeTitle;
           body = c.nudgeBody;
-        } else if (table === 'invites') {
+        } else {
           title = c.inviteTitle;
           body = c.inviteBody(actorName ?? c.someone, challengeTitle ?? c.challengeFallback);
-        } else {
-          title = `${actorName ?? c.someone} · ${challengeTitle ?? c.challengeFallback}`;
-          body = messageBody ?? '';
         }
         return { to: r.token as string, title, body, data: { challengeId, inviteCode } };
       });

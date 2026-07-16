@@ -1097,3 +1097,34 @@ gerekçesiyle aynı: bunlar geçmiş check-in'lerin anlamını/adaletini değiş
 > sunucu tarafında locale-aware system-mesaj kompozisyonu için bugün hiçbir
 > altyapı yok (mesajlar hep istemci metniyle yazılıyor), yeni bir mekanizma
 > icat etmek yerine ayrı, dikkatli bir iş olarak bırakıldı.
+
+## Ek P — Mesaj bildirimi: anlık değil, aralıklı özet
+
+Önceden her sohbet mesajında anında push gidiyordu (`notify` fonksiyonu,
+`messages` tablosu INSERT'i) — aktif bir grup sohbetinde bu çok gürültülü.
+Artık mesajlar **periyodik bir özet**e toplanıyor: "3 yeni mesaj" gibi, tek
+bir push, her mesajda değil.
+
+**Kod tarafı (zaten yapıldı):**
+- `notify` fonksiyonu artık `messages` tablosunu görmezden geliyor
+  (eski `notify-message` DB Webhook'u hâlâ duruyorsa zararı yok, sadece
+  boşuna bir çağrı — istersen Dashboard'dan silebilirsin, zorunlu değil).
+- Yeni `supabase/functions/message-digest` fonksiyonu: her çalıştığında,
+  push token'ı olan her kullanıcı için, `profiles.last_message_notified_at`
+  tarihinden sonra katıldığı halkalarda başkalarının yazdığı mesajları
+  sayıyor, tek bir "X yeni mesaj" bildirimi gönderiyor (tek halkaysa halka
+  adıyla, birden fazlaysa "Y halkanda" diyerek), sonra o kullanıcının
+  penceresini `now()`'a kaydırıyor.
+
+**🔑 Senin yapman gereken:** [`docs/db-message-digest.sql`](./db-message-digest.sql)
+— tek dosyada: `profiles.last_message_notified_at` kolonu + pg_cron kurulumu.
+Dosyanın içinde **iki seçenek** var:
+- 🧪 Test için: her **1 dakikada** bir çalışacak şekilde (hemen sonucu gör).
+- 🚀 Prod için: **saatlik** — aynı SQL'i yorumdan çıkarıp tekrar çalıştırman
+  yeterli, `cron.schedule` aynı isimle (`message-digest`) çağrılınca
+  zamanlamayı GÜNCELLER, ayrı bir job oluşturmaz.
+
+Deploy:
+```powershell
+supabase functions deploy message-digest --no-verify-jwt
+```
