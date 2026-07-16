@@ -1,4 +1,5 @@
 import { SegmentState } from '@/data/types';
+import { getDict, getLocale, intlTag } from '@/i18n';
 
 /**
  * Build a `days` array of a given length from a set of explicit states,
@@ -25,22 +26,16 @@ export function completedToday(participants: { checkedInToday: boolean }[]): num
   return participants.filter((p) => p.checkedInToday).length;
 }
 
-const MONTHS_TR = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
-];
-const DAYS_TR = [
-  'Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi',
-];
-
-/** "7 Temmuz Salı" */
+/** "7 Temmuz Salı" / "Tuesday, July 7" — via Intl so month/weekday names AND
+ * their locale-specific order follow the current app language, instead of a
+ * hand-rolled Turkish-only table. */
 export function formatLongDate(d: Date): string {
-  return `${d.getDate()} ${MONTHS_TR[d.getMonth()]} ${DAYS_TR[d.getDay()]}`;
+  return new Intl.DateTimeFormat(intlTag(), { day: 'numeric', month: 'long', weekday: 'long' }).format(d);
 }
 
-/** "8 Temmuz" */
+/** "8 Temmuz" / "July 8" */
 export function formatShortDate(d: Date): string {
-  return `${d.getDate()} ${MONTHS_TR[d.getMonth()]}`;
+  return new Intl.DateTimeFormat(intlTag(), { day: 'numeric', month: 'long' }).format(d);
 }
 
 export function addDays(d: Date, n: number): Date {
@@ -65,11 +60,12 @@ export function nowClock(): string {
   return `${hh}:${mm}`;
 }
 
-/** Human "join others" summary: "Ayşe, Can ve Mert'i bekliyoruz". */
+/** Human "join others" summary: "Ayşe, Can ve Mert'i bekliyoruz" / "Waiting on Ayşe, Can and Mert". */
 export function waitingNames(names: string[]): string {
-  if (names.length === 0) return 'Herkes tamamladı';
-  if (names.length === 1) return `${names[0]}'i bekliyoruz`;
+  const t = getDict();
+  if (names.length === 0) return t.detail.everyoneWaiting;
+  if (names.length === 1) return t.detail.waitingFor(names[0]);
   const head = names.slice(0, -1).join(', ');
   const tail = names[names.length - 1];
-  return `${head} ve ${tail}'i bekliyoruz`;
+  return t.detail.waitingForMany(head, tail);
 }

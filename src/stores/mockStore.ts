@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { buildDays, nowClock } from '@/lib/day';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { getDict } from '@/i18n';
 import {
-  MOCK_CHALLENGES,
+  getMockChallenges,
   ME_ID,
   ME_NAME,
   ME_INITIALS,
@@ -21,6 +22,8 @@ export interface CreateChallengeInput {
   /** override the "starts" copy (e.g. a custom future date) */
   startsLabel?: string;
   stake?: Stake;
+  /** Ek M — kurucu davet penceresini "yalnızca ilk gün" ile sınırlayabilir. */
+  firstDayJoinOnly?: boolean;
 }
 
 interface MockState {
@@ -49,13 +52,15 @@ interface MockState {
   joinByCode: (code: string, name: string) => string;
   restart: (id: string) => void;
   endEarly: (id: string) => void;
+  /** Faz 3C madde 3 — owner-only edit of title/daily action/stake text. */
+  updateDetails: (id: string, title: string, dailyAction: string, stakeText: string) => void;
   openMomentumDemo: (id: string) => void;
   closeMomentumDemo: () => void;
 }
 
 /** Deep clone the seed so store mutations never touch the source module. */
 function seed(): Challenge[] {
-  return JSON.parse(JSON.stringify(MOCK_CHALLENGES)) as Challenge[];
+  return JSON.parse(JSON.stringify(getMockChallenges())) as Challenge[];
 }
 
 /**
@@ -219,10 +224,12 @@ export const useMockStore = create<MockState>((set, get) => ({
 
   createChallenge: (input, override) => {
     const id = override?.id ?? `new-${Date.now()}`;
+    const t = getDict();
     const challenge: Challenge = {
       id,
-      title: input.title || 'Yeni Challenge',
-      dailyAction: `Bugün: ${input.dailyAction || 'hedefini tamamla'}`,
+      title: input.title || t.common.newChallengeFallback,
+      dailyAction: `${t.common.today}: ${input.dailyAction || t.common.completeYourGoalFallback}`,
+      dailyActionRaw: input.dailyAction || t.common.completeYourGoalFallback,
       totalDays: input.totalDays,
       currentDay: input.startTomorrow ? 0 : 1,
       days: buildDays(
@@ -231,17 +238,24 @@ export const useMockStore = create<MockState>((set, get) => ({
       ),
       status: input.startTomorrow ? 'upcoming' : 'active',
       startsLabel: input.startTomorrow
-        ? input.startsLabel ?? 'Yarın başlıyor'
+        ? input.startsLabel ?? t.common.startsTomorrow
         : undefined,
       meCheckedInToday: false,
-      jokerRemaining: 1,
+      jokerRemaining: input.joker ?? 1,
       hasMissedYesterday: false,
       inviteCode: override?.inviteCode ?? id.slice(-6),
-      scheduleSummary: `${input.dailyAction || 'Günlük hedef'} · ${input.totalDays} gün`,
+      scheduleSummary: t.common.scheduleSummary(input.dailyAction || t.common.dailyGoalFallback, input.totalDays),
       startsWhen: input.startTomorrow
-        ? input.startsLabel ?? 'Yarın 06:00'
-        : 'Bugün başladı',
+        ? input.startsLabel ?? t.common.tomorrowSixAm
+        : t.common.startsToday,
       stake: input.stake,
+      firstDayJoinOnly: input.firstDayJoinOnly ?? false,
+      // Mock data doesn't simulate real elapsed time, so a just-created demo
+      // challenge is never actually closed to new joiners.
+      joinClosed: false,
+      // Whoever runs the create flow is always its owner — matches real
+      // mode's challenges.owner_id.
+      isOwner: true,
       participants: [
         {
           id: ME_ID,
@@ -328,6 +342,24 @@ export const useMockStore = create<MockState>((set, get) => ({
 
   openMomentumDemo: (id) => set({ momentumDemoId: id }),
   closeMomentumDemo: () => set({ momentumDemoId: null }),
+
+  updateDetails: (id, title, dailyAction, stakeText) => {
+    const t = getDict();
+    set((s) => ({
+      challenges: s.challenges.map((c) => {
+        if (c.id !== id) return c;
+        const clean = stakeText.trim();
+        return {
+          ...c,
+          title,
+          dailyAction: `${t.common.today}: ${dailyAction}`,
+          dailyActionRaw: dailyAction,
+          scheduleSummary: t.common.scheduleSummary(dailyAction, c.totalDays),
+          stake: clean ? { mode: c.stake?.mode ?? 'direct', text: clean } : undefined,
+        };
+      }),
+    }));
+  },
 }));
 
 export { firstName };

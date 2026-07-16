@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/data/types';
+import { getDict } from '@/i18n';
 
 interface MessageRow {
   id: string;
@@ -12,9 +13,13 @@ interface MessageRow {
 
 /** Messages + reaction counts for one challenge, newest last. */
 export async function fetchMessages(challengeId: string): Promise<Message[]> {
+  // getSession() (local, no network) instead of getUser() (network round-trip
+  // every call) — this runs on every 4s poll, and a slow/flaky getUser() call
+  // used to make "mine" detection unreliable and slowed the whole poll down.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
 
   const { data: msgs, error } = await supabase
     .from('messages')
@@ -34,7 +39,7 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
     supabase.from('profiles').select('id, name').in('id', userIds),
   ]);
 
-  const nameById = new Map((profs ?? []).map((p) => [p.id as string, (p.name as string) ?? 'Katılımcı']));
+  const nameById = new Map((profs ?? []).map((p) => [p.id as string, (p.name as string) ?? getDict().common.person]));
   const countsByMsg = new Map<string, Map<string, number>>();
   for (const r of (reactions ?? []) as { message_id: string; emoji: string }[]) {
     const inner = countsByMsg.get(r.message_id) ?? new Map<string, number>();
@@ -46,7 +51,7 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
     id: m.id,
     kind: m.kind,
     authorId: m.user_id,
-    authorName: nameById.get(m.user_id) ?? 'Katılımcı',
+    authorName: nameById.get(m.user_id) ?? getDict().common.person,
     text: m.text,
     dayNumber: m.day_number,
     reactions: Array.from(countsByMsg.get(m.id) ?? new Map()).map(([emoji, count]) => ({ emoji, count })),
@@ -56,9 +61,10 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
 
 export async function insertMessage(challengeId: string, dayNumber: number, text: string): Promise<void> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Oturum bulunamadı.');
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error(getDict().errors.sessionMissing);
   const { error } = await supabase
     .from('messages')
     .insert({ challenge_id: challengeId, user_id: user.id, day_number: dayNumber, kind: 'message', text });
@@ -67,9 +73,10 @@ export async function insertMessage(challengeId: string, dayNumber: number, text
 
 export async function insertReaction(messageId: string, emoji: string): Promise<void> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Oturum bulunamadı.');
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error(getDict().errors.sessionMissing);
   const { error } = await supabase
     .from('message_reactions')
     .insert({ message_id: messageId, user_id: user.id, emoji });
@@ -79,9 +86,10 @@ export async function insertReaction(messageId: string, emoji: string): Promise<
 
 export async function insertNudge(challengeId: string, toUserId: string): Promise<void> {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Oturum bulunamadı.');
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error(getDict().errors.sessionMissing);
   const { error } = await supabase
     .from('nudges')
     .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId });

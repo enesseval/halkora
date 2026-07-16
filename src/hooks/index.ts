@@ -10,28 +10,44 @@ import { Alert } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMockStore, CreateChallengeInput } from '@/stores/mockStore';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { insertChallenge, fetchMyChallenges, restartChallenge, endChallengeEarly } from '@/data/challenges';
+import {
+  insertChallenge,
+  fetchMyChallenges,
+  restartChallenge,
+  endChallengeEarly,
+  updateChallengeDetails,
+} from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
 import { errMessage } from '@/lib/errors';
+import { FAST_DAYS } from '@/lib/fastDays';
 import {
   ME_ID,
   ME_NAME,
   ME_INITIALS,
-  TEMPLATES,
-  STAKE_PRESETS,
+  getTemplates,
+  getStakePresets,
   REACTION_EMOJIS,
-  INVITE_JOINERS,
+  getInviteJoiners,
 } from '@/data/mock';
 import { formatLongDate, waitingNames } from '@/lib/day';
 import { firstName } from '@/stores/mockStore';
 import { Challenge, Participant } from '@/data/types';
+import { useT } from '@/i18n';
 
 // Re-export types + static config so screens have a single import source.
 export type { Challenge, Participant, Message, Stake, StakeOption, SegmentState, Momentum } from '@/data/types';
 export type { CreateChallengeInput };
-export { ME_ID, ME_NAME, ME_INITIALS, TEMPLATES, STAKE_PRESETS, REACTION_EMOJIS, INVITE_JOINERS };
+export {
+  ME_ID,
+  ME_NAME,
+  ME_INITIALS,
+  getTemplates as TEMPLATES,
+  getStakePresets as STAKE_PRESETS,
+  REACTION_EMOJIS,
+  getInviteJoiners as INVITE_JOINERS,
+};
 
 /** Single challenge by id (undefined if not found). */
 export function useChallenge(id: string | undefined): Challenge | undefined {
@@ -59,21 +75,45 @@ export const MY_CHALLENGES_KEY = ['challenges', 'mine'] as const;
 export function useChallengesQuery() {
   const setChallenges = useMockStore((s) => s.setChallenges);
   const everHadData = useRef(false);
+  useRealtimeMyChallenges();
 
   const query = useQuery({
     queryKey: MY_CHALLENGES_KEY,
     queryFn: fetchMyChallenges,
     enabled: isSupabaseConfigured,
-    // Polling fallback so other people's check-ins/joins show up while this
-    // screen is open even if the Realtime subscription (or its Supabase
-    // project setup) isn't delivering events.
-    refetchInterval: isSupabaseConfigured ? 5000 : false,
+    // Pure reconciliation safety net now that useRealtimeMyChallenges pushes
+    // updates the instant anyone check-ins/joins/leaves — this only matters
+    // if the websocket silently drops (network switch, background/foreground)
+    // or Ek D's publication step isn't actually enabled. 60s is fine for
+    // "catch up eventually"; it's not the primary way data gets fresh anymore.
+    // In FAST_DAYS test mode a "day" is 60s, so a 60s poll can lag a whole
+    // day — tighten it so day rollovers show up on screen as they happen.
+    refetchInterval: isSupabaseConfigured ? (FAST_DAYS ? 10_000 : 60_000) : false,
   });
 
   useEffect(() => {
     if (isSupabaseConfigured && query.data) {
       everHadData.current = true;
-      setChallenges(query.data);
+      const current = useMockStore.getState().challenges;
+      const byId = new Map(query.data.map((c) => [c.id, c]));
+      // Nothing removes a challenge from "my list" (no leave/delete feature)
+      // — a poll/refetch should only ever add to or update it, never shrink
+      // it. A stale/out-of-order response racing with another concurrent
+      // fetch (e.g. a poll whose DB snapshot predates something that just
+      // committed) could otherwise wipe an already-loaded challenge off
+      // Home/Detail for a cycle even though nothing actually changed.
+      const currentIds = new Set(current.map((c) => c.id));
+      // fetchMyChallenges never fetches chat messages (that's the separate
+      // useChallengeMessages poll) — its rows always carry `messages: []`.
+      // Applying it wholesale would stomp whatever the chat poll had just
+      // populated back to empty every 5s, which is exactly what made a
+      // just-sent message flash and then vanish for BOTH sides of the chat.
+      const refreshed = current.map((c) => {
+        const fresh = byId.get(c.id);
+        return fresh ? { ...fresh, messages: c.messages } : c;
+      });
+      const brandNew = query.data.filter((c) => !currentIds.has(c.id));
+      setChallenges([...refreshed, ...brandNew]);
     }
   }, [query.data, setChallenges]);
 
@@ -132,9 +172,16 @@ export function useRefreshChallenges() {
   return { refreshing, refresh };
 }
 
-/** Archived / completed challenges (drives E9 entry from Settings). */
+/** Archived / completed challenges (drives Home's "history" section + E9
+ * entry from Settings). Reads the raw array and filters in a useMemo rather
+ * than inside the Zustand selector — a selector that returns `.filter(...)`
+ * directly hands back a brand-new array reference on every single read,
+ * which useSyncExternalStore sees as "changed" and re-renders for, which
+ * calls the selector again, forever (infinite render loop / "Maximum update
+ * depth exceeded" — same pattern useTodayStatus above already avoids). */
 export function useCompletedChallenges(): Challenge[] {
-  return useMockStore((s) => s.challenges.filter((c) => c.status === 'completed'));
+  const challenges = useMockStore((s) => s.challenges);
+  return useMemo(() => challenges.filter((c) => c.status === 'completed'), [challenges]);
 }
 
 /** Preview lookup by invite code (E5 deep-link welcome) — Phase 1 mock only. */
@@ -157,6 +204,8 @@ export interface JoinPreview {
   startsWhen: string;
   stakeText?: string;
   participants: { id: string; initials: string; name: string }[];
+  /** Ek M — kurucu daveti "yalnızca ilk gün" ile sınırlamışsa ve o gün geçtiyse true. */
+  joinClosed: boolean;
 }
 
 /**
@@ -165,6 +214,7 @@ export interface JoinPreview {
  * of a few safe fields); mock path reads the local store directly.
  */
 export function useJoinPreview(code: string | undefined): JoinPreview {
+  const { t } = useT();
   const mock = useChallengeByCode(code);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -188,6 +238,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
         scheduleSummary: '',
         startsWhen: '',
         participants: [],
+        joinClosed: false,
       };
     }
     return {
@@ -197,14 +248,15 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       retry: refetch,
       title: data.title,
       totalDays: data.totalDays,
-      scheduleSummary: `${data.dailyAction} · ${data.totalDays} gün`,
-      startsWhen: data.status === 'upcoming' ? 'Yarın başlıyor' : 'Devam ediyor',
+      scheduleSummary: t.common.scheduleSummary(data.dailyAction, data.totalDays),
+      startsWhen: data.status === 'upcoming' ? t.common.startsTomorrow : t.common.ongoing,
       stakeText: data.stakeText,
       participants: data.sampleNames.map((name, i) => ({
         id: `s${i}`,
         name,
         initials: name.slice(0, 2).toUpperCase(),
       })),
+      joinClosed: data.joinClosed,
     };
   }
 
@@ -219,6 +271,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       scheduleSummary: '',
       startsWhen: '',
       participants: [],
+      joinClosed: false,
     };
   }
   return {
@@ -234,11 +287,13 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     participants: mock.participants
       .filter((p) => !p.isMe)
       .map((p) => ({ id: p.id, name: p.name, initials: p.initials })),
+    joinClosed: mock.joinClosed,
   };
 }
 
 /** Check-in action + derived status for one challenge. */
 export function useCheckIn(id: string) {
+  const { t } = useT();
   const checkIn = useMockStore((s) => s.checkIn);
   const undo = useMockStore((s) => s.undoCheckIn);
   const challenge = useChallenge(id);
@@ -261,7 +316,7 @@ export function useCheckIn(id: string) {
         })
         .catch((e) => {
           undo(id); // roll back the optimistic update
-          Alert.alert('Check-in kaydedilemedi', errMessage(e));
+          Alert.alert(t.errors.checkInFailed, errMessage(e));
         });
     }
   };
@@ -302,20 +357,38 @@ export function useChallengeMessages(id: string | undefined) {
     queryKey: messagesKey(id ?? ''),
     queryFn: () => fetchMessages(id as string),
     enabled: isSupabaseConfigured && !!id,
-    // Same polling fallback as useTodayStatus — new messages/reactions from
-    // others show up within a few seconds even without a working Realtime
-    // subscription.
-    refetchInterval: isSupabaseConfigured && !!id ? 4000 : false,
+    // Same reconciliation-safety-net role as useChallengesQuery's poll —
+    // useRealtimeChallenge already pushes new messages/reactions instantly
+    // over the websocket. This is only the backstop for a dropped connection
+    // or a project where Ek D's publication step isn't enabled.
+    refetchInterval: isSupabaseConfigured && !!id ? 20_000 : false,
   });
   useEffect(() => {
     if (!isSupabaseConfigured || !id || !data) return;
     everHadData.current = true;
-    // Guard against a stale in-flight fetch (started before a send) resolving
-    // *after* an optimistic local append and wiping it out — only apply
-    // server data when it's not behind what's already showing locally.
-    const current = useMockStore.getState().challenges.find((c) => c.id === id);
-    if (current && data.length < current.messages.length) return;
-    setMessages(id, data);
+    const currentList = useMockStore.getState().challenges.find((c) => c.id === id)?.messages ?? [];
+    const byId = new Map(data.map((m) => [m.id, m]));
+
+    // Drop a local optimistic bubble (id `local-...`) once its real
+    // (server-id) counterpart has shown up in `data` — matched by author +
+    // text + day, since the ids never match a real db id.
+    const confirmed = new Set(data.filter((d) => d.mine).map((d) => `${d.dayNumber}::${d.text}`));
+    const kept = currentList.filter(
+      (m) => !m.id.startsWith('local-') || !confirmed.has(`${m.dayNumber}::${m.text}`),
+    );
+
+    // Messages are never deleted server-side — a poll/refetch should only
+    // ever add to (or refresh reaction counts on) the list, never shrink it.
+    // A stale/out-of-order response (racing with another concurrent fetch,
+    // e.g. the 4s poll vs. the post-send/post-reaction invalidate) could
+    // otherwise wipe an already-confirmed message off the screen for a cycle
+    // even though it's safely stored — this hit both the sender's and the
+    // recipient's device, since neither has anything to do with the local
+    // optimistic bubble once a message is truly persisted.
+    const keptIds = new Set(kept.map((m) => m.id));
+    const refreshed = kept.map((m) => byId.get(m.id) ?? m);
+    const brandNew = data.filter((m) => !keptIds.has(m.id));
+    setMessages(id, [...refreshed, ...brandNew]);
   }, [data, id, setMessages]);
 
   return {
@@ -325,6 +398,37 @@ export function useChallengeMessages(id: string | undefined) {
     error,
     retry: refetch,
   };
+}
+
+/**
+ * Push-based updates for the "my challenges" list (Home, and anywhere else
+ * useChallengesQuery is read) — a check-in, join, or restart/end-early by
+ * ANYONE on ANY of the user's challenges invalidates the list instantly,
+ * instead of waiting for the next poll. There's no single `challenge_id` to
+ * filter these subscriptions on (this covers every challenge the user is
+ * in), so — same pattern already used for `message_reactions` below —
+ * subscribe unfiltered: Supabase only ever delivers rows the subscriber's
+ * own RLS SELECT policies (Ek B) allow them to see, so this stays scoped to
+ * "my" data. Requires Ek D's `alter publication supabase_realtime add table
+ * ...` to have actually been run — until then this silently does nothing
+ * and the poll below is the only thing keeping the list fresh.
+ */
+function useRealtimeMyChallenges(): void {
+  const queryClient = useQueryClient();
+  const instanceId = useRef(Math.random().toString(36).slice(2)).current;
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const bump = () => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    const channel = supabase
+      .channel(`my-challenges-${instanceId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'check_ins' }, bump)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, bump)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, bump)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, instanceId]);
 }
 
 /**
@@ -379,6 +483,7 @@ export function useRealtimeChallenge(id: string | undefined) {
 
 /** All challenge-scoped actions in one place. */
 export function useChallengeActions(id: string) {
+  const { t } = useT();
   const useJoker = useMockStore((s) => s.useJoker);
   const ackMissed = useMockStore((s) => s.ackMissed);
   const sendMessageMock = useMockStore((s) => s.sendMessage);
@@ -386,6 +491,7 @@ export function useChallengeActions(id: string) {
   const nudgeMock = useMockStore((s) => s.nudge);
   const restart = useMockStore((s) => s.restart);
   const endEarly = useMockStore((s) => s.endEarly);
+  const updateDetailsMock = useMockStore((s) => s.updateDetails);
   const setChallenges = useMockStore((s) => s.setChallenges);
   const challenge = useChallenge(id);
   const queryClient = useQueryClient();
@@ -410,7 +516,7 @@ export function useChallengeActions(id: string) {
           } catch {
             // best-effort resync; the alert below still tells the user it failed
           }
-          Alert.alert('Joker kaydedilemedi', errMessage(e));
+          Alert.alert(t.errors.jokerFailed, errMessage(e));
         });
     }
   };
@@ -429,7 +535,7 @@ export function useChallengeActions(id: string) {
         return true;
       } catch (e) {
         removeMessageMock(id, localId); // roll back — it never actually sent
-        Alert.alert('Mesaj gönderilemedi', errMessage(e));
+        Alert.alert(t.errors.messageFailed, errMessage(e));
         return false;
       }
     }
@@ -457,7 +563,7 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       restartChallenge(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert('Yeniden başlatılamadı', errMessage(e)));
+        .catch((e) => Alert.alert(t.errors.restartFailed, errMessage(e)));
     }
   };
 
@@ -466,7 +572,19 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       endChallengeEarly(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert('Bitirilemedi', errMessage(e)));
+        .catch((e) => Alert.alert(t.errors.endEarlyFailed, errMessage(e)));
+    }
+  };
+
+  /** Owner-settings sheet awaits this directly (like saveUsername) so it can
+   * show the error inline instead of a global Alert — unlike the other
+   * actions here, there's no optimistic UI to roll back if it fails. */
+  const doUpdateDetails = async (title: string, dailyAction: string, stakeText: string): Promise<void> => {
+    if (isSupabaseConfigured) {
+      await updateChallengeDetails(id, title, dailyAction, stakeText);
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    } else {
+      updateDetailsMock(id, title, dailyAction, stakeText);
     }
   };
 
@@ -478,6 +596,7 @@ export function useChallengeActions(id: string) {
     nudge: doNudge,
     restart: doRestart,
     endEarly: doEndEarly,
+    updateDetails: doUpdateDetails,
   };
 }
 
@@ -487,13 +606,15 @@ export function useChallengeActions(id: string) {
  * participants + stake). Returns the id used by the UI.
  */
 export function useCreateChallenge() {
+  const { t } = useT();
   const create = useMockStore((s) => s.createChallenge);
   const queryClient = useQueryClient();
   return async (input: CreateChallengeInput): Promise<string> => {
     if (isSupabaseConfigured) {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (user) {
         try {
           const row = await insertChallenge(input, user.id);
@@ -504,10 +625,7 @@ export function useCreateChallenge() {
           return id;
         } catch (e) {
           const msg = errMessage(e);
-          Alert.alert(
-            'Supabase kaydı başarısız',
-            `${msg}\n\nchallenges/participants tablolarını ve RLS'i kurdun mu? (docs/PHASE2-SUPABASE.md · Ek A)`,
-          );
+          Alert.alert(t.errors.supabaseWriteFailed, t.errors.supabaseWriteFailedDetail(msg));
         }
       }
     }

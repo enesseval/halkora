@@ -5,17 +5,19 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, hairline, radius, type } from '@/theme/tokens';
 import { Message } from '@/data/types';
 import { REACTION_EMOJIS } from '@/hooks';
+import { useT } from '@/i18n';
 import { AppText } from './ui';
 
 /** Centered "Gün 7" divider between chat days. */
 export function DayDivider({ day }: { day: number }) {
+  const { t } = useT();
   return (
     <View
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 }}
     >
       <View style={{ flex: 1, height: hairline, backgroundColor: colors.strokeSubtle }} />
       <AppText variant="meta" color={colors.textTertiary} tabular>
-        Gün {day}
+        {t.chat.day(day)}
       </AppText>
       <View style={{ flex: 1, height: hairline, backgroundColor: colors.strokeSubtle }} />
     </View>
@@ -147,6 +149,7 @@ export function VoteOption({
   pct: number;
   selected?: boolean;
 }) {
+  const { t } = useT();
   return (
     <View
       style={{
@@ -182,7 +185,7 @@ export function VoteOption({
           {label}
         </AppText>
         <AppText variant="secondary" tabular color={selected ? colors.ember : colors.textSecondary}>
-          %{pct} {selected ? '✓' : ''}
+          {t.common.percent(pct)} {selected ? '✓' : ''}
         </AppText>
       </View>
     </View>

@@ -1,12 +1,18 @@
 // Supabase Edge Function — pushes a notification to the OTHER participants of
-// a challenge whenever a check-in, chat message, or nudge is inserted.
+// a challenge whenever a check-in or nudge is inserted (invites too — see
+// below). Chat messages do NOT page through here anymore: per-message push
+// was too noisy, so new messages are batched into a periodic digest instead
+// (supabase/functions/message-digest, docs/PHASE2-SUPABASE.md "Ek P"). If
+// you still have the old "notify-message" DB Webhook configured, it's
+// harmless to leave it (this function now just no-ops on that table) but
+// you can delete it in the Dashboard to save the wasted invocation.
 //
 // Deploy + wiring (DB Webhooks + the shared secret below): see
-// docs/PHASE2-SUPABASE.md "Ek I".
+// docs/PHASE2-SUPABASE.md "Ek I". Locale-aware copy: see "Ek N".
 //
-// Invoked by three Database Webhooks (one per table), each posting the
-// standard Supabase webhook payload:
-//   { type: 'INSERT', table: 'check_ins' | 'messages' | 'nudges', record: {...} }
+// Invoked by Database Webhooks (one per table), each posting the standard
+// Supabase webhook payload:
+//   { type: 'INSERT', table: 'check_ins' | 'nudges' | 'invites', record: {...} }
 //
 // Deployed with --no-verify-jwt (the caller is Supabase's own webhook
 // dispatcher, not a signed-in user) — WEBHOOK_SECRET is what stands in for
@@ -23,8 +29,40 @@ const CORS_HEADERS = {
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
+// Kept in sync by hand with src/i18n/tr.ts + en.ts — this function runs in
+// Deno, isolated from the RN app's bundle, so it can't import those directly.
+// Only the copy actually composed server-side needs an entry here: a chat
+// message's body is the user's own text (never translated), and titles that
+// are just names/challenge titles need no dictionary lookup either.
+const COPY = {
+  tr: {
+    checkedIn: (name: string) => `${name} check-in yaptı ✓`,
+    nudgeTitle: 'El salla 👋',
+    nudgeBody: 'Sana el salladı — sıra sende.',
+    inviteTitle: 'Halka daveti 💌',
+    inviteBody: (name: string, challengeTitle: string) => `${name} seni "${challengeTitle}" halkasına davet etti.`,
+    someone: 'Biri',
+    challengeFallback: 'Halkan',
+  },
+  en: {
+    checkedIn: (name: string) => `${name} checked in ✓`,
+    nudgeTitle: 'Nudge 👋',
+    nudgeBody: "Someone nudged you — you're up.",
+    inviteTitle: 'Ring invite 💌',
+    inviteBody: (name: string, challengeTitle: string) => `${name} invited you to "${challengeTitle}".`,
+    someone: 'Someone',
+    challengeFallback: 'Your ring',
+  },
+} as const;
+
+type Locale = keyof typeof COPY;
+
+function copyFor(locale: string | null | undefined): (typeof COPY)['tr'] {
+  return COPY[(locale as Locale) ?? 'tr'] ?? COPY.tr;
+}
+
 type WebhookPayload = {
-  table: 'check_ins' | 'messages' | 'nudges';
+  table: 'check_ins' | 'messages' | 'nudges' | 'invites';
   record: Record<string, unknown>;
 };
 
@@ -63,12 +101,14 @@ Deno.serve(async (req) => {
 
     const { table, record } = payload;
 
+    // Messages are batched into the periodic digest now, not pushed
+    // instantly — see the file header comment.
+    if (table === 'messages') return ok();
+
     let challengeId: string | undefined;
     let actorUserId: string | undefined;
-    let title = 'Halkora';
-    let body = '';
-    // nudges target exactly one recipient; the other two notify every other
-    // participant in the challenge.
+    // nudges and invites target exactly one recipient; check_ins notifies
+    // every other participant in the challenge.
     let onlyRecipient: string | undefined;
 
     if (table === 'check_ins') {
@@ -79,35 +119,30 @@ Deno.serve(async (req) => {
         .eq('id', record.participant_id as string)
         .single();
       actorUserId = participant?.user_id as string | undefined;
-    } else if (table === 'messages') {
-      if (record.kind !== 'message') return ok(); // skip system messages
-      challengeId = record.challenge_id as string;
-      actorUserId = record.user_id as string;
-      body = String(record.text ?? '').slice(0, 120);
     } else if (table === 'nudges') {
       challengeId = record.challenge_id as string;
       actorUserId = record.from_user as string;
       onlyRecipient = record.to_user as string;
-      title = 'El salla 👋';
-      body = 'Sana el salladı — sıra sende.';
+    } else if (table === 'invites') {
+      challengeId = record.challenge_id as string;
+      actorUserId = record.from_user as string;
+      onlyRecipient = record.to_user as string;
     } else {
       return ok();
     }
     if (!challengeId || !actorUserId) return ok();
 
     const [{ data: challenge }, { data: actorProfile }] = await Promise.all([
-      admin.from('challenges').select('title').eq('id', challengeId).single(),
+      admin.from('challenges').select('title, invite_code').eq('id', challengeId).single(),
       admin.from('profiles').select('name').eq('id', actorUserId).single(),
     ]);
-    const actorName = (actorProfile?.name as string | undefined) ?? 'Biri';
-    const challengeTitle = (challenge?.title as string | undefined) ?? 'Halkan';
-
-    if (table === 'check_ins') {
-      body = `${actorName} check-in yaptı ✓`;
-      title = challengeTitle;
-    } else if (table === 'messages') {
-      title = `${actorName} · ${challengeTitle}`;
-    }
+    const actorName = actorProfile?.name as string | undefined;
+    const challengeTitle = challenge?.title as string | undefined;
+    // Recipient of an 'invites' row isn't a participant yet — RLS would block
+    // them from reading the challenge if the app routed them straight to
+    // /challenge/{id} on tap, so that tap needs the invite CODE instead
+    // (routes to the public join-preview screen, docs "Ek O" follow-up).
+    const inviteCode = table === 'invites' ? (challenge?.invite_code as string | undefined) : undefined;
 
     let recipientIds: string[];
     if (onlyRecipient) {
@@ -122,19 +157,33 @@ Deno.serve(async (req) => {
     }
     if (recipientIds.length === 0) return ok();
 
-    const { data: tokenRows } = await admin
-      .from('push_tokens')
-      .select('token')
-      .in('user_id', recipientIds);
-    const tokens = (tokenRows ?? []).map((r) => r.token as string).filter(Boolean);
-    if (tokens.length === 0) return ok();
+    const [{ data: tokenRows }, { data: recipientProfiles }] = await Promise.all([
+      admin.from('push_tokens').select('user_id, token').in('user_id', recipientIds),
+      admin.from('profiles').select('id, locale').in('id', recipientIds),
+    ]);
+    const localeByUser = new Map(
+      (recipientProfiles ?? []).map((p) => [p.id as string, p.locale as string | null]),
+    );
 
-    const messages = tokens.map((to) => ({
-      to,
-      title,
-      body,
-      data: { challengeId },
-    }));
+    const messages = (tokenRows ?? [])
+      .filter((r) => r.token)
+      .map((r) => {
+        const c = copyFor(localeByUser.get(r.user_id as string));
+        let title: string;
+        let body: string;
+        if (table === 'check_ins') {
+          title = challengeTitle ?? c.challengeFallback;
+          body = c.checkedIn(actorName ?? c.someone);
+        } else if (table === 'nudges') {
+          title = c.nudgeTitle;
+          body = c.nudgeBody;
+        } else {
+          title = c.inviteTitle;
+          body = c.inviteBody(actorName ?? c.someone, challengeTitle ?? c.challengeFallback);
+        }
+        return { to: r.token as string, title, body, data: { challengeId, inviteCode } };
+      });
+    if (messages.length === 0) return ok();
 
     const res = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
@@ -145,7 +194,7 @@ Deno.serve(async (req) => {
       return ok({ sent: 0, expoStatus: res.status });
     }
 
-    return ok({ sent: tokens.length });
+    return ok({ sent: messages.length });
   } catch (e) {
     // A webhook is fire-and-forget from Postgres's perspective — never let a
     // push failure surface as a DB-visible error. Log-and-200 instead.

@@ -71,6 +71,18 @@ export interface Challenge {
   inviteCode: string;
   scheduleSummary: string; // "Her gün 20 sayfa · 14 gün"
   startsWhen: string; // "Yarın başlıyor"
+  /** Kurucunun seçimi: true ise davet yalnızca 1. gün açık (Ek M). */
+  firstDayJoinOnly: boolean;
+  /** Viewer is this challenge's owner — gates the Detail screen's ⚙️ owner
+   * settings entry (Faz 3C madde 3). Demo/pre-seeded mock challenges are
+   * never editable this way (only ones created via the real create flow). */
+  isOwner: boolean;
+  /** dailyAction without the "Bugün:" prefix, for the owner edit sheet.
+   * Only set where isOwner can ever be true (real challenges + freshly
+   * created mock ones) — pre-seeded demo challenges never need it. */
+  dailyActionRaw?: string;
+  /** firstDayJoinOnly + 1. gün geçtiyse true — davet artık kapalı. */
+  joinClosed: boolean;
   stake?: Stake;
   participants: Participant[];
   messages: Message[];

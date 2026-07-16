@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Platform, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -7,14 +7,27 @@ import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { colors } from '@/theme/tokens';
-import { useAuth, useAuthInit, useSyncPushToken } from '@/hooks/useAuth';
+import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
+import { initLocale } from '@/i18n';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient();
+
+// react-query's polling (refetchInterval) only pauses itself when it thinks
+// the app isn't "focused" — on web that's tab visibility, but on native
+// nothing reports that by default, so the Home/Detail/chat polls kept
+// hitting Supabase every few seconds even with the app fully backgrounded.
+// Wiring AppState in makes refetchIntervalInBackground's default (false)
+// actually take effect on iOS/Android.
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', (state) => {
+    focusManager.setFocused(state === 'active');
+  });
+}
 
 /**
  * Auth-aware routing:
@@ -83,8 +96,15 @@ function useNotificationDeepLink(ready: boolean) {
     if (!ready || Platform.OS === 'web') return;
 
     const go = (data: unknown) => {
-      const challengeId = (data as { challengeId?: string } | undefined)?.challengeId;
-      if (challengeId) router.push(`/challenge/${challengeId}`);
+      const d = data as { challengeId?: string; inviteCode?: string } | undefined;
+      // An invite recipient isn't a participant yet — RLS blocks
+      // /challenge/{id}, so this routes to the public join-preview screen
+      // instead (docs/PHASE2-SUPABASE.md "Ek O" follow-up).
+      if (d?.inviteCode) {
+        router.push(`/join/${d.inviteCode}`);
+      } else if (d?.challengeId) {
+        router.push(`/challenge/${d.challengeId}`);
+      }
     };
 
     if (!handled.current) {
@@ -101,15 +121,28 @@ function useNotificationDeepLink(ready: boolean) {
   }, [ready, router]);
 }
 
+/** Reads the persisted language choice (or detects the device's) once, before
+ * anything renders real copy — see src/i18n/index.ts. */
+function useLocaleInit(): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    initLocale().then(() => setReady(true));
+  }, []);
+  return ready;
+}
+
 function RootNavigator() {
   const { ready, configured } = useAuth();
+  const localeReady = useLocaleInit();
   useAuthInit();
   useProtectedRoute();
   useSyncPushToken();
+  useSyncLocale();
   useNotificationDeepLink(ready);
 
-  // Avoid a flash of Home before the persisted session is restored.
-  if (configured && !ready) {
+  // Avoid a flash of Home before the persisted session is restored, or of
+  // default-locale copy before the saved/detected language is applied.
+  if (!localeReady || (configured && !ready)) {
     return <View style={{ flex: 1, backgroundColor: colors.bgBase }} />;
   }
 

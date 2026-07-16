@@ -153,10 +153,12 @@ ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
       gönderebilirdi. Sunucu tarafında "aynı kişiye günde 1 nudge" kısıtı
       eklendi (unique index — `docs/PHASE2-SUPABASE.md` "Ek K", SQL Editor'de
       çalıştırman gerekiyor).
-- [ ] 🔑 **Davet kodu brute-force riski:** `get_challenge_preview` herkese
+- [x] 🔑 **Davet kodu brute-force riski:** `get_challenge_preview` herkese
       açık bir RPC. Kod uzunluğu 6 hex karakterden 10'a çıkarıldı (Ek K —
-      SQL Editor'de çalıştırman gerekiyor), ayrıca Supabase Dashboard'da API
-      rate limit ayarlarının açık olduğunu doğrulaman gerekiyor.
+      SQL Editor'de çalıştırman gerekiyor, `docs/db-fixes.sql` içinde).
+      ~~Ayrıca Dashboard'da API rate limit'i doğrula~~ — düzeltme: böyle bir
+      dashboard ayarı yok (Ek K'ye eklenen not), 10 karakterlik kod alanı
+      tek başına yeterli koruma.
 - [x] 🧑‍💻 **Çıkışta push token temizlenmiyordu:** `signOut()` artık çıkıştan
       önce `push_tokens` satırını siliyor — kullanıcı çıkış yaptığında cihaz o
       hesabın bildirimlerini almayı bırakıyor (push_token tablosu taşınırken
@@ -169,29 +171,36 @@ ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
 
 ### 🟡 Tutarlılık
 
-- [ ] 🧑‍💻 **Gün sınırı iki farklı yerde iki farklı şekilde hesaplanıyor:**
-      istemci (`daysSinceStart`) cihazın yerel gece yarısını, `check-in` Edge
-      Function ise challenge'ın `timezone` kolonunu kullanıyor; `insertChallenge`
-      ise timezone'u hiç yazmıyor (DB default'una kalıyor). Farklı saat
-      diliminde biri ekranda "bugün işaretlenebilir" görüp sunucudan ret
-      yiyebilir — tek doğruluk kaynağı seçilmeli.
-- [ ] 🧑‍💻 Mock `createChallenge` joker seçimini yok sayıyor
-      (`jokerRemaining: 1` sabit) — gerçek yol doğru, yalnızca mock modda tutarsız.
-- [ ] 🧑‍💻 Ayarlar'da "Sürüm 1.0.2" elle yazılmış, `app.json` 1.0.0 diyor —
-      `expo-constants`'tan (`Constants.expoConfig?.version`) okunmalı.
-- [ ] 🧑‍💻 Ayarlar'daki profil kartı + "İsim" satırı chevron'lu görünüyor ama
-      hiçbir aksiyon yok — ya isim düzenleme akışı bağlanmalı ya chevron kaldırılmalı.
+- [x] 🧑‍💻 **Gün sınırı iki farklı yerde iki farklı şekilde hesaplanıyordu:**
+      `insertChallenge` artık cihazın gerçek IANA timezone'unu `timezone`
+      kolonuna yazıyor (DB default'una güvenmek yerine), istemci
+      (`daysSinceStart`) artık challenge'ın kendi `timezone`'unu okuyor
+      (cihaz yerel gece yarısı yerine), `restart_challenge` RPC'si de
+      `current_date` (DB session/UTC) yerine aynı timezone'u kullanıyor —
+      client + check-in Edge Function + join-window RPC'leri artık aynı günü
+      görüyor (`docs/PHASE2-SUPABASE.md` "Ek G" güncellemesi — SQL Editor'de
+      tekrar çalıştırman gerekiyor, 🔑).
+- [x] 🧑‍💻 Mock `createChallenge` artık step 3'te seçilen joker sayısını
+      kullanıyor (`input.joker ?? 1`) — gerçek yolla tutarlı.
+- [x] 🧑‍💻 Ayarlar'da sürüm artık `expo-constants`'tan (`Constants.expoConfig?.version`)
+      okunuyor, elle yazılmış string kalmadı.
+- [x] 🧑‍💻 Ayarlar'daki profil kartı + "İsim" satırı — aksiyonu olmayan
+      satırlar artık chevron göstermiyor (isim düzenleme akışı henüz yok).
 
 ### 🟢 Performans
 
-- [ ] 🧑‍💻 **`fetchMyChallenges` her 5 saniyede TÜM check-in geçmişini
-      çekiyor** — challenge/katılımcı sayısı arttıkça sınırsız büyüyen bir
-      sorgu. Poll aralığını büyüt + uygulama arka plandayken durdur
-      (`AppState`), uzun vadede özet hesaplamayı bir SQL view/RPC'ye taşı.
-- [ ] 🧑‍💻 Sohbet 4 saniyede bir polling yapıyor — Realtime aboneliği
-      doğrulandıktan sonra bu yalnızca fallback'e (ör. 30sn) düşürülmeli.
-- [ ] 🧑‍💻 Özel gün sayısı 999'a kadar girilebiliyor, `ProgressRing` her gün
-      için ayrı SVG path çiziyor — makul bir üst sınır (ör. 100) konmalı.
+- [x] 🧑‍💻 **`fetchMyChallenges` her 5 saniyede TÜM check-in geçmişini
+      çekiyordu** — poll aralığı 12sn'ye çıkarıldı, `AppState` artık
+      react-query'nin `focusManager`'ına bağlı olduğu için uygulama
+      arka plandayken poll'lar duruyor (önceden yalnızca web sekme
+      görünürlüğü bunu yapıyordu). Özet hesaplamayı bir SQL view/RPC'ye
+      taşımak hâlâ uzun vadeli bir iyileştirme olarak duruyor.
+- [x] 🧑‍💻 Sohbet poll'u 4sn'den 8sn'ye çıkarıldı + aynı `AppState` durdurma
+      mantığından faydalanıyor. Realtime'ın (Ek D) gerçekten tetiklendiği
+      doğrulanınca 30sn'ye kadar daha da genişletilebilir.
+- [x] 🧑‍💻 Özel gün sayısı artık 100 ile sınırlı (önceden 999'a kadar
+      girilebiliyordu) — `ProgressRing`'in her gün için ayrı SVG path
+      çizme maliyeti artık sınırsız büyümüyor.
 
 ### 💡 Özellik önerileri
 
@@ -228,6 +237,103 @@ ayrı bir güvenlik + tutarlılık + performans taraması. Öncelik sırası:
       dokunuş. `expo-apple-targets` ile WidgetKit hedefi; prebuild kullandığın
       için mümkün ama native Swift gerektirir — Faz 3B'nin en pahalı kalemi,
       en sona.
+
+---
+
+## 🆔 Faz 3C — @kullanıcıadı + kurucu ayarları (kullanıcı isteği, 14 Tem 2026)
+
+İki üründen çıkma istek: (a) her kullanıcının `@enesseval` tarzı benzersiz bir
+adı olsun ve bununla davet edilebilsin, (b) challenge kurucusu Detay
+ekranından akışı etkilemeyen alanları düzenleyebilsin. Uygulama sırası da bu —
+handle sistemi davet özelliğinin ön koşulu.
+
+### 1. @kullanıcıadı (handle) altyapısı — ✅ kod tamam, SQL senin işin
+
+- [x] 🧑‍💻 Şema: `profiles.username` (unique, `^[a-z0-9_]{3,20}$` check) +
+      `reserved_usernames` tablosu + rezerve-isim trigger'ı (defense-in-depth
+      — "own profile" RLS politikası RPC'yi atlayan doğrudan yazımı da
+      kapsasın diye). Tek dosyada: `docs/db-username.sql` — 🔑 SQL Editor'de
+      çalıştırman gerekiyor, `YAPILACAKLAR.md` §1,5'e eklendi.
+- [x] 🧑‍💻 Herkese otomatik handle: `src/lib/username.ts` (Türkçe karakter +
+      aksan temizleme, kısa isimler için dolgu) + `useAuth().ensureUsername`
+      onboarding'de isim kaydedilince best-effort çalışır (ağ hatası
+      onboarding'i asla bloklamaz). Onboarding'de isim adımının altında canlı
+      `@handle` önizlemesi var.
+- [x] 🧑‍💻 Ayarlar'da "Kullanıcı adı" satırı: `UsernameSheet` ile
+      düzenlenebilir; format/rezerve/çakışma hataları `USERNAME_INVALID` /
+      `USERNAME_RESERVED` / `USERNAME_TAKEN` kodlarıyla lokalize gösteriliyor.
+      Eski handle serbest kalır — davetler koda bağlı olduğu için hiçbir şey
+      kırılmaz.
+- [x] 🧑‍💻 Görünürlük: co-participant RLS politikası `profiles` satırını zaten
+      okutuyor → halka arkadaşların handle'ı otomatik görülür. Halka DIŞI
+      arama için `find_user_by_username(text)` RPC'si — yalnızca TAM eşleşme
+      (prefix araması bilerek yok), `(id, name, initials, username)` döner.
+      Madde 2 (davet) bunu henüz çağırmıyor — o ekranın işi.
+- [x] 🧑‍💻 i18n: tüm yeni string'ler tr+en (AGENTS.md kuralı).
+
+### 2. Handle ile davet — ✅ kod tamam, SQL + webhook senin işin
+
+- [x] 🧑‍💻 `invites` tablosu: `(challenge_id, from_user, to_user, created_at,
+      unique(challenge_id, to_user))` + RLS (gönderen yazar — üyelik şartıyla,
+      alıcı okur). Nudge'la aynı desen. Tek dosyada: `docs/db-invites.sql`
+      — 🔑 SQL Editor'de çalıştırman gerekiyor.
+- [x] 🧑‍💻 `notify` Edge Function'a 4. tablo: `invites` INSERT → alıcıya
+      dilinde push ("Enes seni '30 Gün Kitap Okuma' halkasına davet etti") +
+      `data.inviteCode` ile `/join/{kod}`'a deep link (challenge id'ye değil —
+      alıcı henüz üye değil, RLS onu Detay ekranından zaten engelliyor). 🔑
+      Yeni DB webhook + `notify`'ı yeniden deploy etmen gerekiyor
+      (`docs/PHASE2-SUPABASE.md` "Ek O2").
+- [x] 🧑‍💻 Davet ekranına "@kullanıcıadıyla davet et" alanı: yaz → bul
+      (`find_user_by_username` RPC) → gönder; "bulunamadı", "kendini davet
+      edemezsin", "zaten üye", "zaten davet edilmiş" durumları ayrı ayrı
+      gösteriliyor. Bu davet gerçek katılım değil — yalnızca bir bildirim
+      tetikler, alıcı katılımı `join_challenge_by_code` ile kendisi
+      tamamlar, yani "sadece ilk gün" penceresini asla bypass etmez.
+- [ ] 💡 MVP sonrası: uygulama içi "davetlerim" kutusu (push kaçarsa davet
+      kaybolmasın diye Home'da bir satır) — v1'de push + link yeterli.
+
+### 3. Kurucu ayarları (Detay ekranında ⚙️) — ✅ kod tamam, SQL senin işin
+
+- [x] 🧑‍💻 Detay ekranında yalnızca kurucuya görünen ⚙️ ayarlar girişi (top bar,
+      sağ üstte — kurucu değilsen aynı yerde boş bir spacer var, layout
+      kaymaz) → sheet: **başlık, günlük eylem, bahis metni** düzenlenebilir.
+      Gün sayısı, joker, başlangıç tarihi, katılım penceresi bilinçli olarak
+      DÜZENLENEMEZ — bunlar geçmiş check-in'lerin anlamını/adaleti değiştirir
+      (grup 10 gün koştuktan sonra 30 günü 15'e çekmek gibi).
+- [x] 🧑‍💻 Dar RPC: `update_challenge_details(p_challenge_id, p_title,
+      p_daily_action, p_stake_text)` — owner-only (`NOT_THE_OWNER` kodu),
+      SECURITY DEFINER. Genel bir UPDATE RLS politikası yerine (Ek G'deki
+      gerekçeyle aynı: geniş policy title/owner dahil her alanı açardı). Tek
+      dosyada: `docs/db-owner-settings.sql` — 🔑 SQL Editor'de çalıştırman
+      gerekiyor, deploy yok.
+- [ ] 🧑‍💻 Başlık değişince sohbete system message ("Kurucu halkanın adını
+      '...' yaptı") — bu turda YAPILMADI. Sunucu tarafında locale-aware
+      system-mesaj kompozisyonu için bugün hiçbir altyapı yok (mesajlar hep
+      istemci metniyle yazılıyor, `notify`'ın push-copy COPY dict'ine benzer
+      bir mekanizma sohbet mesajları için henüz mevcut değil) — yeni bir
+      mekanizma icat etmek yerine ayrı, dikkatli bir iş olarak bırakıldı.
+- [ ] 💡 Pro bağlantısı (beta sonrası, Faz 4 ile): aynı ayarlar alanına
+      "İstatistikler" bölümü — grup tamamlama eğrisi, en istikrarlı üye, gün
+      gün katılım — `is_pro` kapısının arkasında. Ücretsizde bugünkü basit
+      özet kalır.
+
+### 4. Bitiş ekranı istatistikleri — ✅ zaten gerçek veriden (kontrol edildi)
+
+~~Ek G'deki bilinen eksik~~ — 14 Tem 2026'da kod incelendi: `mapRow`
+(`src/data/challenges.ts`) `finishStats` (kişi/check-in/tamamlama %) ve
+her katılımcının `completedDays`'ini status `'completed'` olan HER
+challenge için gerçek `check_ins`'ten zaten hesaplıyor; mock arşiv
+(`archive1`) ayrı bir demo görünümü, kod yolu paylaşmıyor. Doküman notu
+bayatmış, düzeltildi (Ek G). Gerçekten eksik olan tek şey — `stakeResult`
+("kim kaybetti" metni) — bilinçli olarak hesaplanmıyor: kim kaybettiğine
+grup karar verir, `complete.tsx` bu durumda zaten `stake.text`'e düşüyor.
+Bir sonraki fast-days testinde bu ekranın gerçek veriyle doğru geldiğini
+görmen gerekir; görmezsen bana söyle, o zaman gerçek bir bug'dır.
+
+- [x] 🧑‍💻 **Yanıltıcı buton metni düzeltildi:** "Aynı grupla yeni challenge
+      başlat" aslında hiçbir grubu taşımıyor, boş create'e gidiyor (Rematch,
+      Faz 3B'de henüz yok) — metin artık "Yeni bir halka kur" / "Start a new
+      ring" diyor, olmayan bir özelliği vaat etmiyor.
 
 ---
 

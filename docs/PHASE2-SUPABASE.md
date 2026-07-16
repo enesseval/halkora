@@ -349,7 +349,7 @@ declare
 begin
   select id into v_challenge_id from challenges where invite_code = p_code;
   if v_challenge_id is null then
-    raise exception 'Davet kodu bulunamadı';
+    raise exception 'INVITE_NOT_FOUND';
   end if;
 
   insert into participants (challenge_id, user_id)
@@ -402,14 +402,22 @@ create policy "read member nudges" on nudges
 ```
 
 **Realtime'ı açman gerekiyor** — yoksa `postgres_changes` aboneliği hiç tetiklenmez.
-Supabase Dashboard → **Database → Replication** → `supabase_realtime` publication'a
-şu tabloları ekle (toggle ile), ya da SQL Editor'de:
+En güvenilir yol SQL Editor'de bunu çalıştırmak (dashboard'daki toggle'ları aramaya
+gerek yok, herhangi bir compute tier'da çalışır):
 
 ```sql
-alter publication supabase_realtime add table check_ins, messages, message_reactions, participants;
+alter publication supabase_realtime add table check_ins, messages, message_reactions, participants, challenges;
 ```
 
-> Zaten "All tables" seçiliyse bu adıma gerek yok — dashboard'da kontrol et.
+> Zaten "All tables" seçiliyse bu adıma gerek yok — SQL Editor'de
+> `select * from pg_publication_tables where pubname = 'supabase_realtime';`
+> ile hangi tabloların zaten ekli olduğunu görebilirsin.
+>
+> ⚠️ Dashboard'da **Database → Replication** sayfasına girip "Small compute
+> gerekiyor" gibi bir uyarı görürsen o **Read Replicas** (ayrı, ücretli bir
+> bölgesel ölçekleme özelliği) ile ilgili — bizim kullandığımız Realtime
+> publication'la alakası yok, o yüzden bu uyarıyı görmezden gelip yukarıdaki
+> SQL'i çalıştırman yeterli.
 
 Detay ekranı artık her açılışta bir `postgres_changes` kanalına abone oluyor
 (`useRealtimeChallenge`): biri check-in yapınca, katılınca, mesaj/tepki atınca
@@ -503,11 +511,15 @@ create or replace function public.restart_challenge(p_challenge_id uuid)
 returns void language plpgsql security definer as $$
 begin
   if not public.is_member(p_challenge_id) then
-    raise exception 'Bu challenge''in üyesi değilsin.';
+    raise exception 'NOT_A_MEMBER';
   end if;
-  update challenges
-  set start_date = current_date, status = 'active'
-  where id = p_challenge_id;
+  -- current_date is the DB SESSION's date (server/UTC), not the challenge's
+  -- own timezone column — used the challenge's timezone instead so a restart
+  -- always lands on the day this specific group actually sees as "today"
+  -- (matches the check-in Edge Function's day math, Ek F).
+  update challenges c
+  set start_date = (now() at time zone c.timezone)::date, status = 'active'
+  where c.id = p_challenge_id;
 end;
 $$;
 grant execute on function public.restart_challenge(uuid) to authenticated;
@@ -516,7 +528,7 @@ create or replace function public.end_challenge_early(p_challenge_id uuid)
 returns void language plpgsql security definer as $$
 begin
   if not public.is_member(p_challenge_id) then
-    raise exception 'Bu challenge''in üyesi değilsin.';
+    raise exception 'NOT_A_MEMBER';
   end if;
   update challenges set status = 'completed' where id = p_challenge_id;
 end;
@@ -524,10 +536,26 @@ $$;
 grant execute on function public.end_challenge_early(uuid) to authenticated;
 ```
 
-> ⚠️ Bilinen eksik: E9 (Bitiş & Kutlama) ekranındaki `finishStats` (kişi/check-in/
-> tamamlama %) ve katılımcı sıralaması hâlâ yalnızca **mock arşiv verisinde**
-> (`archive1`) dolu geliyor — gerçek bir challenge'ı `endEarly` ile bitirince o
-> istatistikler henüz `check_ins`'ten hesaplanmıyor. Ayrı bir iş olarak bırakıldı.
+> 🔑 **Güncelleme (gün sınırı tutarlılığı):** `restart_challenge` yukarıdaki
+> haliyle değiştiyse SQL Editor'de tekrar çalıştırman gerekiyor (`create or
+> replace function` zaten var olanı değiştirir, `restart_challenge`'ın dönüş
+> tipi değişmedi, `get_challenge_preview`'daki gibi önce `drop` etmene gerek
+> yok). Ayrıca `insertChallenge` artık challenge'ı oluşturan cihazın kendi
+> saat dilimini `timezone` kolonuna yazıyor (`Europe/Istanbul` default'una
+> güvenmek yerine) — bu, istemcinin "bugün kaçıncı gün" hesabını da artık
+> cihazın yerel saatinden değil, challenge'ın kendi `timezone`'undan yapmasıyla
+> birleşince, farklı saat diliminde biri ekranda "bugün işaretlenebilir"
+> görüp sunucudan ret yeme sorununu ortadan kaldırıyor.
+
+> ✅ Düzeltme (14 Tem 2026): bu notta "E9'daki `finishStats` yalnızca mock
+> arşiv verisinde dolu geliyor" yazıyordu — kod incelemesinde bunun **bayat**
+> olduğu görüldü. `mapRow` (`src/data/challenges.ts`) `finishStats`'ı ve her
+> katılımcının `completedDays`'ini status `'completed'` olan HER challenge
+> için gerçek `check_ins` verisinden zaten hesaplıyor (mock arşiv sadece bir
+> demo görünümü, ayrı bir kod yolu değil). Gerçekten hesaplanmayan tek şey
+> `stakeResult` ("kim kaybetti" metni) — bu bilinçli bir tasarım kararı: kim
+> kaybettiğine grup karar verir, sunucu tahmin edemez; `complete.tsx` bu
+> durumda zaten `stake.text`'e düşüyor.
 
 ## Ek H — EAS Build çökme sorunu (ZORUNLU — TestFlight için)
 
@@ -795,9 +823,17 @@ alter table challenges
 > ile yenileyebilirsin, ama bu paylaşılmış eski davet linklerini kıracağı için
 > zorunlu değil.
 
-- [ ] 🔑 **Ayrıca doğrula:** Supabase Dashboard → Settings → API'de rate
-      limiting'in açık olduğunu kontrol et — kod alanı büyüse de sınırsız
-      istek atılabiliyorsa brute-force yine de (çok daha yavaş) mümkün kalır.
+> ✅ **Düzeltme (14 Tem 2026):** burada önceden "Dashboard → Settings → API'de
+> rate limiting'i doğrula" diye bir madde vardı — yanlıştı. Supabase
+> Dashboard'da `get_challenge_preview` gibi herkese açık RPC'ler için genel
+> amaçlı bir rate-limit ayarı **yok**; tek panel Authentication → Rate
+> Limits, o da yalnızca auth uçlarını (OTP, kayıt, token yenileme) kapsıyor.
+> Yani buradaki tek gerçek koruma yukarıdaki 10 karakterlik kod alanı
+> (~1 trilyon kombinasyon) — kontrol edilecek bir dashboard ayarı yok.
+> İstersen ileride `get_challenge_preview`/`join_challenge_by_code` içine
+> `current_setting('request.headers', true)`'dan IP okuyup bir
+> rate-limit tablosuna yazan ek bir kontrol eklenebilir (ayrı bir iş,
+> şu an entropi tek başına yeterli).
 
 ## Ek L — Hesap silme (App Store zorunluluğu)
 
@@ -837,3 +873,357 @@ Dashboard → Authentication → Users'ta artık görünmez), uygulama Welcome
 ekranına döner. Grup halindeki bir challenge'da SADECE hesabını silen
 kişinin katılımcılığı/check-in'leri/mesajları kayboluyor, diğer katılımcılar
 ve challenge'ın kendisi olduğu gibi kalıyor.
+
+## Ek M — Katılım penceresi: "sadece ilk gün" seçeneği
+
+**Neden:** Bir challenge başladıktan günler sonra katılan biri, katılmadan
+önceki günlerde "kaçırdı" gibi görünmemeli — ama bunu çözmenin yolu katılımı
+zaman sınırlamak değil (bkz. sohbet: geç katılan biri hâlâ toplam gün
+sayısına göre adil bir yüzde alıyor, çünkü payda hep `total_days`). Bunun
+yerine kurucuya bir seçim bırakıyoruz: **"Sınırsız"** (istediği zaman
+katılabilir, varsayılan — mevcut davranış) veya **"Sadece ilk gün"**
+(challenge'ın 1. günü bitince davet kapanır).
+
+### 1. Şema
+
+```sql
+alter table challenges
+  add column if not exists first_day_join_only boolean not null default false;
+```
+
+### 2. `join_challenge_by_code` — sunucu tarafında zorunlu kıl
+
+İstemci tarafında bir kontrol yeterli değil — biri RPC'yi doğrudan çağırıp
+bypass edebilir. `join_challenge_by_code`'u güncelle (Ek C'deki fonksiyonun
+yerine geçer):
+
+```sql
+create or replace function public.join_challenge_by_code(p_code text)
+returns uuid language plpgsql security definer as $$
+declare
+  v_challenge_id uuid;
+  v_start_date date;
+  v_timezone text;
+  v_restrict boolean;
+  v_current_day int;
+begin
+  select id, start_date, timezone, first_day_join_only
+    into v_challenge_id, v_start_date, v_timezone, v_restrict
+    from challenges where invite_code = p_code;
+  if v_challenge_id is null then
+    raise exception 'INVITE_NOT_FOUND';
+  end if;
+
+  if v_restrict then
+    v_current_day := ((now() at time zone v_timezone)::date - v_start_date) + 1;
+    if v_current_day > 1 then
+      raise exception 'JOIN_WINDOW_CLOSED';
+    end if;
+  end if;
+
+  insert into participants (challenge_id, user_id)
+  values (v_challenge_id, auth.uid())
+  on conflict (challenge_id, user_id) do nothing;
+
+  return v_challenge_id;
+end;
+$$;
+grant execute on function public.join_challenge_by_code(text) to authenticated;
+```
+
+### 3. `get_challenge_preview` — davet ekranının önceden bilmesi için
+
+```sql
+create or replace function public.get_challenge_preview(p_code text)
+returns table (
+  id uuid,
+  title text,
+  daily_action text,
+  total_days int,
+  start_date date,
+  status text,
+  stake_text text,
+  participant_count int,
+  sample_names text[],
+  join_closed boolean
+) language sql security definer stable as $$
+  select
+    c.id, c.title, c.daily_action, c.total_days, c.start_date, c.status,
+    (select s.text from stakes s where s.challenge_id = c.id limit 1) as stake_text,
+    (select count(*)::int from participants p where p.challenge_id = c.id) as participant_count,
+    (select array_agg(pr.name order by p.joined_at)
+       from participants p join profiles pr on pr.id = p.user_id
+       where p.challenge_id = c.id limit 5) as sample_names,
+    (c.first_day_join_only
+       and ((now() at time zone c.timezone)::date - c.start_date) + 1 > 1) as join_closed
+  from challenges c
+  where c.invite_code = p_code
+  limit 1;
+$$;
+grant execute on function public.get_challenge_preview(text) to anon, authenticated;
+```
+
+Bu SQL'i çalıştırdıktan sonra istemci tarafı zaten hazır (aşağıdaki commit'te):
+create akışında "Katılım" seçimi, davet/join ekranlarında süre dolunca
+gösterilecek mesaj, ve Detay ekranında kapanan daveti gizleme.
+
+## Ek N — Tam uygulama içi i18n (Türkçe + İngilizce)
+
+Uygulamanın tamamı (ekranlar, hata mesajları, push bildirimleri) artık iki
+dilli — `src/i18n/tr.ts` + `en.ts`, Ayarlar'da bir dil seçici, cihazın
+diline göre otomatik ilk seçim. Bunun sunucu tarafındaki iki parçası **senin
+çalıştırman gerekiyor**:
+
+### 1. `profiles.locale` kolonu (🔑 ZORUNLU)
+
+```sql
+alter table profiles
+  add column if not exists locale text not null default 'tr';
+```
+
+İstemci, kullanıcı Ayarlar'dan dil değiştirdiğinde (veya ilk onboarding'i
+bitirdiğinde) bu kolonu otomatik günceller (`useSyncLocale`,
+`src/hooks/useAuth.ts`) — sen sadece kolonu eklemen yeterli.
+
+### 2. Hata mesajları artık kod dönüyor (🔑 ZORUNLU — yeniden çalıştır)
+
+`join_challenge_by_code`, `restart_challenge`, `end_challenge_early` — bu
+üçü artık Türkçe/İngilizce metin yerine sabit bir kod döndürüyor
+(`INVITE_NOT_FOUND`, `JOIN_WINDOW_CLOSED`, `NOT_A_MEMBER`, ...) ve istemci
+bunu aktif dile göre kendisi çeviriyor (`src/lib/errors.ts`). Bu üç
+fonksiyonun SQL'i yukarıda ("Ek G", "Ek M") zaten güncellendi — **SQL
+Editor'de tekrar çalıştırman yeterli**, dönüş tipleri değişmediği için
+önce `drop function` yapmana gerek yok.
+
+`check-in` ve `delete-account` Edge Function'ları da aynı şekilde artık
+prose yerine kod döndürüyor — bir sonraki adımda onları da yeniden deploy
+edeceksin.
+
+### 3. Push bildirimleri: alıcının diline göre (🔑 ZORUNLU — yeniden deploy)
+
+`notify` ve `evening-reminder` Edge Function'ları artık her alıcının
+`profiles.locale`'ına bakıp bildirim başlığını/gövdesini o dilde
+oluşturuyor (aynı toplu gönderimde biri Türkçe biri İngilizce görebilir —
+bu doğru davranış). Deploy komutları Ek I'dekiyle aynı:
+
+```sql
+supabase functions deploy notify --no-verify-jwt
+supabase functions deploy evening-reminder --no-verify-jwt
+supabase functions deploy check-in
+supabase functions deploy delete-account
+```
+
+> Not: Bu dört Edge Function'ın kodu bu commit'te değişti (check-in ve
+> delete-account artık kod döndürüyor, notify ve evening-reminder artık
+> alıcının diline bakıyor) — dördünü de yeniden deploy etmen gerekiyor,
+> sadece yeni eklenenleri değil.
+
+## Ek O — @kullanıcıadı (handle) sistemi (Faz 3C madde 1)
+
+Her kullanıcının artık benzersiz bir `@handle`'ı var (`docs/ROADMAP.md`
+"Faz 3C"). Onboarding'de isimden otomatik türetiliyor (`Enes Seval` →
+`enesseval`, doluysa `enesseval2` gibi ekleniyor) — kullanıcıya ekstra adım
+yok. Ayarlar'dan istediği zaman değiştirebilir.
+
+**Tüm SQL tek dosyada:** [`docs/db-username.sql`](./db-username.sql) — SQL
+Editor'de baştan sona çalıştır (idempotent). İçinde:
+
+- `reserved_usernames` tablosu (`halkora`, `admin`, `destek`... hiç kimseye
+  verilmiyor — yeni bir isim eklemek yalnızca bu tabloya `insert`, kod/RPC
+  değişikliği gerekmiyor).
+- `profiles.username` kolonu: format CHECK'i (`^[a-z0-9_]{3,20}$`, her zaman
+  küçük harf) + unique constraint.
+- Rezerve-liste kontrolünü `set_username` RPC'sinin ÖTESİNDE de garanti eden
+  bir trigger — "own profile" RLS politikası (Ek A) tüm kolonlara ALL izni
+  verdiği için biri RPC'yi atlayıp doğrudan `update profiles set
+  username=...` çalıştırabilir; format CHECK'i zaten bunu format açısından
+  kapatıyor, trigger da rezerve isimler için aynısını yapıyor.
+- `set_username(p_username)` — istemcinin TEK yazma yolu. Format/rezerve/
+  benzersizlik hatalarını `USERNAME_INVALID` / `USERNAME_RESERVED` /
+  `USERNAME_TAKEN` kodlarıyla fırlatır (istemci `src/lib/errors.ts` üzerinden
+  lokalize eder), yalnızca çağıranın kendi satırını değiştirir.
+- `find_user_by_username(p_username)` — davet için TAM eşleşme arama.
+  Bilinçli olarak prefix/ILIKE arama YOK: aksi halde biri `a`, `b`, `c`...
+  deneyerek tüm kullanıcı tablosunu enumerate edebilirdi.
+
+İstemci tarafı (kod, zaten yapıldı): `src/lib/username.ts` (slugify + aday
+üretimi), `useAuth()`'a `ensureUsername`/`saveUsername`, onboarding'de isim
+adımının altında canlı `@handle` önizlemesi, Ayarlar'da düzenlenebilir
+"Kullanıcı adı" satırı. Deploy gerektirmiyor — yalnızca SQL, kod zaten
+`main`'de.
+
+## Ek O2 — Handle ile davet (Faz 3C madde 2)
+
+Davet ekranında artık "@kullanıcıadıyla davet et" alanı var. Tek dosyada:
+[`docs/db-invites.sql`](./db-invites.sql) — `invites` tablosu (bir kişi bir
+challenge'a bir kere davet edilebilir, unique constraint) + RLS (gönderen
+yalnızca ÜYESİ OLDUĞU bir challenge için kendi adına yazabilir — nudge/message
+ile aynı üyelik şartı deseni).
+
+**Bu davet gerçek katılım DEĞİL** — yalnızca bir bildirim tetikler; alıcı
+bildirime dokununca `/join/{kod}` ekranına düşer ve katılımı normal
+`join_challenge_by_code` akışıyla kendisi tamamlar. Yani "sadece ilk gün
+katılım" penceresini asla bypass etmez — pencere kapalıysa alıcı normal join
+ekranındaki kapalı-davet mesajını görür.
+
+**🔑 İki manuel adım:**
+1. `docs/db-invites.sql`'i SQL Editor'de çalıştır.
+2. Dashboard → Database → Webhooks'a **4. bir webhook** ekle (mevcut 3'ün
+   aynısı — Ek I §3'teki tabloya bak): tablo `invites`, event `INSERT`, aynı
+   URL, aynı `Authorization`/`x-webhook-secret` header'ları.
+
+`notify` Edge Function'ı bu commit'te `invites` tablosunu da işleyecek
+şekilde güncellendi (alıcının diline göre "X seni Y halkasına davet etti"
+bildirimi) — yeniden deploy etmen gerekiyor:
+```sql
+supabase functions deploy notify --no-verify-jwt
+```
+
+## Ek O3 — Kurucu ayarları (Faz 3C madde 3)
+
+Detay ekranında artık kurucuya özel bir ⚙️ ayarlar girişi var — sheet: başlık,
+günlük eylem, bahis metni düzenlenebilir. Tek dosyada:
+[`docs/db-owner-settings.sql`](./db-owner-settings.sql) —
+`update_challenge_details(p_challenge_id, p_title, p_daily_action,
+p_stake_text)` RPC'si, yalnızca `owner_id = auth.uid()` olan kurucu çağırabilir
+(`NOT_THE_OWNER` kodu). Deploy gerekmiyor, yalnızca SQL.
+
+Bilinçli olarak DAR tutuldu: gün sayısı, joker hakkı, başlangıç tarihi,
+katılım penceresi bu RPC'nin kapsamı dışında — Ek G'deki restart/endEarly
+gerekçesiyle aynı: bunlar geçmiş check-in'lerin anlamını/adaletini değiştirir.
+
+> 💡 Not: ROADMAP'te önerilen "başlık değişince sohbete otomatik system
+> mesajı" (grup sessizce değişiklik yaşamasın diye) bu turda YAPILMADI —
+> sunucu tarafında locale-aware system-mesaj kompozisyonu için bugün hiçbir
+> altyapı yok (mesajlar hep istemci metniyle yazılıyor), yeni bir mekanizma
+> icat etmek yerine ayrı, dikkatli bir iş olarak bırakıldı.
+
+## Ek P — Mesaj bildirimi: anlık değil, aralıklı özet
+
+Önceden her sohbet mesajında anında push gidiyordu (`notify` fonksiyonu,
+`messages` tablosu INSERT'i) — aktif bir grup sohbetinde bu çok gürültülü.
+Artık mesajlar **periyodik bir özet**e toplanıyor: "3 yeni mesaj" gibi, tek
+bir push, her mesajda değil.
+
+**Kod tarafı (zaten yapıldı):**
+- `notify` fonksiyonu artık `messages` tablosunu görmezden geliyor
+  (eski `notify-message` DB Webhook'u hâlâ duruyorsa zararı yok, sadece
+  boşuna bir çağrı — istersen Dashboard'dan silebilirsin, zorunlu değil).
+- Yeni `supabase/functions/message-digest` fonksiyonu: her çalıştığında,
+  push token'ı olan her kullanıcı için, `profiles.last_message_notified_at`
+  tarihinden sonra katıldığı halkalarda başkalarının yazdığı mesajları
+  sayıyor, tek bir "X yeni mesaj" bildirimi gönderiyor (tek halkaysa halka
+  adıyla, birden fazlaysa "Y halkanda" diyerek), sonra o kullanıcının
+  penceresini `now()`'a kaydırıyor.
+
+**🔑 Senin yapman gereken:** [`docs/db-message-digest.sql`](./db-message-digest.sql)
+— tek dosyada: `profiles.last_message_notified_at` kolonu + pg_cron kurulumu.
+Dosyanın içinde **iki seçenek** var:
+- 🧪 Test için: her **1 dakikada** bir çalışacak şekilde (hemen sonucu gör).
+- 🚀 Prod için: **saatlik** — aynı SQL'i yorumdan çıkarıp tekrar çalıştırman
+  yeterli, `cron.schedule` aynı isimle (`message-digest`) çağrılınca
+  zamanlamayı GÜNCELLER, ayrı bir job oluşturmaz.
+
+Deploy:
+```powershell
+supabase functions deploy message-digest --no-verify-jwt
+```
+
+## Ek Q — Uygulama App Store Connect'ten silindi: Push + Apple ile Giriş'i sıfırdan kurma
+
+App Store Connect'teki uygulama kaydı silindiğinde **Apple Developer
+portalındaki** App ID (`com.halkora.app`) ve onun capability'leri, key'leri
+otomatik silinmez — ayrı sistemler. Ama App Store Connect kaydı olmadan
+gerçek cihazda push/Apple girişini test edip App Store'a basamazsın, o yüzden
+ikisini de baştan sona kontrol/kur. Sırayla:
+
+### 1. Apple Developer → App ID'yi doğrula/oluştur
+
+1. [developer.apple.com](https://developer.apple.com) → Certificates, IDs &
+   Profiles → Identifiers.
+2. `com.halkora.app` hâlâ listede mi bak.
+   - **Varsa:** aç, aşağıdaki iki capability'nin işaretli olduğunu doğrula:
+     **Push Notifications**, **Sign in with Apple**. İkisi de değilse işaretle
+     → Save.
+   - **Yoksa (silinmiş):** + ile yeni bir App ID oluştur, Bundle ID
+     `com.halkora.app` (Explicit, wildcard değil), Description "Halkora",
+     Capabilities'ten **Push Notifications** + **Sign in with Apple**'ı
+     işaretleyerek kaydet.
+
+### 2. Apple Developer → APNs key (push için)
+
+Ek I §5'te bahsedilen key de App ID gibi silinmemiş olabilir ama üzerinde
+durmaya değer, çünkü bir .p8 key **yalnızca oluşturulduğu an bir kere**
+indirilebiliyor — kaybettiysen yenisini çıkarman gerekiyor:
+
+1. Certificates, IDs & Profiles → Keys → mevcut bir "APNs" amaçlı key'in
+   .p8 dosyası elinde duruyor mu kontrol et (yerelde/parola kasasında).
+2. Yoksa: Keys → + → isim ver ("Halkora APNs"), **Apple Push Notifications
+   service (APNs)** kutusunu işaretle → Continue → Register → **Download**
+   (bu ekrana bir daha dönemezsin, indirir indirmez güvenli bir yere kaydet).
+   Key ID'yi de not al (URL'de ve listede görünür).
+3. Team ID'ni de not al (sağ üstte hesap adının yanında / Membership
+   sayfasında) — az sonra lazım.
+
+### 3. Apple Developer → Sign in with Apple için Service ID + ayrı key
+
+Push key'i Sign in with Apple için **kullanamazsın**, ayrı bir key gerekiyor
+(Ek J §1'de anlatılan):
+
+1. Identifiers → Service IDs sekmesi → + → yeni bir Service ID oluştur
+   (örn. `com.halkora.app.signin`), **Sign in with Apple**'ı işaretle,
+   "Configure" ile **Primary App ID**'yi `com.halkora.app` olarak bağla.
+   Bu Service ID'nin kendisi Supabase'e "Client ID" olarak girilecek.
+2. Keys → + → isim ver ("Halkora Sign in with Apple"), **Sign in with Apple**
+   kutusunu işaretle → Configure → Primary App ID'yi yine `com.halkora.app`
+   seç → Continue → Register → Download (yine tek seferlik). Key ID'yi not al.
+
+### 4. Supabase Dashboard → Authentication → Providers → Apple
+
+Elinde: Team ID, Service ID (Client ID), Sign in with Apple key'in Key ID'si
+ve .p8 içeriği. Apple provider ekranı bu dört alanı tek tek istiyor, doldur
+ve etkinleştir. Ayrıca:
+
+- **Authentication → Settings → "Allow manual linking"** açık mı kontrol et
+  (kapalıysa anonim→Apple hesap yükseltmesi `linkIdentity()` hatasıyla çöker).
+
+### 5. Push credential'ını Expo'nun push servisine tanıt
+
+Bu uygulama push'u kendi APNs bağlantısı yerine Expo'nun ortak push
+servisi üzerinden gönderiyor (`exp.host/--/api/v2/push/send` —
+`notify`/`message-digest` fonksiyonlarında). Expo'nun bu servisi senin
+adına APNs'e konuşabilmesi için 2. adımdaki push .p8 key'ini Expo'nun
+credential sistemine yüklemen gerekiyor.
+
+> ⚠️ Bunun için resmi yol `eas credentials` komutu — **`eas build` değil**,
+> hiçbir şeyi derlemiyor/cloud'da build başlatmıyor, yalnızca bu key'i
+> Expo'nun credential deposuna kaydediyor. Yine de `eas-cli`/bir Expo hesabı
+> gerektiriyor, o yüzden madem "eas build kullanmak istemiyorum" dedin, bu
+> adımı atlamadan önce sana danışmak istedim: `eas credentials` → iOS →
+> Push Notifications → "Set up a push key" → 2. adımdaki .p8'i + Key ID'yi +
+> Team ID'ni gir, kaydet. Bu komutu çalıştırmak istemiyorsan haber ver,
+> alternatifi (Expo'nun push servisini hiç kullanmayıp doğrudan kendi APNs
+> bağlantımızı kurmak, epeyce daha fazla iş) birlikte konuşuruz.
+
+### 6. App Store Connect → yeni app kaydı
+
+1. [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → My Apps
+   → + → New App.
+2. Platform iOS, isim "Halkora" (veya App Store'da görünecek başka bir isim —
+   isim benzersiz olmalı, doluysa varyasyon dene), Primary language, Bundle ID
+   açılır listesinden `com.halkora.app`'i seç (1. adımda Developer portalda
+   var olduğu için burada listede çıkar), SKU (örn. `halkora-ios`, sana özel,
+   App Store'da görünmez).
+3. Kayıt oluştuktan sonra App Information, Pricing, Privacy (App Privacy
+   soru formu — hangi veriyi topladığını beyan ediyorsun: hesap, mesajlar,
+   push token vb.) sekmelerini doldurman gerekecek ama bunlar submission
+   öncesi, push/Apple girişini test etmek için şart değil.
+
+### 7. Doğrulama
+
+Yeni bir production build'de (nasıl derlediğine bağlı — Ek I §5 ve Ek J §3'te
+anlatılan adımlar hâlâ geçerli, sadece `eas build` kısmı kendi
+tercihine kalıyor):
+- Push: gerçek cihazda bildirim gelmeli (simülatörde asla gelmez).
+- Apple girişi: Welcome → "Apple ile devam et" → sistem Apple sheet'i açılıp
+  bağlanmalı, Ayarlar → "Hesap" satırı "Apple ile bağlı"ya dönmeli.

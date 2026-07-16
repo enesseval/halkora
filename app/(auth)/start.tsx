@@ -8,6 +8,7 @@ import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { extractCode } from '@/lib/invite';
 import { AppText, IconButton, Screen } from '@/components/ui';
+import { useT } from '@/i18n';
 
 function OptionCard({
   icon,
@@ -67,8 +68,9 @@ function OptionCard({
 
 export default function StartScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { name } = useAuth();
-  const first = (name ?? '').trim().split(/\s+/)[0] || 'sen';
+  const first = (name ?? '').trim().split(/\s+/)[0] || t.start.nameFallback;
 
   const [mode, setMode] = useState<'fork' | 'join'>('fork');
   const [input, setInput] = useState('');
@@ -105,7 +107,7 @@ export default function StartScreen() {
             numberOfLines={1}
             style={{ flex: 1, textAlign: 'center', fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textPrimary }}
           >
-            Davetle katıl
+            {t.start.joinHeaderTitle}
           </AppText>
           <View style={{ width: 40 }} />
         </View>
@@ -115,7 +117,7 @@ export default function StartScreen() {
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Davet linki veya kod"
+            placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
@@ -137,14 +139,14 @@ export default function StartScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <Feather name="clipboard" size={14} color={colors.ember} />
               <AppText variant="meta" color={colors.ember}>
-                {fromClipboard ? 'Panoda bir davet bulduk' : 'Davet hazır'}
+                {fromClipboard ? t.start.foundInClipboard : t.start.inviteReady}
               </AppText>
             </View>
             <AppText style={{ fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textPrimary }}>
-              Kod: {code}
+              {t.start.codeLabel(code)}
             </AppText>
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
-              Detay ve katılımcıları bir sonraki ekranda görürsün.
+              {t.start.detailHint}
             </AppText>
             <Pressable
               onPress={() => {
@@ -162,7 +164,7 @@ export default function StartScreen() {
               })}
             >
               <AppText style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>
-                Bu challenge'a katıl
+                {t.start.joinThisChallenge}
               </AppText>
             </Pressable>
           </View>
@@ -170,7 +172,7 @@ export default function StartScreen() {
 
         <View style={{ flex: 1 }} />
         <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center', paddingBottom: spacing.section }}>
-          Yanlış davet mi? Linki yukarıya yapıştır.
+          {t.start.wrongInvite}
         </AppText>
         </KeyboardAvoidingView>
       </Screen>
@@ -181,20 +183,20 @@ export default function StartScreen() {
     <Screen edges={['top', 'bottom']}>
       <View style={{ flex: 1, justifyContent: 'center' }}>
         <AppText variant="screenTitle" style={{ marginBottom: 28 }}>
-          Güzel, {first}.{'\n'}Nasıl başlıyoruz?
+          {t.start.greeting(first)}
         </AppText>
         <View style={{ gap: 12 }}>
           <OptionCard
             icon="plus"
             emberIcon
-            title="Challenge başlat"
-            subtitle="Hedefi sen koy, grubunu çağır. 2 dakika sürer."
+            title={t.start.createTitle}
+            subtitle={t.start.createSubtitle}
             onPress={() => router.replace('/create')}
           />
           <OptionCard
             icon="link-2"
-            title="Davetle katıl"
-            subtitle="Arkadaşın link mi gönderdi? Buradan gir."
+            title={t.start.joinTitle}
+            subtitle={t.start.joinSubtitle}
             onPress={() => setMode('join')}
           />
         </View>
@@ -205,7 +207,7 @@ export default function StartScreen() {
         onPress={() => router.replace('/')}
         style={{ textAlign: 'center', paddingBottom: spacing.section }}
       >
-        İkisini de sonra yapabilirsin — şimdilik göz at
+        {t.start.footnote}
       </AppText>
     </Screen>
   );

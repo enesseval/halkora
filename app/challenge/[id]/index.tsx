@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -29,9 +29,10 @@ import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
 import { ParticipantRow } from '@/components/ParticipantRow';
 import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
-import { MissedDaySheet, MomentumSheet } from '@/components/Sheets';
+import { MissedDaySheet, MomentumSheet, OwnerSettingsSheet } from '@/components/Sheets';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { useT } from '@/i18n';
 
 type Row =
   | { kind: 'participant'; p: Participant }
@@ -44,6 +45,7 @@ type Row =
 export default function DetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useT();
   const challenge = useChallenge(id);
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const { checkIn, undo, meCheckedInToday, myOrder, myCheckinTime } = useCheckIn(id ?? '');
@@ -53,14 +55,15 @@ export default function DetailScreen() {
   const { firstLoadError: chatError, error: chatErrorDetail, retry: retryChat } = useChallengeMessages(id);
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
+  const [showOwnerSettings, setShowOwnerSettings] = useState(false);
 
   const rows = useMemo<Row[]>(() => {
     if (!challenge) return [];
     const out: Row[] = [];
-    out.push({ kind: 'label', id: 'p', text: 'Katılımcılar' });
+    out.push({ kind: 'label', id: 'p', text: t.detail.participants });
     challenge.participants.forEach((p) => out.push({ kind: 'participant', p }));
     if (chatError || challenge.messages.length > 0) {
-      out.push({ kind: 'label', id: 'c', text: 'Sohbet' });
+      out.push({ kind: 'label', id: 'c', text: t.detail.chat });
       if (chatError) out.push({ kind: 'chatError' });
       let lastDay = -1;
       challenge.messages.forEach((m) => {
@@ -76,7 +79,27 @@ export default function DetailScreen() {
       });
     }
     return out;
-  }, [challenge, chatError]);
+  }, [challenge, chatError, t]);
+
+  // Auto-finish: once everyone's checked in on the LAST day, there's no
+  // reason to sit around waiting for the calendar date to roll over —
+  // close it out now and take whoever's here straight to the celebration
+  // screen, instead of the challenge just quietly flipping to 'completed'
+  // overnight with nobody ever seeing E9.
+  const isLastDayFullyDone =
+    !!challenge &&
+    challenge.status === 'active' &&
+    challenge.currentDay === challenge.totalDays &&
+    challenge.participants.length > 0 &&
+    completedCount(challenge) === challenge.participants.length;
+  useEffect(() => {
+    if (!isLastDayFullyDone || !challenge) return;
+    actions.endEarly();
+    router.replace(`/challenge/${challenge.id}/complete`);
+    // Deliberately only watches isLastDayFullyDone — actions/router/challenge
+    // are stable enough here and re-running this on every challenge poll
+    // tick would just re-fire the (idempotent) endEarly + replace call.
+  }, [isLastDayFullyDone]);
 
   if (!challenge) {
     // Not in the store yet — tell "still loading" and "genuinely failed" apart
@@ -105,7 +128,7 @@ export default function DetailScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase }} edges={['top']}>
           {backButton}
           <ErrorState
-            message="Challenge yüklenemedi."
+            message={t.detail.loadFailed}
             detail={errMessage(error)}
             onRetry={refetch}
           />
@@ -114,7 +137,7 @@ export default function DetailScreen() {
     }
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase, alignItems: 'center', justifyContent: 'center' }}>
-        <AppText color={colors.textSecondary}>Challenge bulunamadı.</AppText>
+        <AppText color={colors.textSecondary}>{t.detail.notFound}</AppText>
       </SafeAreaView>
     );
   }
@@ -124,7 +147,13 @@ export default function DetailScreen() {
   const doneAvatars = challenge.participants
     .filter((p) => p.checkedInToday)
     .map((p) => ({ id: p.id, initials: p.initials }));
-  const showMissed = challenge.hasMissedYesterday && !challenge.missedAcknowledged;
+  // `missedAcknowledged` isn't persisted server-side (mapRow never sets it
+  // for real challenges — see src/data/challenges.ts) so it resets to falsy
+  // on every poll-driven refetch; without the meCheckedInToday check this
+  // gate kept reappearing on every visit even after actually checking in
+  // for today, which makes no sense — there's nothing left to acknowledge
+  // once today is done.
+  const showMissed = challenge.hasMissedYesterday && !challenge.missedAcknowledged && !meCheckedInToday;
   const showMomentum = momentumDemoId === challenge.id;
 
   const topBar = (
@@ -152,7 +181,13 @@ export default function DetailScreen() {
       >
         {challenge.title}
       </AppText>
-      <View style={{ width: 40 }} />
+      {challenge.isOwner ? (
+        <IconButton size={40} onPress={() => setShowOwnerSettings(true)}>
+          <Feather name="settings" size={18} color={colors.textSecondary} />
+        </IconButton>
+      ) : (
+        <View style={{ width: 40 }} />
+      )}
     </View>
   );
 
@@ -166,7 +201,7 @@ export default function DetailScreen() {
           {challenge.dailyAction}
         </AppText>
         <AppText variant="meta" color={colors.textTertiary} tabular style={{ marginTop: 4 }}>
-          {isUpcoming ? challenge.startsWhen : `Gün ${challenge.currentDay}/${challenge.totalDays}`}
+          {isUpcoming ? challenge.startsWhen : t.common.dayOf(challenge.currentDay, challenge.totalDays)}
         </AppText>
       </View>
 
@@ -181,7 +216,7 @@ export default function DetailScreen() {
             isUpcoming ? (
               <View style={{ alignItems: 'center' }}>
                 <AppText style={{ fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textSecondary }}>
-                  Henüz başlamadı
+                  {t.detail.upcomingRing}
                 </AppText>
                 <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
                   {challenge.startsWhen}
@@ -204,7 +239,7 @@ export default function DetailScreen() {
       {!isUpcoming && meCheckedInToday && myOrder ? (
         <Animated.View entering={FadeIn.duration(250)} style={{ alignItems: 'center', marginTop: 18 }}>
           <AppText variant="bodyMedium" tabular>
-            Sen {myOrder}. tamamlayansın
+            {t.detail.completedRank(myOrder)}
           </AppText>
           <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 2 }}>
             {waitingLine(challenge)}
@@ -237,7 +272,7 @@ export default function DetailScreen() {
           }}
         >
           <AppText variant="bodyMedium" tabular>
-            Bugün {done}/{total}
+            {t.detail.todayCount(done, total)}
           </AppText>
           {doneAvatars.length > 0 ? <AvatarStack people={doneAvatars} max={5} size={26} /> : null}
         </View>
@@ -289,10 +324,10 @@ export default function DetailScreen() {
             }}
           >
             <AppText variant="meta" color={colors.textTertiary} style={{ flex: 1 }}>
-              Sohbet yüklenemedi{chatErrorDetail ? `: ${errMessage(chatErrorDetail)}` : '.'}
+              {t.detail.chatLoadFailed}{chatErrorDetail ? `: ${errMessage(chatErrorDetail)}` : '.'}
             </AppText>
             <AppText variant="meta" color={colors.ember} onPress={() => retryChat()}>
-              Tekrar dene
+              {t.common.retry}
             </AppText>
           </View>
         );
@@ -342,7 +377,7 @@ export default function DetailScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Bir not bırak..."
+              placeholder={t.detail.composerPlaceholder}
               placeholderTextColor={colors.textTertiary}
               style={{
                 flex: 1,
@@ -359,11 +394,11 @@ export default function DetailScreen() {
             />
             <Pressable
               onPress={async () => {
-                const t = draft.trim();
-                if (!t) return;
+                const text = draft.trim();
+                if (!text) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDraft('');
-                const sent = await actions.sendMessage(t);
+                const sent = await actions.sendMessage(text);
                 if (sent) Keyboard.dismiss();
               }}
               style={{
@@ -408,6 +443,16 @@ export default function DetailScreen() {
             router.replace(`/challenge/${challenge.id}/complete`);
           }}
           onClose={close}
+        />
+      ) : null}
+
+      {/* Faz 3C madde 3 — owner-only settings */}
+      {showOwnerSettings ? (
+        <OwnerSettingsSheet
+          visible={showOwnerSettings}
+          challenge={challenge}
+          onClose={() => setShowOwnerSettings(false)}
+          onSave={actions.updateDetails}
         />
       ) : null}
     </View>

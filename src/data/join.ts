@@ -10,6 +10,8 @@ export interface ChallengePreview {
   stakeText?: string;
   participantCount: number;
   sampleNames: string[];
+  /** Ek M — kurucu daveti "yalnızca ilk gün" ile sınırlamışsa ve o gün geçtiyse true. */
+  joinClosed: boolean;
 }
 
 interface PreviewRow {
@@ -22,6 +24,7 @@ interface PreviewRow {
   stake_text: string | null;
   participant_count: number;
   sample_names: string[] | null;
+  join_closed: boolean;
 }
 
 /** Public preview by invite code — works even before the viewer has joined. */
@@ -40,6 +43,7 @@ export async function fetchChallengePreview(code: string): Promise<ChallengePrev
     stakeText: row.stake_text ?? undefined,
     participantCount: row.participant_count ?? 0,
     sampleNames: row.sample_names ?? [],
+    joinClosed: row.join_closed,
   };
 }
 

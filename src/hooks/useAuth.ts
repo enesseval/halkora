@@ -6,7 +6,9 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { registerForPushToken } from '@/lib/push';
-import { savePushToken, clearPushToken, deleteAccount as deleteAccountRequest } from '@/data/profile';
+import { savePushToken, clearPushToken, saveLocale, deleteAccount as deleteAccountRequest } from '@/data/profile';
+import { slugifyUsername, usernameCandidates } from '@/lib/username';
+import { getDict, useI18nStore } from '@/i18n';
 
 /** "Selin Nur" -> "SN" */
 export function initialsFrom(name: string): string {
@@ -20,25 +22,27 @@ interface AuthState {
   ready: boolean; // initial session check finished
   session: Session | null;
   name: string | null; // profiles.name (null => needs onboarding)
+  username: string | null; // profiles.username (@handle, docs "Ek O")
 }
 
 const useAuthStore = create<AuthState>(() => ({
   ready: false,
   session: null,
   name: null,
+  username: null,
 }));
 
 async function loadProfileName(session: Session | null): Promise<void> {
   if (!session) {
-    useAuthStore.setState({ name: null });
+    useAuthStore.setState({ name: null, username: null });
     return;
   }
   const { data } = await supabase
     .from('profiles')
-    .select('name')
+    .select('name, username')
     .eq('id', session.user.id)
     .maybeSingle();
-  useAuthStore.setState({ name: data?.name ?? null });
+  useAuthStore.setState({ name: data?.name ?? null, username: data?.username ?? null });
 }
 
 /**
@@ -130,6 +134,28 @@ export function useSyncPushToken(): void {
   }, [ready, session, name]);
 }
 
+/**
+ * Keeps `profiles.locale` in sync with the app's current language — read by
+ * the `notify` / `evening-reminder` Edge Functions (docs/PHASE2-SUPABASE.md
+ * "Ek N") so push copy matches whatever language this device is showing,
+ * not just whatever it was at signup. Fires once the user is signed in +
+ * onboarded, and again any time they switch language from Settings.
+ */
+export function useSyncLocale(): void {
+  const ready = useAuthStore((s) => s.ready);
+  const session = useAuthStore((s) => s.session);
+  const name = useAuthStore((s) => s.name);
+  const locale = useI18nStore((s) => s.locale);
+  const lastSaved = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !ready || !session || !name) return;
+    if (locale === lastSaved.current) return;
+    lastSaved.current = locale;
+    saveLocale(session.user.id, locale).catch(() => {});
+  }, [ready, session, name, locale]);
+}
+
 /* ---------------- actions ---------------- */
 
 async function signInAnonymously(): Promise<void> {
@@ -163,7 +189,7 @@ async function signInWithApple(): Promise<void> {
     if (isAppleCancellation(e)) return; // user dismissed the sheet, not an error
     throw e;
   }
-  if (!credential.identityToken) throw new Error('Apple girişi tamamlanamadı.');
+  if (!credential.identityToken) throw new Error(getDict().errors.appleIncomplete);
   const { error } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
     token: credential.identityToken,
@@ -179,7 +205,7 @@ async function signInWithApple(): Promise<void> {
  */
 async function linkAppleIdentity(): Promise<void> {
   if (Platform.OS !== 'ios' || !(await AppleAuthentication.isAvailableAsync())) {
-    throw new Error('Apple ile giriş bu cihazda kullanılamıyor.');
+    throw new Error(getDict().errors.appleUnavailable);
   }
   let credential: AppleAuthentication.AppleAuthenticationCredential;
   try {
@@ -190,7 +216,7 @@ async function linkAppleIdentity(): Promise<void> {
     if (isAppleCancellation(e)) return;
     throw e;
   }
-  if (!credential.identityToken) throw new Error('Apple girişi tamamlanamadı.');
+  if (!credential.identityToken) throw new Error(getDict().errors.appleIncomplete);
   const { error } = await supabase.auth.linkIdentity({
     provider: 'apple',
     token: credential.identityToken,
@@ -208,6 +234,44 @@ async function saveName(name: string): Promise<void> {
     .eq('id', session.user.id);
   if (error) throw error;
   useAuthStore.setState({ name: clean });
+}
+
+/** True for both the RPC's own 'USERNAME_TAKEN' code and a raw unique-
+ * constraint violation from a genuine two-callers-same-instant race
+ * (docs/db-username.sql "Ek O" — the RPC checks-then-updates, not atomic). */
+function isUsernameTakenError(error: { message?: string; code?: string }): boolean {
+  return error.message === 'USERNAME_TAKEN' || error.code === '23505';
+}
+
+/**
+ * Best-effort auto-handle right after onboarding sets a name — tries
+ * `enesseval`, `enesseval2`, ... until one isn't taken. Never throws: a
+ * network hiccup or exhausting all candidates just leaves username unset,
+ * and the user can pick one later from Settings (Ek O). No-ops if a username
+ * already exists — "Onboarding'i tekrar gör" clears `name` but not
+ * `username`, and re-submitting the name step must not clobber a handle the
+ * user may have since customized in Settings.
+ */
+async function ensureUsername(name: string): Promise<void> {
+  const session = useAuthStore.getState().session;
+  if (!session || useAuthStore.getState().username) return;
+  const base = slugifyUsername(name);
+  for (const candidate of usernameCandidates(base)) {
+    const { error } = await supabase.rpc('set_username', { p_username: candidate });
+    if (!error) {
+      useAuthStore.setState({ username: candidate });
+      return;
+    }
+    if (!isUsernameTakenError(error)) return; // some other failure — give up quietly
+  }
+}
+
+/** Settings-driven rename — unlike ensureUsername, real errors (invalid
+ * format, reserved, taken) are surfaced so the edit sheet can show them. */
+async function saveUsername(username: string): Promise<void> {
+  const { error } = await supabase.rpc('set_username', { p_username: username });
+  if (error) throw error;
+  useAuthStore.setState({ username: username.trim().toLowerCase() });
 }
 
 async function signOut(): Promise<void> {
@@ -252,6 +316,7 @@ export function useAuth() {
   const ready = useAuthStore((s) => s.ready);
   const session = useAuthStore((s) => s.session);
   const name = useAuthStore((s) => s.name);
+  const username = useAuthStore((s) => s.username);
   return {
     ready,
     session,
@@ -259,11 +324,14 @@ export function useAuth() {
     isSignedIn: !!session,
     isAnonymous: !!session?.user.is_anonymous,
     name,
+    username,
     needsOnboarding: !!session && !name,
     signInAnonymously,
     signInWithApple,
     linkAppleIdentity,
     saveName,
+    ensureUsername,
+    saveUsername,
     signOut,
     deleteAccount,
     resetOnboarding,

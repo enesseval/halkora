@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase';
 import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
 import { buildDays, formatShortDate } from '@/lib/day';
+import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
+import { getDict } from '@/i18n';
 
 export interface InsertedChallenge {
   id: string;
@@ -17,6 +19,12 @@ export async function insertChallenge(
   input: CreateChallengeInput,
   userId: string,
 ): Promise<InsertedChallenge> {
+  // The creator's own device timezone becomes this challenge's single source
+  // of truth for "what day is it" — written once here, then read back by the
+  // client (mapRow), the `check-in` Edge Function, and the join-window RPCs
+  // (docs/PHASE2-SUPABASE.md "Ek F"/"Ek M") so every participant, regardless
+  // of their own device's timezone, agrees on the same day boundary.
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data, error } = await supabase
     .from('challenges')
     .insert({
@@ -24,10 +32,11 @@ export async function insertChallenge(
       title: input.title,
       daily_action: input.dailyAction,
       total_days: input.totalDays,
-      start_date:
-        input.startDateISO ?? new Date().toISOString().slice(0, 10),
+      start_date: input.startDateISO ?? todayInTimezone(timezone),
+      timezone,
       status: input.startTomorrow ? 'upcoming' : 'active',
       joker_allowance: input.joker ?? 1,
+      first_day_join_only: input.firstDayJoinOnly ?? false,
     })
     .select('id, invite_code')
     .single();
@@ -62,9 +71,13 @@ interface ChallengeRow {
   daily_action: string;
   total_days: number;
   start_date: string;
+  timezone: string;
   status: string;
   invite_code: string;
   joker_allowance: number;
+  first_day_join_only: boolean;
+  created_at: string;
+  owner_id: string | null;
 }
 
 interface ParticipantRow {
@@ -98,11 +111,36 @@ function utcDateOf(iso: string): string {
   return iso.slice(0, 10);
 }
 
-/** Whole days from `startISO` (local midnight) to today. 0 === starts today. */
-function daysSinceStart(startISO: string): number {
-  const start = new Date(`${startISO}T00:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+/** Today's date ("YYYY-MM-DD") as seen in `timezone` — used once at challenge
+ * creation so `start_date` agrees with the `timezone` column being written
+ * alongside it, instead of falling back to a UTC slice that can be off by a
+ * day from the creator's actual local date. */
+function todayInTimezone(timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/** Whole days from `startISO` to today, both read in the CHALLENGE's own
+ * timezone — not the viewing device's clock. Must match the `check-in` Edge
+ * Function's day math (docs/PHASE2-SUPABASE.md "Ek F") exactly, or a
+ * participant in a different timezone than the challenge can see "bugün
+ * işaretlenebilir" on screen and get rejected server-side. 0 === starts today. */
+function daysSinceStart(startISO: string, timezone: string, createdAtISO: string): number {
+  // Test-only acceleration: 1 day == 1 minute, anchored to created_at
+  // because start_date has no time-of-day (see src/lib/fastDays.ts).
+  if (FAST_DAYS) return fastDaysSince(createdAtISO);
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date()); // "YYYY-MM-DD"
+  const start = new Date(`${startISO}T00:00:00Z`);
+  const today = new Date(`${todayStr}T00:00:00Z`);
   return Math.round((today.getTime() - start.getTime()) / 86_400_000);
 }
 
@@ -120,7 +158,7 @@ function mapRow(
   nudgedToday: Set<string>,
   stake?: StakeRow,
 ): Challenge {
-  const diff = daysSinceStart(row.start_date);
+  const diff = daysSinceStart(row.start_date, row.timezone, row.created_at);
   const rawDay = diff + 1; // day 1 == start day
   const dateBasedStatus: Challenge['status'] =
     rawDay <= 0 ? 'upcoming' : rawDay > row.total_days ? 'completed' : 'active';
@@ -132,15 +170,16 @@ function mapRow(
     row.status === 'completed' ? 'completed' : dateBasedStatus;
   const currentDay = status === 'upcoming' ? 0 : Math.min(rawDay, row.total_days);
 
+  const t = getDict();
   // "Yarın başlıyor" only when it's actually tomorrow — a challenge starting
   // in 20 days showed that same label before this fix, which is just wrong.
   const daysUntilStart = -diff;
   const startsWhen =
     status === 'upcoming'
       ? daysUntilStart === 1
-        ? 'Yarın başlıyor'
-        : `${formatShortDate(new Date(`${row.start_date}T00:00:00`))}'da başlıyor`
-      : 'Devam ediyor';
+        ? t.common.startsTomorrow
+        : t.common.startsOn(formatShortDate(new Date(`${row.start_date}T00:00:00`)))
+      : t.common.ongoing;
 
   const myParticipant = parts.find((p) => p.user_id === myUserId);
   const myCheckIns = myParticipant
@@ -175,7 +214,7 @@ function mapRow(
 
   const participants: Participant[] = parts.map((p) => {
     const prof = profMap.get(p.user_id);
-    const name = prof?.name ?? 'Katılımcı';
+    const name = prof?.name ?? t.common.person;
     const todayCi = checkIns.find((c) => c.participant_id === p.id && c.day_number === currentDay);
     // Every day this participant covered (done or joker) — the E9 leaderboard.
     const completedDays = checkIns.filter((c) => c.participant_id === p.id).length;
@@ -207,7 +246,8 @@ function mapRow(
   return {
     id: row.id,
     title: row.title,
-    dailyAction: `Bugün: ${row.daily_action}`,
+    dailyAction: `${t.common.today}: ${row.daily_action}`,
+    dailyActionRaw: row.daily_action,
     totalDays: row.total_days,
     currentDay,
     days: buildDays(row.total_days, explicit),
@@ -219,8 +259,13 @@ function mapRow(
     jokerRemaining: Math.max(row.joker_allowance - jokerUsed, 0),
     hasMissedYesterday,
     inviteCode: row.invite_code,
-    scheduleSummary: `${row.daily_action} · ${row.total_days} gün`,
+    scheduleSummary: t.common.scheduleSummary(row.daily_action, row.total_days),
     startsWhen,
+    firstDayJoinOnly: row.first_day_join_only,
+    isOwner: row.owner_id === myUserId,
+    // Client-side mirror of the join_challenge_by_code RPC's check (Ek M) —
+    // display only, the RPC is what actually enforces it server-side.
+    joinClosed: row.first_day_join_only && currentDay > 1,
     stake: stake ? { mode: stake.mode, text: stake.text ?? '' } : undefined,
     participants,
     messages: [],
@@ -234,9 +279,15 @@ function mapRow(
 
 /** Challenges the current user participates in, mapped to the UI shape. */
 export async function fetchMyChallenges(): Promise<Challenge[]> {
+  // getSession() reads the already-verified session from local storage —
+  // getUser() makes a real network round-trip every call, and this runs on
+  // every 5s poll (Home + Detail). Any transient hiccup there used to make
+  // "no user yet" look identical to "no challenges", wiping the list for a
+  // cycle (flash of "Challenge bulunamadı" / stale-then-empty Home).
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) return [];
 
   const { data: mine, error: e1 } = await supabase
@@ -256,7 +307,9 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
   ] = await Promise.all([
     supabase
       .from('challenges')
-      .select('id, title, daily_action, total_days, start_date, status, invite_code, joker_allowance')
+      .select(
+        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at, owner_id',
+      )
       .in('id', ids),
     supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),
     supabase
@@ -332,5 +385,26 @@ export async function restartChallenge(challengeId: string): Promise<void> {
 /** E10 "Erken bitir" — marks the challenge completed. */
 export async function endChallengeEarly(challengeId: string): Promise<void> {
   const { error } = await supabase.rpc('end_challenge_early', { p_challenge_id: challengeId });
+  if (error) throw error;
+}
+
+/**
+ * Faz 3C madde 3 — owner-only edit of title/daily action/stake text.
+ * Deliberately narrow (docs/db-owner-settings.sql): day count, jokers, start
+ * date, and the join window can never be changed this way — they'd change
+ * the meaning/fairness of check-ins the group already made.
+ */
+export async function updateChallengeDetails(
+  challengeId: string,
+  title: string,
+  dailyAction: string,
+  stakeText: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('update_challenge_details', {
+    p_challenge_id: challengeId,
+    p_title: title,
+    p_daily_action: dailyAction,
+    p_stake_text: stakeText,
+  });
   if (error) throw error;
 }

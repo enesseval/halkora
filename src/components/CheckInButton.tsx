@@ -7,6 +7,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { colors, fonts, hairline, type } from '@/theme/tokens';
+import { useT } from '@/i18n';
 import { AppText } from './ui';
 
 interface Props {
@@ -27,6 +28,7 @@ export function CheckInButton({
   onCheckIn,
   onUndo,
 }: Props) {
+  const { t } = useT();
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -62,10 +64,10 @@ export function CheckInButton({
             <AppText
               style={{ fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textPrimary }}
             >
-              Tamamlandı
+              {t.common.completed}
             </AppText>
             <AppText variant="meta" color={colors.textTertiary} tabular style={{ marginTop: 2 }}>
-              Gün {day}{time ? ` · ${time}` : ''}
+              {t.chat.day(day)}{time ? ` · ${time}` : ''}
             </AppText>
           </Animated.View>
         ) : (
@@ -73,10 +75,10 @@ export function CheckInButton({
             <AppText
               style={{ fontFamily: fonts.displaySemibold, fontSize: 22, color: colors.bgBase }}
             >
-              Check-in
+              {t.common.checkIn}
             </AppText>
             <AppText tabular style={{ ...type.meta, color: colors.bgBase, opacity: 0.7, marginTop: 2 }}>
-              Gün {day}
+              {t.chat.day(day)}
             </AppText>
           </Animated.View>
         )}

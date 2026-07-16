@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { colors, spacing } from '@/theme/tokens';
-import { useTodayStatus, useCheckIn, useRefreshChallenges } from '@/hooks';
+import { useTodayStatus, useCheckIn, useRefreshChallenges, useCompletedChallenges } from '@/hooks';
 import type { Challenge, SegmentState } from '@/hooks';
 import { errMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
@@ -13,24 +13,26 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { useT } from '@/i18n';
 
 const EMPTY_RING_DAYS: SegmentState[] = Array(12).fill('empty');
 
 /** Shown when the visitor has zero challenges at all (never created, never joined). */
 function EmptyHome({ onStart }: { onStart: () => void }) {
+  const { t } = useT();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 24 }}>
       <ProgressRing totalDays={12} days={EMPTY_RING_DAYS} size="L" />
       <View style={{ alignItems: 'center', gap: 8 }}>
         <AppText variant="hero" style={{ textAlign: 'center' }}>
-          Henüz bir halkan yok.
+          {t.home.emptyTitle}
         </AppText>
         <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 280 }}>
-          Bir challenge kur, grubunu çağır — ya da bir davetle katıl.
+          {t.home.emptySubtitle}
         </AppText>
       </View>
       <View style={{ alignSelf: 'stretch' }}>
-        <Button label="İlk halkanı kur" onPress={onStart} />
+        <Button label={t.home.emptyCta} onPress={onStart} />
       </View>
     </View>
   );
@@ -49,12 +51,20 @@ function PendingCardWithCheckIn({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { dateLabel, pending, done, upcoming, loading, firstLoadError, backgroundError, error, retry } =
     useTodayStatus();
+  // Genuinely FINISHED challenges (status === 'completed') — distinct from
+  // `done` above, which despite its section label really means "checked in
+  // today" on a still-ongoing challenge. Without this, a challenge that
+  // finishes has no section it belongs to on Home at all — it just quietly
+  // stops appearing anywhere, even though its data/history is still there.
+  const finished = useCompletedChallenges();
   const { refreshing, refresh } = useRefreshChallenges();
   const [showStart, setShowStart] = useState(false);
 
   const goDetail = (id: string) => router.push(`/challenge/${id}`);
+  const goComplete = (id: string) => router.push(`/challenge/${id}/complete`);
 
   // A poll/pull-to-refresh failing after we already have real data shouldn't
   // blank the list — just say so once per failure streak (not every 5s poll).
@@ -62,11 +72,11 @@ export default function HomeScreen() {
   useEffect(() => {
     if (backgroundError && !alerted.current) {
       alerted.current = true;
-      Alert.alert('Güncellenemedi', errMessage(error) || 'Bağlantını kontrol et.');
+      Alert.alert(t.errors.updateFailed, errMessage(error) || t.errors.checkConnection);
     } else if (!backgroundError) {
       alerted.current = false;
     }
-  }, [backgroundError, error]);
+  }, [backgroundError, error, t]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
@@ -82,7 +92,7 @@ export default function HomeScreen() {
           }}
         >
           <View>
-            <AppText variant="screenTitle">Bugün</AppText>
+            <AppText variant="screenTitle">{t.home.title}</AppText>
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
               {dateLabel}
             </AppText>
@@ -110,11 +120,11 @@ export default function HomeScreen() {
             <HomeSkeleton />
           ) : firstLoadError ? (
             <ErrorState
-              message="Challenge'ların yüklenemedi."
+              message={t.home.challengesLoadFailed}
               detail={errMessage(error)}
               onRetry={retry}
             />
-          ) : pending.length === 0 && done.length === 0 && upcoming.length === 0 ? (
+          ) : pending.length === 0 && done.length === 0 && upcoming.length === 0 && finished.length === 0 ? (
             <EmptyHome onStart={() => setShowStart(true)} />
           ) : (
             <>
@@ -135,7 +145,7 @@ export default function HomeScreen() {
               {/* completed — calm */}
               {done.length > 0 ? (
                 <View style={{ marginTop: 16 }}>
-                  <SectionLabel>Tamamlandı</SectionLabel>
+                  <SectionLabel>{t.home.completed}</SectionLabel>
                   <View style={{ gap: 10, marginTop: 12 }}>
                     {done.map((c) => (
                       <Animated.View key={c.id} layout={LinearTransition} entering={FadeIn}>
@@ -149,10 +159,25 @@ export default function HomeScreen() {
               {/* upcoming — faint */}
               {upcoming.length > 0 ? (
                 <View style={{ marginTop: spacing.section }}>
-                  <SectionLabel>Yakında</SectionLabel>
+                  <SectionLabel>{t.home.upcoming}</SectionLabel>
                   <View style={{ marginTop: 4 }}>
                     {upcoming.map((c) => (
                       <UpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {/* finished — history, links to the celebration/stats screen
+                  rather than Detail (check-in/chat don't make sense anymore) */}
+              {finished.length > 0 ? (
+                <View style={{ marginTop: spacing.section }}>
+                  <SectionLabel>{t.home.history}</SectionLabel>
+                  <View style={{ gap: 10, marginTop: 12 }}>
+                    {finished.map((c) => (
+                      <Animated.View key={c.id} layout={LinearTransition} entering={FadeIn}>
+                        <CompletedCard challenge={c} onPress={() => goComplete(c.id)} />
+                      </Animated.View>
                     ))}
                   </View>
                 </View>
