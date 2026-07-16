@@ -44,6 +44,8 @@ export const tr = {
     generic: 'Bir şeyler ters gitti. Tekrar dene.',
     checkConnection: 'Bağlantını kontrol et.',
     loadFailed: 'Veriler yüklenemedi.',
+    appUnavailable: 'Uygulama şu an kullanılamıyor',
+    appUnavailableDetail: 'Sunucu bağlantısı kurulamadı. Lütfen daha sonra tekrar dene.',
     signInFailed: 'Giriş yapılamadı. Tekrar dene.',
     sessionMissing: 'Oturum bulunamadı.',
     invalidSession: 'Geçersiz oturum.',
@@ -86,6 +88,7 @@ export const tr = {
       NOT_THE_OWNER: "Bu halkanın kurucusu değilsin.",
       TITLE_REQUIRED: 'Başlık boş olamaz.',
       DAILY_ACTION_REQUIRED: 'Günlük eylem boş olamaz.',
+      CHALLENGE_LIMIT_REACHED: 'Ücretsiz planda aynı anda en fazla 2 halka kurabilirsin.',
     },
   },
 
@@ -299,12 +302,61 @@ export const tr = {
     statPeople: 'kişi',
     statCheckins: 'check-in',
     statCompletion: 'tamamlama',
+    // Gelişmiş istatistikler — Halkora Pro (Faz 4). Mevcut check_ins'ten
+    // hesaplanır, ekstra veri saklanmaz.
+    storyTitle: 'Halkanın hikâyesi',
+    advancedTitle: 'Gelişmiş istatistikler',
+    advancedUnlockCta: 'Pro ile aç',
+    advancedPerfectDays: 'kusursuz gün',
+    advancedPerfectDaysSub: 'Herkesin check-in yaptığı günler',
+    advancedStreak: 'en uzun seri',
+    advancedDaysFmt: (done: number, total: number) => `${done}/${total} gün`,
     stakeResult: (text: string) => `Bahis: ${text}`,
     // Rematch (Faz 3B) henüz yok — aynı gruba otomatik davet göndermiyor,
     // sadece boş create akışına götürüyor. Metin bunu vaat etmemeli.
     rematch: 'Yeni bir halka kur',
     shareResult: 'Sonucu paylaş',
     shareMessage: (title: string, totalDays: number) => `"${title}" tamamlandı — ${totalDays} gün, birlikte. 🔥`,
+  },
+
+  pro: {
+    title: 'Halkora Pro',
+    settingsSubFree: 'Sınırsız halka + gelişmiş istatistik',
+    settingsSubActive: 'Aktif',
+    close: 'Kapat',
+    // Paywall başlığı/alt metni tetikleyen bağlama göre değişir (nag yok).
+    headline: {
+      challengeLimit: 'Daha fazla halka mı?',
+      advancedStats: 'Halkanı daha yakından tanı',
+      generic: 'Halkora Pro',
+    },
+    sub: {
+      challengeLimit: 'Ücretsiz planda aynı anda 2 halka kurabilirsin. Pro ile sınır yok.',
+      advancedStats: 'Kişi kişi seriler, kusursuz günler ve dahası Pro ile açılır.',
+      generic: "Halkora'nın tamamını aç.",
+    },
+    features: {
+      unlimited: 'Sınırsız aktif halka',
+      advancedStats: 'Gelişmiş istatistikler',
+    },
+    cta: "Halkora Pro'ya geç",
+    restore: 'Satın alımları geri yükle',
+    legal: 'Kullanım Koşulları · Gizlilik',
+    // Fiyat bloğu — Faz A'da placeholder (gerçek fiyatlar RevenueCat'ten, Faz B).
+    planMonthlyLabel: 'Aylık',
+    planAnnualLabel: 'Yıllık',
+    monthlyPrice: '₺59',
+    monthlyPer: '/ay',
+    monthlyNote: 'İstediğin an iptal',
+    annualPrice: '₺399',
+    annualPer: '/yıl',
+    annualNote: "≈₺33/ay'a denk gelir",
+    saveBadge: '2 ay bedava',
+    // Faz A: satın alma henüz bağlı değil (RevenueCat = Faz B).
+    notReadyTitle: 'Neredeyse hazır',
+    notReadyBody: 'Abonelikler çok yakında açılıyor.',
+    // DEV-only (Ayarlar) — RevenueCat gelmeden gate'i test etmek için.
+    devToggle: 'DEV: Pro’yu aç/kapat',
   },
 
   join: {

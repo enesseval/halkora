@@ -149,6 +149,23 @@ function hhmm(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** Longest run of consecutive covered days (done or joker) within 1..N. */
+function longestStreak(days: Set<number>): number {
+  if (days.size === 0) return 0;
+  const last = Math.max(...days);
+  let best = 0;
+  let run = 0;
+  for (let d = 1; d <= last; d++) {
+    if (days.has(d)) {
+      run += 1;
+      if (run > best) best = run;
+    } else {
+      run = 0;
+    }
+  }
+  return best;
+}
+
 function mapRow(
   row: ChallengeRow,
   parts: ParticipantRow[],
@@ -243,6 +260,43 @@ function mapRow(
         }
       : undefined;
 
+  // Halkora Pro — gelişmiş istatistikler. Aynı verinin (checkIns) daha zengin
+  // bir okuması: kişi kişi seri/oran + herkesin işaretlediği "kusursuz" günler.
+  const advancedStats =
+    status === 'completed' && parts.length > 0
+      ? (() => {
+          // day_number -> distinct participants who covered it (perfect-day count).
+          const coveredByDay = new Map<number, Set<string>>();
+          for (const c of checkIns) {
+            if (!coveredByDay.has(c.day_number)) coveredByDay.set(c.day_number, new Set());
+            coveredByDay.get(c.day_number)!.add(c.participant_id);
+          }
+          let perfectDays = 0;
+          for (let d = 1; d <= row.total_days; d++) {
+            if ((coveredByDay.get(d)?.size ?? 0) === parts.length) perfectDays += 1;
+          }
+
+          const leaderboard = parts
+            .map((p) => {
+              const myDays = new Set(
+                checkIns.filter((c) => c.participant_id === p.id).map((c) => c.day_number),
+              );
+              const prof = profMap.get(p.user_id);
+              const name = prof?.name ?? t.common.person;
+              return {
+                name,
+                initials: prof?.initials ?? name.slice(0, 2).toUpperCase(),
+                completedDays: myDays.size,
+                completionPct: Math.round((myDays.size / row.total_days) * 100),
+                longestStreak: longestStreak(myDays),
+              };
+            })
+            .sort((a, b) => b.completedDays - a.completedDays || b.longestStreak - a.longestStreak);
+
+          return { perfectDays, leaderboard };
+        })()
+      : undefined;
+
   return {
     id: row.id,
     title: row.title,
@@ -270,6 +324,7 @@ function mapRow(
     participants,
     messages: [],
     finishStats,
+    advancedStats,
     // No automatic "kim kaybetti" computation from real data (that's a group
     // decision, not something we can infer) — the stake's own text is shown
     // instead by the Detail/complete screens when this is absent.

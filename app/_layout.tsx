@@ -11,7 +11,8 @@ import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-
 import { colors } from '@/theme/tokens';
 import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
-import { initLocale } from '@/i18n';
+import { initLocale, useT } from '@/i18n';
+import { ErrorState } from '@/components/ErrorState';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -131,6 +132,23 @@ function useLocaleInit(): boolean {
   return ready;
 }
 
+/**
+ * Shown instead of the whole app when EXPO_PUBLIC_SUPABASE_* env vars weren't
+ * present at build time (`isSupabaseConfigured` false) — a build/config bug,
+ * never something a user or retry can fix. This used to silently fall back to
+ * running on the old Phase-1 mock layer instead, which looked like a working
+ * app (fake data, no real auth) and hid the real problem; a loud, unmistakable
+ * error is safer now that Supabase is the only real backend.
+ */
+function ConfigErrorScreen() {
+  const { t } = useT();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
+      <ErrorState message={t.errors.appUnavailable} detail={t.errors.appUnavailableDetail} />
+    </View>
+  );
+}
+
 function RootNavigator() {
   const { ready, configured } = useAuth();
   const localeReady = useLocaleInit();
@@ -144,6 +162,10 @@ function RootNavigator() {
   // default-locale copy before the saved/detected language is applied.
   if (!localeReady || (configured && !ready)) {
     return <View style={{ flex: 1, backgroundColor: colors.bgBase }} />;
+  }
+
+  if (!configured) {
+    return <ConfigErrorScreen />;
   }
 
   return (
@@ -168,6 +190,10 @@ function RootNavigator() {
       <Stack.Screen name="challenge/[id]/complete" />
       <Stack.Screen name="join/[code]" options={{ animation: 'fade' }} />
       <Stack.Screen name="j/[code]" options={{ animation: 'none' }} />
+      <Stack.Screen
+        name="paywall"
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
     </Stack>
   );
 }

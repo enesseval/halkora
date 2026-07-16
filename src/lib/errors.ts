@@ -33,6 +33,26 @@ export function errMessage(e: unknown): string {
   }
 }
 
+/**
+ * The raw (un-localized) message/code a Supabase error carries — the stable
+ * UPPER_SNAKE_CASE string an RPC/trigger raised, before `errMessage` turns it
+ * into localized prose. Use this to branch on a specific code (e.g. show the
+ * paywall on CHALLENGE_LIMIT_REACHED instead of a generic alert).
+ */
+function rawMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object' && 'message' in e) {
+    const m = (e as { message?: unknown }).message;
+    if (typeof m === 'string') return m;
+  }
+  return '';
+}
+
+/** True when a Supabase error was raised with this exact stable code. */
+export function isErrorCode(e: unknown, code: string): boolean {
+  return rawMessage(e).includes(code);
+}
+
 /** Pull the real `{ error }` JSON body out of a failed Edge Function call. */
 export async function edgeFunctionError(e: unknown): Promise<Error> {
   if (e instanceof FunctionsHttpError) {
