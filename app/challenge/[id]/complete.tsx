@@ -7,6 +7,7 @@ import { AppText, Avatar, Button, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { useT } from '@/i18n';
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
@@ -34,6 +35,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 export default function CompleteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useT();
   const challenge = useChallenge(id);
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
 
@@ -43,9 +45,9 @@ export default function CompleteScreen() {
         {loading ? (
           <RingScreenSkeleton />
         ) : firstLoadError ? (
-          <ErrorState message="Yüklenemedi." detail={errMessage(error)} onRetry={refetch} />
+          <ErrorState message={t.complete.loadFailed} detail={errMessage(error)} onRetry={refetch} />
         ) : (
-          <ErrorState message="Challenge bulunamadı." />
+          <ErrorState message={t.complete.notFound} />
         )}
       </Screen>
     );
@@ -58,7 +60,7 @@ export default function CompleteScreen() {
 
   const share = () => {
     Share.share({
-      message: `"${challenge.title}" tamamlandı — ${challenge.totalDays} gün, birlikte. 🔥`,
+      message: t.complete.shareMessage(challenge.title, challenge.totalDays),
     }).catch(() => {});
   };
 
@@ -77,18 +79,18 @@ export default function CompleteScreen() {
             }
           />
           <AppText variant="screenTitle" style={{ marginTop: 28 }}>
-            {challenge.totalDays} gün. Birlikte.
+            {t.complete.title(challenge.totalDays)}
           </AppText>
           <AppText variant="secondary" style={{ marginTop: 6 }}>
-            {challenge.title} tamamlandı
+            {t.complete.subtitle(challenge.title)}
           </AppText>
         </View>
 
         {stats ? (
           <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.section }}>
-            <Stat value={`${stats.people}`} label="kişi" />
-            <Stat value={`${stats.checkins}`} label="check-in" />
-            <Stat value={`%${stats.completionPct}`} label="tamamlama" />
+            <Stat value={`${stats.people}`} label={t.complete.statPeople} />
+            <Stat value={`${stats.checkins}`} label={t.complete.statCheckins} />
+            <Stat value={t.common.percent(stats.completionPct)} label={t.complete.statCompletion} />
           </View>
         ) : null}
 
@@ -139,15 +141,15 @@ export default function CompleteScreen() {
             }}
           >
             <AppText variant="bodyMedium" color={colors.ember}>
-              {challenge.stakeResult ?? `Bahis: ${challenge.stake!.text}`}
+              {challenge.stakeResult ?? t.complete.stakeResult(challenge.stake!.text)}
             </AppText>
           </View>
         ) : null}
 
         {/* CTAs */}
         <View style={{ gap: 12, marginTop: spacing.section }}>
-          <Button label="Aynı grupla yeni challenge başlat" onPress={() => router.replace('/create')} />
-          <Button label="Sonucu paylaş" variant="secondary" onPress={share} />
+          <Button label={t.complete.rematch} onPress={() => router.replace('/create')} />
+          <Button label={t.complete.shareResult} variant="secondary" onPress={share} />
         </View>
       </ScrollView>
     </Screen>

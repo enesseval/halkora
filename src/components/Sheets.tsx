@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
+import { errMessage } from '@/lib/errors';
+import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Button } from './ui';
 
@@ -18,6 +20,7 @@ export function MissedDaySheet({
   onUseJoker: () => void;
   onDismiss: () => void;
 }) {
+  const { t } = useT();
   const [usedJoker, setUsedJoker] = useState(false);
 
   useEffect(() => {
@@ -43,10 +46,10 @@ export function MissedDaySheet({
       }}
     >
       <AppText variant="screenTitle" style={{ textAlign: 'center' }}>
-        Dün olmadı.{'\n'}Bugün buradasın.
+        {t.detail.notStarted}
       </AppText>
       <AppText variant="secondary" tabular style={{ marginTop: 8, marginBottom: 36 }}>
-        {challenge.title} · Gün {challenge.currentDay}/{challenge.totalDays}
+        {challenge.title} · {t.common.dayOf(challenge.currentDay, challenge.totalDays)}
       </AppText>
 
       <ProgressRing
@@ -64,10 +67,10 @@ export function MissedDaySheet({
       <View style={{ height: 40 }} />
 
       <View style={{ width: '100%', gap: 12 }}>
-        <Button label="Bugünün check-in'i" onPress={onDismiss} />
+        <Button label={t.detail.todayCheckIn} onPress={onDismiss} />
         {challenge.jokerRemaining > 0 && !usedJoker ? (
           <Button
-            label={`Dün için joker kullan · ${challenge.jokerRemaining} hakkın var`}
+            label={t.detail.useJoker(challenge.jokerRemaining)}
             variant="amber"
             onPress={() => {
               onUseJoker();
@@ -94,6 +97,7 @@ export function MomentumSheet({
   onEndEarly: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const startDay = momentum.daysTogether - momentum.last3.length + 1;
   return (
     <Animated.View
@@ -134,10 +138,10 @@ export function MomentumSheet({
           }}
         />
         <AppText variant="screenTitle" style={{ fontSize: 24 }}>
-          Grubun temposu düştü.
+          {t.detail.momentumTitle}
         </AppText>
         <AppText variant="secondary" style={{ marginTop: 8 }}>
-          Son 3 günde check-in'ler azaldı. Nasıl devam etmek istersin?
+          {t.detail.momentumSubtitle}
         </AppText>
 
         <View
@@ -156,7 +160,7 @@ export function MomentumSheet({
           {momentum.last3.map((n, i) => (
             <View key={i} style={{ alignItems: 'center', flex: 1 }}>
               <AppText variant="meta" color={colors.textTertiary} tabular>
-                Gün {startDay + i}
+                {t.detail.momentumDay(startDay + i)}
               </AppText>
               <AppText
                 tabular
@@ -165,20 +169,20 @@ export function MomentumSheet({
                 {n}
               </AppText>
               <AppText variant="meta" color={colors.textTertiary} tabular>
-                / {momentum.total} kişi
+                {t.detail.momentumOutOf(momentum.total)}
               </AppText>
             </View>
           ))}
           <View style={{ flex: 1.4, paddingLeft: 8 }}>
             <AppText variant="secondary" color={colors.textSecondary}>
-              Halka yine de duruyor. Karar grubun.
+              {t.detail.momentumFootnote}
             </AppText>
           </View>
         </View>
 
         <View style={{ gap: 12, marginTop: 20 }}>
-          <Button label="Yeniden başlat" onPress={onRestart} />
-          <Button label="Erken bitir" variant="secondary" onPress={onEndEarly} />
+          <Button label={t.detail.restart} onPress={onRestart} />
+          <Button label={t.detail.endEarly} variant="secondary" onPress={onEndEarly} />
         </View>
 
         <AppText
@@ -187,9 +191,328 @@ export function MomentumSheet({
           tabular
           style={{ textAlign: 'center', marginTop: 18 }}
         >
-          {momentum.daysTogether} gün birlikte devam ettiniz.
+          {t.detail.daysTogether(momentum.daysTogether)}
         </AppText>
       </Animated.View>
+    </Animated.View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Ayarlar — @kullanıcıadı düzenleme (Faz 3C, docs "Ek O")             */
+/* ------------------------------------------------------------------ */
+export function UsernameSheet({
+  visible,
+  current,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  current: string | null;
+  onClose: () => void;
+  onSave: (username: string) => Promise<void>;
+}) {
+  const { t } = useT();
+  const [value, setValue] = useState(current ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setValue(current ?? '');
+      setError(null);
+    }
+  }, [visible, current]);
+
+  if (!visible) return null;
+
+  // Strip anything the server would reject anyway, live — friendlier than
+  // letting an invalid character through and rejecting it after Save.
+  const sanitize = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
+
+  const canSave = value.length >= 3 && value !== current && !saving;
+
+  const submit = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(value);
+      onClose();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        zIndex: 30,
+      }}
+    >
+      {/* The backdrop Pressable + sheet both live INSIDE the
+          KeyboardAvoidingView (not as a sibling before it) — otherwise
+          'padding' has no flex:1 box to measure against and the keyboard
+          just covers the input instead of pushing the sheet up. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 20,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+            {t.settings.usernameEditTitle}
+          </AppText>
+          <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
+            {t.settings.usernameEditHint}
+          </AppText>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              marginTop: 18,
+              backgroundColor: colors.bgElevated,
+              borderRadius: radius.pill,
+              borderWidth: hairline,
+              borderColor: error ? colors.joker : colors.strokeSubtle,
+              paddingHorizontal: 16,
+              height: 52,
+            }}
+          >
+            <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.textTertiary }}>
+              @
+            </AppText>
+            <TextInput
+              value={value}
+              onChangeText={(raw) => setValue(sanitize(raw))}
+              placeholder={t.settings.usernamePlaceholder}
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={20}
+              returnKeyType="done"
+              onSubmitEditing={submit}
+              style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
+            />
+          </View>
+
+          {error ? (
+            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+              {error}
+            </AppText>
+          ) : null}
+
+          <View style={{ marginTop: 20 }}>
+            <Button
+              label={saving ? t.settings.usernameSaving : t.settings.usernameSave}
+              onPress={submit}
+              disabled={!canSave}
+            />
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Animated.View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Detay ekranı — kurucu ayarları (Faz 3C, docs "Ek O3")               */
+/* ------------------------------------------------------------------ */
+function EditField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <View style={{ marginTop: 16 }}>
+      <AppText variant="meta" color={colors.textTertiary} style={{ marginBottom: 8 }}>
+        {label}
+      </AppText>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textTertiary}
+        style={{
+          height: 50,
+          backgroundColor: colors.bgElevated,
+          borderRadius: radius.badge,
+          borderWidth: hairline,
+          borderColor: colors.strokeSubtle,
+          paddingHorizontal: 16,
+          color: colors.textPrimary,
+          fontFamily: fonts.bodyMedium,
+          fontSize: 16,
+        }}
+      />
+    </View>
+  );
+}
+
+export function OwnerSettingsSheet({
+  visible,
+  challenge,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  challenge: Challenge;
+  onClose: () => void;
+  onSave: (title: string, dailyAction: string, stakeText: string) => Promise<void>;
+}) {
+  const { t } = useT();
+  const [title, setTitle] = useState(challenge.title);
+  const [dailyAction, setDailyAction] = useState(challenge.dailyActionRaw ?? '');
+  const [stakeText, setStakeText] = useState(challenge.stake?.text ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setTitle(challenge.title);
+      setDailyAction(challenge.dailyActionRaw ?? '');
+      setStakeText(challenge.stake?.text ?? '');
+      setError(null);
+    }
+    // Deliberately excludes `challenge` from deps — only reset when the
+    // sheet transitions to visible, not on every poll-driven refresh while
+    // it's open (that would wipe whatever the owner is mid-typing).
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const canSave = title.trim().length > 0 && dailyAction.trim().length > 0 && !saving;
+
+  const submit = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(title.trim(), dailyAction.trim(), stakeText.trim());
+      onClose();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        zIndex: 30,
+      }}
+    >
+      {/* See UsernameSheet's comment: backdrop + sheet live INSIDE the
+          KeyboardAvoidingView, not before it, or 'padding' has nothing to
+          measure against and the keyboard covers the inputs instead. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 20,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+            {t.detail.ownerSettingsTitle}
+          </AppText>
+
+          <EditField label={t.detail.ownerSettingsTitleLabel} value={title} onChangeText={setTitle} />
+          <EditField
+            label={t.detail.ownerSettingsDailyActionLabel}
+            value={dailyAction}
+            onChangeText={setDailyAction}
+          />
+          <EditField
+            label={t.detail.ownerSettingsStakeLabel}
+            value={stakeText}
+            onChangeText={setStakeText}
+            placeholder={t.detail.ownerSettingsStakePlaceholder}
+          />
+
+          {error ? (
+            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+              {error}
+            </AppText>
+          ) : null}
+
+          <View style={{ marginTop: 20 }}>
+            <Button
+              label={saving ? t.detail.ownerSettingsSaving : t.detail.ownerSettingsSave}
+              onPress={submit}
+              disabled={!canSave}
+            />
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 }

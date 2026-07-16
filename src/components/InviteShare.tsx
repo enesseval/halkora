@@ -4,15 +4,17 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, type } from '@/theme/tokens';
+import { useT } from '@/i18n';
 import { AppText, Button } from './ui';
 
 /** "Daveti paylaş" button + a real, working copy-link row. Used by E4 (invite) and Detail (upcoming). */
 export function InviteShare({ inviteCode, title }: { inviteCode: string; title: string }) {
+  const { t } = useT();
   const [copied, setCopied] = useState(false);
   const link = `halkora.app/j/${inviteCode}`;
 
   const share = () => {
-    Share.share({ message: `"${title}" challenge'ına katıl: ${link}` }).catch(() => {});
+    Share.share({ message: t.invite.shareMessage(title, link) }).catch(() => {});
   };
 
   const copy = async () => {
@@ -28,7 +30,7 @@ export function InviteShare({ inviteCode, title }: { inviteCode: string; title: 
 
   return (
     <View style={{ gap: 12 }}>
-      <Button label="Daveti paylaş" onPress={share} icon={<Feather name="share" size={18} color={colors.bgBase} />} />
+      <Button label={t.invite.shareInvite} onPress={share} icon={<Feather name="share" size={18} color={colors.bgBase} />} />
       <Pressable
         onPress={copy}
         style={({ pressed }) => ({
@@ -48,7 +50,7 @@ export function InviteShare({ inviteCode, title }: { inviteCode: string; title: 
           {link}
         </AppText>
         <AppText variant="secondary" color={colors.ember} style={{ fontFamily: type.bodyMedium.fontFamily }}>
-          {copied ? 'Kopyalandı ✓' : 'Kopyala'}
+          {copied ? t.common.copied : t.common.copy}
         </AppText>
       </Pressable>
     </View>

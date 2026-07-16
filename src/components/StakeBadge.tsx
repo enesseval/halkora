@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { colors, hairline, radius } from '@/theme/tokens';
+import { useT } from '@/i18n';
 import { AppText } from './ui';
 
 export function StakeBadge({
@@ -9,6 +10,7 @@ export function StakeBadge({
   text: string;
   align?: 'start' | 'center';
 }) {
+  const { t } = useT();
   return (
     <View
       style={{
@@ -37,7 +39,7 @@ export function StakeBadge({
         <AppText style={{ fontSize: 11 }}>🎲</AppText>
       </View>
       <AppText variant="secondary" color={colors.textSecondary}>
-        Bahis: {text}
+        {t.complete.stakeResult(text)}
       </AppText>
     </View>
   );

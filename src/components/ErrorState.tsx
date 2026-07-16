@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '@/theme/tokens';
+import { useT } from '@/i18n';
 import { AppText, Button } from './ui';
 
 /**
@@ -9,7 +10,7 @@ import { AppText, Button } from './ui';
  * something went wrong and offers a way to try again.
  */
 export function ErrorState({
-  message = 'Veriler yüklenemedi.',
+  message,
   detail,
   onRetry,
 }: {
@@ -17,6 +18,7 @@ export function ErrorState({
   detail?: string;
   onRetry?: () => void;
 }) {
+  const { t } = useT();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 }}>
       <View
@@ -32,7 +34,7 @@ export function ErrorState({
         <Feather name="wifi-off" size={22} color={colors.textTertiary} />
       </View>
       <AppText variant="bodyMedium" style={{ textAlign: 'center' }}>
-        {message}
+        {message ?? t.errors.loadFailed}
       </AppText>
       {detail ? (
         <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
@@ -41,7 +43,7 @@ export function ErrorState({
       ) : null}
       {onRetry ? (
         <View style={{ marginTop: 8, alignSelf: 'stretch' }}>
-          <Button label="Tekrar dene" variant="secondary" onPress={onRetry} />
+          <Button label={t.common.retry} variant="secondary" onPress={onRetry} />
         </View>
       ) : null}
     </View>

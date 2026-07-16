@@ -4,7 +4,10 @@
 // Deploy: see docs/PHASE2-SUPABASE.md "Ek F".
 //
 // Body: { challenge_id: string, type?: 'done' | 'joker' }
-// Returns: { day_number: number } on success, { error: string } on failure.
+// Returns: { day_number: number } on success, { error: string } on failure —
+// `error` is a stable UPPER_SNAKE_CASE code (see src/i18n/*.ts `errors.codes`)
+// that the client localizes, not prose — never change these strings without
+// updating the client's code table too.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -25,12 +28,12 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return fail('Oturum bulunamadı.', 401);
+    if (!authHeader) return fail('SESSION_MISSING', 401);
 
     const body = await req.json().catch(() => ({}));
     const challengeId: string | undefined = body?.challenge_id;
     const checkInType: 'done' | 'joker' = body?.type === 'joker' ? 'joker' : 'done';
-    if (!challengeId) return fail('challenge_id gerekli.');
+    if (!challengeId) return fail('CHALLENGE_ID_REQUIRED');
 
     // Bound to the CALLER's own JWT — only used to resolve who is calling.
     const authed = createClient(
@@ -39,7 +42,7 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
     const { data: userData, error: userErr } = await authed.auth.getUser();
-    if (userErr || !userData.user) return fail('Geçersiz oturum.', 401);
+    if (userErr || !userData.user) return fail('INVALID_SESSION', 401);
     const userId = userData.user.id;
 
     // Service-role client for the trusted work below — every check here
@@ -52,10 +55,10 @@ Deno.serve(async (req) => {
 
     const { data: challenge, error: chErr } = await admin
       .from('challenges')
-      .select('id, start_date, timezone, total_days, status, joker_allowance')
+      .select('id, start_date, timezone, total_days, status, joker_allowance, created_at')
       .eq('id', challengeId)
       .single();
-    if (chErr || !challenge) return fail('Challenge bulunamadı.', 404);
+    if (chErr || !challenge) return fail('CHALLENGE_NOT_FOUND', 404);
 
     const { data: participant, error: pErr } = await admin
       .from('participants')
@@ -63,29 +66,39 @@ Deno.serve(async (req) => {
       .eq('challenge_id', challengeId)
       .eq('user_id', userId)
       .single();
-    if (pErr || !participant) return fail('Bu challenge\'a katılımcı değilsin.', 403);
+    if (pErr || !participant) return fail('NOT_A_PARTICIPANT', 403);
 
     // "Today" in the CHALLENGE's own timezone — not the caller's device
     // clock — so every participant shares the same day boundary.
-    const todayStr = new Intl.DateTimeFormat('en-CA', {
-      timeZone: challenge.timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date()); // "YYYY-MM-DD"
-    const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
-    const today = new Date(`${todayStr}T00:00:00Z`);
-    const daysSinceStart = Math.round((today.getTime() - startDate.getTime()) / 86_400_000);
-    const currentDay = daysSinceStart + 1;
+    //
+    // FAST_DAYS (test-only): 1 day == 1 minute, anchored to created_at —
+    // must mirror the client's src/lib/fastDays.ts exactly, and both sides
+    // must be toggled together (supabase secrets set FAST_DAYS=1 + redeploy
+    // here, EXPO_PUBLIC_FAST_DAYS=1 on the client). Never in production.
+    let currentDay: number;
+    if (Deno.env.get('FAST_DAYS') === '1') {
+      currentDay =
+        Math.floor((Date.now() - new Date(challenge.created_at as string).getTime()) / 60_000) + 1;
+    } else {
+      const todayStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: challenge.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date()); // "YYYY-MM-DD"
+      const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
+      const today = new Date(`${todayStr}T00:00:00Z`);
+      currentDay = Math.round((today.getTime() - startDate.getTime()) / 86_400_000) + 1;
+    }
 
-    if (currentDay < 1) return fail('Bu challenge henüz başlamadı.');
-    if (currentDay > challenge.total_days) return fail('Bu challenge sona erdi.');
+    if (currentDay < 1) return fail('CHALLENGE_NOT_STARTED');
+    if (currentDay > challenge.total_days) return fail('CHALLENGE_ENDED');
 
     let dayNumber = currentDay;
 
     if (checkInType === 'joker') {
       dayNumber = currentDay - 1;
-      if (dayNumber < 1) return fail('Telafi edilecek bir gün yok.');
+      if (dayNumber < 1) return fail('NOTHING_TO_MAKE_UP');
 
       const { data: existingForDay } = await admin
         .from('check_ins')
@@ -93,7 +106,7 @@ Deno.serve(async (req) => {
         .eq('participant_id', participant.id)
         .eq('day_number', dayNumber)
         .maybeSingle();
-      if (existingForDay) return fail('O gün zaten işaretli.');
+      if (existingForDay) return fail('DAY_ALREADY_MARKED');
 
       const { count: jokerUsed } = await admin
         .from('check_ins')
@@ -101,7 +114,7 @@ Deno.serve(async (req) => {
         .eq('participant_id', participant.id)
         .eq('type', 'joker');
       if ((jokerUsed ?? 0) >= challenge.joker_allowance) {
-        return fail('Joker hakkın kalmadı.');
+        return fail('NO_JOKERS_LEFT');
       }
     }
 
@@ -112,7 +125,7 @@ Deno.serve(async (req) => {
       type: checkInType,
     });
     if (insErr) {
-      if (insErr.code === '23505') return fail('Bugün için zaten check-in var.');
+      if (insErr.code === '23505') return fail('ALREADY_CHECKED_IN');
       return fail(insErr.message);
     }
 

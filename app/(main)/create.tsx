@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { Picker } from '@react-native-picker/picker';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -14,6 +17,7 @@ import {
 } from '@/hooks';
 import { addDays, formatLongDate, formatShortDate, isSameDay } from '@/lib/day';
 import { AppText, Button, Chip, IconButton, Screen } from '@/components/ui';
+import { useT } from '@/i18n';
 
 /** One start-date choice pill (Bugün / Yarın / custom calendar date). */
 function DatePill({
@@ -78,20 +82,25 @@ function DatePill({
   );
 }
 
-/** Editable "gün sayısı" pill — sits next to the 7/30 quick-pick chips so the
- * user can type any custom day count (3, 5, 15, ...). */
-function DayInput({
-  value,
-  onChangeText,
+/** Pill that opens the day-count wheel below (mirrors the "Takvim" DatePill's
+ * open/close-a-panel pattern) — shows "Özel" until a custom count is active,
+ * then shows the chosen count. */
+function DayPickerTrigger({
+  label,
   selected,
+  onPress,
 }: {
-  value: string;
-  onChangeText: (t: string) => void;
+  label: string;
   selected: boolean;
+  onPress: () => void;
 }) {
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        onPress();
+      }}
+      style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
@@ -101,41 +110,115 @@ function DayInput({
         borderRadius: radius.badge,
         paddingHorizontal: 14,
         paddingVertical: 9,
-      }}
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
-      <TextInput
-        value={value}
-        onChangeText={(t) => onChangeText(t.replace(/[^0-9]/g, '').slice(0, 3))}
-        placeholder="Özel"
-        placeholderTextColor={colors.textTertiary}
-        keyboardType="number-pad"
-        maxLength={3}
-        style={{
-          minWidth: 26,
-          padding: 0,
-          fontFamily: fonts.bodyMedium,
-          fontSize: 15,
-          color: selected ? colors.textPrimary : colors.textSecondary,
-        }}
-      />
       <AppText
         style={{
           ...type.secondary,
+          fontFamily: selected ? fonts.bodyMedium : type.secondary.fontFamily,
           color: selected ? colors.textPrimary : colors.textSecondary,
         }}
       >
-        gün
+        {label}
       </AppText>
-    </View>
+      <Feather name="chevron-down" size={14} color={selected ? colors.ember : colors.textTertiary} />
+    </Pressable>
   );
 }
 
+/**
+ * Native wheel (UIPickerView on iOS, a dropdown/dialog on Android — each
+ * platform's own convention, matching DateTimePicker below) for the custom
+ * day count (1..max), presented as a real modal: blurred/dimmed backdrop +
+ * slide-up sheet, same as every other picker/action in this app (Ek
+ * MomentumSheet/UsernameSheet) — not an inline panel wedged into the page
+ * that pushes everything below it down.
+ */
+function DayPickerSheet({
+  visible,
+  max,
+  value,
+  onChange,
+  onClose,
+}: {
+  visible: boolean;
+  max: number;
+  value: number;
+  onChange: (n: number) => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  const days = useMemo(() => Array.from({ length: max }, (_, i) => i + 1), [max]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}
+    >
+      <BlurView intensity={40} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 12,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22, marginBottom: 4 }}>
+            {t.create.titles[1]}
+          </AppText>
+          <Picker
+            selectedValue={value}
+            onValueChange={(v) => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(Number(v));
+            }}
+            itemStyle={{
+              color: colors.textPrimary,
+              fontFamily: fonts.bodyMedium,
+              fontSize: 19,
+            }}
+            style={Platform.OS !== 'ios' ? { color: colors.textPrimary } : undefined}
+            dropdownIconColor={colors.textPrimary}
+          >
+            {days.map((d) => (
+              <Picker.Item key={d} label={t.common.dayCount(d)} value={d} />
+            ))}
+          </Picker>
+          <View style={{ marginTop: 12 }}>
+            <Button label={t.common.done} onPress={onClose} />
+          </View>
+        </Animated.View>
+      </BlurView>
+    </Animated.View>
+  );
+}
+
+// ProgressRing draws one SVG path segment per day — an unbounded custom count
+// (the input allowed up to 999) made that render cost unbounded too.
+const MAX_CUSTOM_DAYS = 100;
+
 const DAY_OPTIONS = [7, 30];
-const JOKER_OPTIONS = [
-  { v: 0, label: 'Yok' },
-  { v: 1, label: '1' },
-  { v: 2, label: '2' },
-];
+const JOKER_VALUES = [0, 1, 2];
 
 function Dots({ step }: { step: number }) {
   return (
@@ -197,23 +280,25 @@ function Field({
 
 export default function CreateScreen() {
   const router = useRouter();
+  const { t } = useT();
   const create = useCreateChallenge();
 
   const [step, setStep] = useState(0);
   const [title, setTitle] = useState('');
   const [action, setAction] = useState('');
   const [totalDays, setTotalDays] = useState(14);
-  // Empty when a 7/30 preset chip is active; holds the raw typed text
-  // whenever a custom day count is in use (initially the 14-day default).
-  const [daysText, setDaysText] = useState('14');
+  // False while a 7/30 preset chip is active; true once the wheel picker has
+  // been used to pick a custom count (starts already "custom" — 14 isn't a preset).
+  const [customDays, setCustomDays] = useState(true);
+  const [showDayPicker, setShowDayPicker] = useState(false);
   const pickPresetDays = (d: number) => {
     setTotalDays(d);
-    setDaysText('');
+    setCustomDays(false);
+    setShowDayPicker(false);
   };
-  const changeCustomDays = (raw: string) => {
-    setDaysText(raw);
-    const n = parseInt(raw, 10);
-    if (!Number.isNaN(n) && n > 0) setTotalDays(n);
+  const pickCustomDays = (n: number) => {
+    setTotalDays(n);
+    setCustomDays(true);
   };
   const today = new Date();
   const tomorrow = addDays(today, 1);
@@ -227,8 +312,9 @@ export default function CreateScreen() {
   const [stakeMode, setStakeMode] = useState<'direct' | 'vote'>('direct');
   const [stakeText, setStakeText] = useState('');
   const [creating, setCreating] = useState(false);
+  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(false);
 
-  const titles = ['Ne yapacaksınız?', 'Kaç gün?', 'Joker hakkı', 'Bahis'];
+  const titles = t.create.titles;
 
   const onChangeDate = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
@@ -240,9 +326,7 @@ export default function CreateScreen() {
     setCreating(true);
     const pad = (n: number) => String(n).padStart(2, '0');
     const startDateISO = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
-    const startsLabel = isTomorrow
-      ? 'Yarın başlıyor'
-      : `${formatShortDate(startDate)} başlıyor`;
+    const startsLabel = isTomorrow ? t.common.startsTomorrow : t.common.startsOn(formatShortDate(startDate));
     const id = await create({
       title,
       dailyAction: action,
@@ -252,6 +336,7 @@ export default function CreateScreen() {
       joker,
       startsLabel: isToday ? undefined : startsLabel,
       stake: stakeText ? { mode: stakeMode, text: stakeText } : undefined,
+      firstDayJoinOnly,
     });
     router.replace(`/challenge/${id}/invite`);
   };
@@ -290,7 +375,7 @@ export default function CreateScreen() {
         <Dots step={step} />
         {step === 3 ? (
           <AppText variant="secondary" color={colors.textSecondary} onPress={finish}>
-            Atla
+            {t.common.skip}
           </AppText>
         ) : (
           <View style={{ width: 38 }} />
@@ -305,21 +390,21 @@ export default function CreateScreen() {
         {step === 0 ? (
           <>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 }}>
-              {TEMPLATES.map((t) => (
+              {TEMPLATES().map((tpl) => (
                 <Chip
-                  key={t.id}
-                  label={t.label}
-                  emoji={t.emoji}
-                  selected={title === t.title}
+                  key={tpl.id}
+                  label={tpl.label}
+                  emoji={tpl.emoji}
+                  selected={title === tpl.title}
                   onPress={() => {
-                    setTitle(t.title);
-                    setAction(t.action);
+                    setTitle(tpl.title);
+                    setAction(tpl.action);
                   }}
                 />
               ))}
             </View>
-            <Field label="Challenge adı" value={title} onChangeText={setTitle} placeholder="30 Gün Kitap Okuma" />
-            <Field label="Günlük aksiyon" value={action} onChangeText={setAction} placeholder="ör. 20 sayfa oku" />
+            <Field label={t.create.challengeName} value={title} onChangeText={setTitle} placeholder={t.create.challengeNamePlaceholder} />
+            <Field label={t.create.dailyActionLabel} value={action} onChangeText={setAction} placeholder={t.create.dailyActionPlaceholder} />
           </>
         ) : null}
 
@@ -330,18 +415,23 @@ export default function CreateScreen() {
                 <Chip
                   key={d}
                   label={`${d}`}
-                  selected={totalDays === d && !daysText}
+                  selected={totalDays === d && !customDays}
                   onPress={() => pickPresetDays(d)}
                 />
               ))}
-              <DayInput value={daysText} onChangeText={changeCustomDays} selected={!!daysText} />
+              <DayPickerTrigger
+                label={customDays ? t.common.dayCount(totalDays) : t.create.custom}
+                selected={customDays}
+                onPress={() => setShowDayPicker(true)}
+              />
             </View>
+
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 8 }}>
-              Başlangıç
+              {t.create.start}
             </AppText>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <DatePill
-                dayLabel="Bugün"
+                dayLabel={t.create.todayLabel}
                 dateLabel={formatShortDate(today)}
                 selected={isToday}
                 onPress={() => {
@@ -350,7 +440,7 @@ export default function CreateScreen() {
                 }}
               />
               <DatePill
-                dayLabel="Yarın"
+                dayLabel={t.create.tomorrowLabel}
                 dateLabel={formatShortDate(tomorrow)}
                 selected={isTomorrow}
                 onPress={() => {
@@ -360,8 +450,8 @@ export default function CreateScreen() {
               />
               <DatePill
                 icon
-                dayLabel={isCustom ? formatShortDate(startDate) : 'Takvim'}
-                dateLabel={isCustom ? 'seçildi' : 'ileri tarih'}
+                dayLabel={isCustom ? formatShortDate(startDate) : t.create.calendar}
+                dateLabel={isCustom ? t.create.selected : t.create.futureDate}
                 selected={isCustom}
                 onPress={() => setShowPicker((v) => !v)}
               />
@@ -392,7 +482,7 @@ export default function CreateScreen() {
                 {Platform.OS === 'ios' ? (
                   <View style={{ alignSelf: 'stretch', marginTop: 4 }}>
                     <Button
-                      label="Tamam"
+                      label={t.common.done}
                       variant="secondary"
                       onPress={() => setShowPicker(false)}
                     />
@@ -408,21 +498,37 @@ export default function CreateScreen() {
                 tabular
                 style={{ marginTop: 12 }}
               >
-                Başlangıç: {formatLongDate(startDate)}
+                {t.create.start}: {formatLongDate(startDate)}
               </AppText>
             ) : null}
+
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 8 }}>
+              {t.create.join}
+            </AppText>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Chip label={t.create.joinUnlimited} selected={!firstDayJoinOnly} onPress={() => setFirstDayJoinOnly(false)} />
+              <Chip label={t.create.joinFirstDayOnly} selected={firstDayJoinOnly} onPress={() => setFirstDayJoinOnly(true)} />
+            </View>
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }}>
+              {firstDayJoinOnly ? t.create.joinFirstDayOnlyHint : t.create.joinUnlimitedHint}
+            </AppText>
           </>
         ) : null}
 
         {step === 2 ? (
           <>
             <AppText variant="secondary" style={{ marginTop: 12 }}>
-              Joker, kaçırılan bir günü kural içinde telafi eder. Halkada amber görünür — kimse utanmaz.
+              {t.create.jokerIntro}
             </AppText>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              {JOKER_OPTIONS.map((j) => (
-                <View key={j.v} style={{ flex: 1 }}>
-                  <Chip label={j.label} tint="joker" selected={joker === j.v} onPress={() => setJoker(j.v)} />
+              {JOKER_VALUES.map((v) => (
+                <View key={v} style={{ flex: 1 }}>
+                  <Chip
+                    label={v === 0 ? t.create.jokerNone : `${v}`}
+                    tint="joker"
+                    selected={joker === v}
+                    onPress={() => setJoker(v)}
+                  />
                 </View>
               ))}
             </View>
@@ -432,21 +538,21 @@ export default function CreateScreen() {
         {step === 3 ? (
           <>
             <AppText variant="secondary" style={{ marginTop: 12 }}>
-              Tamamlayamayan ne yapar? İsteğe bağlı — ama grubu diri tutar.
+              {t.create.stakeIntro}
             </AppText>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
               <View style={{ flex: 1 }}>
-                <Chip label="Doğrudan belirle" selected={stakeMode === 'direct'} onPress={() => setStakeMode('direct')} />
+                <Chip label={t.create.stakeDirect} selected={stakeMode === 'direct'} onPress={() => setStakeMode('direct')} />
               </View>
               <View style={{ flex: 1 }}>
-                <Chip label="Oylamaya sun" selected={stakeMode === 'vote'} onPress={() => setStakeMode('vote')} />
+                <Chip label={t.create.stakeVote} selected={stakeMode === 'vote'} onPress={() => setStakeMode('vote')} />
               </View>
             </View>
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 24, marginBottom: 10 }}>
-              Hazır öneriler
+              {t.create.stakeSuggestions}
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {STAKE_PRESETS.map((s) => (
+              {STAKE_PRESETS().map((s) => (
                 <Chip
                   key={s.id}
                   label={s.label}
@@ -456,7 +562,7 @@ export default function CreateScreen() {
                 />
               ))}
             </View>
-            <Field label="Kendi bahsini yaz" value={stakeText} onChangeText={setStakeText} placeholder="Kendi bahsini yaz..." />
+            <Field label={t.create.stakeCustomLabel} value={stakeText} onChangeText={setStakeText} placeholder={t.create.stakeCustomPlaceholder} />
           </>
         ) : null}
       </ScrollView>
@@ -466,15 +572,23 @@ export default function CreateScreen() {
           label={
             step === 3
               ? creating
-                ? 'Oluşturuluyor…'
-                : "Challenge'ı oluştur"
-              : 'Devam'
+                ? t.create.creating
+                : t.create.createCta
+              : t.common.continue
           }
           onPress={next}
           disabled={creating || (step === 0 && (!title.trim() || !action.trim()))}
         />
       </View>
       </KeyboardAvoidingView>
+
+      <DayPickerSheet
+        visible={showDayPicker}
+        max={MAX_CUSTOM_DAYS}
+        value={totalDays}
+        onChange={pickCustomDays}
+        onClose={() => setShowDayPicker(false)}
+      />
     </Screen>
   );
 }
