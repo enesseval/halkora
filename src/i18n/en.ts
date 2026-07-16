@@ -43,6 +43,8 @@ export const en: Dictionary = {
     generic: 'Something went wrong. Try again.',
     checkConnection: 'Check your connection.',
     loadFailed: "Couldn't load data.",
+    appUnavailable: 'The app is currently unavailable',
+    appUnavailableDetail: "We couldn't reach the server. Please try again later.",
     signInFailed: "Couldn't sign in. Try again.",
     sessionMissing: 'No session found.',
     invalidSession: 'Invalid session.',

@@ -44,6 +44,8 @@ export const tr = {
     generic: 'Bir şeyler ters gitti. Tekrar dene.',
     checkConnection: 'Bağlantını kontrol et.',
     loadFailed: 'Veriler yüklenemedi.',
+    appUnavailable: 'Uygulama şu an kullanılamıyor',
+    appUnavailableDetail: 'Sunucu bağlantısı kurulamadı. Lütfen daha sonra tekrar dene.',
     signInFailed: 'Giriş yapılamadı. Tekrar dene.',
     sessionMissing: 'Oturum bulunamadı.',
     invalidSession: 'Geçersiz oturum.',
