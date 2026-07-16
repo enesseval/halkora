@@ -20,7 +20,8 @@ import {
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
-import { errMessage } from '@/lib/errors';
+import { errMessage, isErrorCode } from '@/lib/errors';
+import { router } from 'expo-router';
 import { FAST_DAYS } from '@/lib/fastDays';
 import {
   ME_ID,
@@ -609,7 +610,9 @@ export function useCreateChallenge() {
   const { t } = useT();
   const create = useMockStore((s) => s.createChallenge);
   const queryClient = useQueryClient();
-  return async (input: CreateChallengeInput): Promise<string> => {
+  // Returns the new challenge id, or null when nothing was created (a
+  // server-rejected write) — the caller must not navigate on null.
+  return async (input: CreateChallengeInput): Promise<string | null> => {
     if (isSupabaseConfigured) {
       const {
         data: { session },
@@ -624,8 +627,17 @@ export function useCreateChallenge() {
           queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
           return id;
         } catch (e) {
+          // Free-plan cap (2 active rings) tripped by the server-side trigger
+          // (docs/db-pro.sql) — this isn't an error to alert, it's the
+          // paywall's cue. Nothing was created; return null so the caller
+          // stays put behind the paywall instead of navigating to invite.
+          if (isErrorCode(e, 'CHALLENGE_LIMIT_REACHED')) {
+            router.push('/paywall?reason=challengeLimit');
+            return null;
+          }
           const msg = errMessage(e);
           Alert.alert(t.errors.supabaseWriteFailed, t.errors.supabaseWriteFailedDetail(msg));
+          return null;
         }
       }
     }

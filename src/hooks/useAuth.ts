@@ -23,6 +23,7 @@ interface AuthState {
   session: Session | null;
   name: string | null; // profiles.name (null => needs onboarding)
   username: string | null; // profiles.username (@handle, docs "Ek O")
+  isPro: boolean; // profiles.is_pro (Halkora Pro, docs "Ek R")
 }
 
 const useAuthStore = create<AuthState>(() => ({
@@ -30,19 +31,24 @@ const useAuthStore = create<AuthState>(() => ({
   session: null,
   name: null,
   username: null,
+  isPro: false,
 }));
 
 async function loadProfileName(session: Session | null): Promise<void> {
   if (!session) {
-    useAuthStore.setState({ name: null, username: null });
+    useAuthStore.setState({ name: null, username: null, isPro: false });
     return;
   }
   const { data } = await supabase
     .from('profiles')
-    .select('name, username')
+    .select('name, username, is_pro')
     .eq('id', session.user.id)
     .maybeSingle();
-  useAuthStore.setState({ name: data?.name ?? null, username: data?.username ?? null });
+  useAuthStore.setState({
+    name: data?.name ?? null,
+    username: data?.username ?? null,
+    isPro: !!data?.is_pro,
+  });
 }
 
 /**
@@ -282,7 +288,7 @@ async function signOut(): Promise<void> {
   const userId = useAuthStore.getState().session?.user.id;
   if (userId) await clearPushToken(userId).catch(() => {});
   await supabase.auth.signOut();
-  useAuthStore.setState({ session: null, name: null });
+  useAuthStore.setState({ session: null, name: null, username: null, isPro: false });
 }
 
 /**
@@ -294,7 +300,7 @@ async function signOut(): Promise<void> {
  */
 async function deleteAccount(): Promise<void> {
   await deleteAccountRequest();
-  useAuthStore.setState({ session: null, name: null });
+  useAuthStore.setState({ session: null, name: null, username: null, isPro: false });
 }
 
 /**
@@ -311,12 +317,25 @@ async function resetOnboarding(): Promise<void> {
   useAuthStore.setState({ name: null });
 }
 
+/**
+ * DEV-ONLY: flip is_pro on the current profile so the paywall / advanced-stats
+ * gating can be exercised before RevenueCat (Faz B) is wired. Guarded by
+ * __DEV__ at the (single) call site — never reachable in a release build.
+ */
+async function setProDev(next: boolean): Promise<void> {
+  const session = useAuthStore.getState().session;
+  if (!session) return;
+  await supabase.from('profiles').update({ is_pro: next }).eq('id', session.user.id);
+  useAuthStore.setState({ isPro: next });
+}
+
 /** Auth state + actions for screens. */
 export function useAuth() {
   const ready = useAuthStore((s) => s.ready);
   const session = useAuthStore((s) => s.session);
   const name = useAuthStore((s) => s.name);
   const username = useAuthStore((s) => s.username);
+  const isPro = useAuthStore((s) => s.isPro);
   return {
     ready,
     session,
@@ -325,6 +344,7 @@ export function useAuth() {
     isAnonymous: !!session?.user.is_anonymous,
     name,
     username,
+    isPro,
     needsOnboarding: !!session && !name,
     signInAnonymously,
     signInWithApple,
@@ -335,5 +355,6 @@ export function useAuth() {
     signOut,
     deleteAccount,
     resetOnboarding,
+    setProDev,
   };
 }

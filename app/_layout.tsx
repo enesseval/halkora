@@ -190,6 +190,10 @@ function RootNavigator() {
       <Stack.Screen name="challenge/[id]/complete" />
       <Stack.Screen name="join/[code]" options={{ animation: 'fade' }} />
       <Stack.Screen name="j/[code]" options={{ animation: 'none' }} />
+      <Stack.Screen
+        name="paywall"
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
     </Stack>
   );
 }

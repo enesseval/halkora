@@ -1,7 +1,10 @@
-import { ScrollView, Share, View } from 'react-native';
+import { Pressable, ScrollView, Share, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useChallenge, useChallengesQuery } from '@/hooks';
+import { useAuth } from '@/hooks/useAuth';
 import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, Button, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -37,6 +40,7 @@ export default function CompleteScreen() {
   const router = useRouter();
   const { t } = useT();
   const challenge = useChallenge(id);
+  const { isPro } = useAuth();
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
 
   if (!challenge) {
@@ -54,6 +58,7 @@ export default function CompleteScreen() {
   }
 
   const stats = challenge.finishStats;
+  const advanced = challenge.advancedStats;
   const finishers = [...challenge.participants].sort(
     (a, b) => (b.completedDays ?? 0) - (a.completedDays ?? 0),
   );
@@ -62,6 +67,11 @@ export default function CompleteScreen() {
     Share.share({
       message: t.complete.shareMessage(challenge.title, challenge.totalDays),
     }).catch(() => {});
+  };
+
+  const openPaywall = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push('/paywall?reason=advancedStats');
   };
 
   return (
@@ -126,6 +136,107 @@ export default function CompleteScreen() {
             );
           })}
         </View>
+
+        {/* advanced stats — Halkora Pro. Free users see a locked teaser that
+            opens the paywall; Pro users see perfect days + per-person streaks. */}
+        {advanced ? (
+          <View style={{ marginTop: spacing.section }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <Feather name="bar-chart-2" size={16} color={colors.textSecondary} />
+              <AppText variant="bodyMedium">{t.complete.advancedTitle}</AppText>
+            </View>
+
+            {isPro ? (
+              <>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: colors.emberSoft,
+                    borderRadius: radius.badge,
+                    paddingVertical: 16,
+                    paddingHorizontal: 18,
+                    marginBottom: 14,
+                  }}
+                >
+                  <AppText variant="secondary" color={colors.ember} style={{ fontFamily: type.bodyMedium.fontFamily }}>
+                    {t.complete.advancedPerfectDays}
+                  </AppText>
+                  <AppText tabular style={{ fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 28, color: colors.ember }}>
+                    {advanced.perfectDays}
+                  </AppText>
+                </View>
+
+                {advanced.leaderboard.map((p, i) => (
+                  <View
+                    key={`${p.name}-${i}`}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      paddingVertical: 11,
+                      borderBottomWidth: hairline,
+                      borderBottomColor: colors.strokeSubtle,
+                    }}
+                  >
+                    <Avatar initials={p.initials} size={32} />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="bodyMedium">{p.name}</AppText>
+                      <AppText variant="meta" color={colors.textTertiary}>
+                        {t.complete.advancedDaysFmt(p.completedDays, challenge.totalDays)} ·{' '}
+                        {t.common.percent(p.completionPct)}
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="secondary"
+                      tabular
+                      color={colors.joker}
+                      style={{ fontFamily: type.bodyMedium.fontFamily }}
+                    >
+                      🔥 {p.longestStreak}
+                    </AppText>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <Pressable
+                onPress={openPaywall}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  backgroundColor: colors.bgSurface,
+                  borderRadius: radius.badge,
+                  borderWidth: hairline,
+                  borderColor: colors.strokeSubtle,
+                  paddingVertical: 16,
+                  paddingHorizontal: 18,
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: colors.emberSoft,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="lock" size={16} color={colors.ember} />
+                </View>
+                <AppText variant="secondary" style={{ flex: 1 }}>
+                  {t.pro.sub.advancedStats}
+                </AppText>
+                <AppText variant="secondary" color={colors.ember} style={{ fontFamily: type.bodyMedium.fontFamily }}>
+                  {t.complete.advancedUnlockCta}
+                </AppText>
+              </Pressable>
+            )}
+          </View>
+        ) : null}
 
         {/* stake — a computed "who lost" result when we have one (mock demo),
             otherwise just the stake's own text so real challenges aren't blank */}

@@ -338,6 +338,12 @@ export default function CreateScreen() {
       stake: stakeText ? { mode: stakeMode, text: stakeText } : undefined,
       firstDayJoinOnly,
     });
+    // null = the create was rejected (e.g. free-plan cap → paywall shown by
+    // the hook). Stay on this screen so the user can retry after upgrading.
+    if (!id) {
+      setCreating(false);
+      return;
+    }
     router.replace(`/challenge/${id}/invite`);
   };
 

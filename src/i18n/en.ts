@@ -84,6 +84,7 @@ export const en: Dictionary = {
       NOT_THE_OWNER: "You're not this ring's owner.",
       TITLE_REQUIRED: "Title can't be empty.",
       DAILY_ACTION_REQUIRED: "Daily action can't be empty.",
+      CHALLENGE_LIMIT_REACHED: 'The free plan lets you run up to 2 rings at once.',
     },
   },
 
@@ -297,11 +298,42 @@ export const en: Dictionary = {
     statPeople: 'people',
     statCheckins: 'check-ins',
     statCompletion: 'completion',
+    advancedTitle: 'Advanced stats',
+    advancedUnlockCta: 'Unlock with Pro',
+    advancedPerfectDays: 'perfect days',
+    advancedStreak: 'longest streak',
+    advancedDaysFmt: (done: number, total: number) => `${done}/${total} days`,
     stakeResult: (text: string) => `Stake: ${text}`,
     rematch: 'Start a new ring',
     shareResult: 'Share result',
     shareMessage: (title: string, totalDays: number) =>
       `"${title}" completed — ${totalDays} days, together. 🔥`,
+  },
+
+  pro: {
+    title: 'Halkora Pro',
+    settingsSubFree: 'Unlimited rings + advanced stats',
+    settingsSubActive: 'Active',
+    close: 'Close',
+    headline: {
+      challengeLimit: 'More rings?',
+      advancedStats: 'Get to know your ring',
+      generic: 'Halkora Pro',
+    },
+    sub: {
+      challengeLimit: 'The free plan lets you run 2 rings at once. Pro removes the limit.',
+      advancedStats: 'Per-person streaks, perfect days and more unlock with Pro.',
+      generic: 'Unlock all of Halkora.',
+    },
+    features: {
+      unlimited: 'Unlimited active rings',
+      advancedStats: 'Advanced stats',
+    },
+    cta: 'Get Halkora Pro',
+    restore: 'Restore purchases',
+    notReadyTitle: 'Almost ready',
+    notReadyBody: 'Subscriptions are coming very soon.',
+    devToggle: 'DEV: toggle Pro',
   },
 
   join: {
