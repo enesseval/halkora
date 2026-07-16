@@ -1128,3 +1128,102 @@ Deploy:
 ```powershell
 supabase functions deploy message-digest --no-verify-jwt
 ```
+
+## Ek Q — Uygulama App Store Connect'ten silindi: Push + Apple ile Giriş'i sıfırdan kurma
+
+App Store Connect'teki uygulama kaydı silindiğinde **Apple Developer
+portalındaki** App ID (`com.halkora.app`) ve onun capability'leri, key'leri
+otomatik silinmez — ayrı sistemler. Ama App Store Connect kaydı olmadan
+gerçek cihazda push/Apple girişini test edip App Store'a basamazsın, o yüzden
+ikisini de baştan sona kontrol/kur. Sırayla:
+
+### 1. Apple Developer → App ID'yi doğrula/oluştur
+
+1. [developer.apple.com](https://developer.apple.com) → Certificates, IDs &
+   Profiles → Identifiers.
+2. `com.halkora.app` hâlâ listede mi bak.
+   - **Varsa:** aç, aşağıdaki iki capability'nin işaretli olduğunu doğrula:
+     **Push Notifications**, **Sign in with Apple**. İkisi de değilse işaretle
+     → Save.
+   - **Yoksa (silinmiş):** + ile yeni bir App ID oluştur, Bundle ID
+     `com.halkora.app` (Explicit, wildcard değil), Description "Halkora",
+     Capabilities'ten **Push Notifications** + **Sign in with Apple**'ı
+     işaretleyerek kaydet.
+
+### 2. Apple Developer → APNs key (push için)
+
+Ek I §5'te bahsedilen key de App ID gibi silinmemiş olabilir ama üzerinde
+durmaya değer, çünkü bir .p8 key **yalnızca oluşturulduğu an bir kere**
+indirilebiliyor — kaybettiysen yenisini çıkarman gerekiyor:
+
+1. Certificates, IDs & Profiles → Keys → mevcut bir "APNs" amaçlı key'in
+   .p8 dosyası elinde duruyor mu kontrol et (yerelde/parola kasasında).
+2. Yoksa: Keys → + → isim ver ("Halkora APNs"), **Apple Push Notifications
+   service (APNs)** kutusunu işaretle → Continue → Register → **Download**
+   (bu ekrana bir daha dönemezsin, indirir indirmez güvenli bir yere kaydet).
+   Key ID'yi de not al (URL'de ve listede görünür).
+3. Team ID'ni de not al (sağ üstte hesap adının yanında / Membership
+   sayfasında) — az sonra lazım.
+
+### 3. Apple Developer → Sign in with Apple için Service ID + ayrı key
+
+Push key'i Sign in with Apple için **kullanamazsın**, ayrı bir key gerekiyor
+(Ek J §1'de anlatılan):
+
+1. Identifiers → Service IDs sekmesi → + → yeni bir Service ID oluştur
+   (örn. `com.halkora.app.signin`), **Sign in with Apple**'ı işaretle,
+   "Configure" ile **Primary App ID**'yi `com.halkora.app` olarak bağla.
+   Bu Service ID'nin kendisi Supabase'e "Client ID" olarak girilecek.
+2. Keys → + → isim ver ("Halkora Sign in with Apple"), **Sign in with Apple**
+   kutusunu işaretle → Configure → Primary App ID'yi yine `com.halkora.app`
+   seç → Continue → Register → Download (yine tek seferlik). Key ID'yi not al.
+
+### 4. Supabase Dashboard → Authentication → Providers → Apple
+
+Elinde: Team ID, Service ID (Client ID), Sign in with Apple key'in Key ID'si
+ve .p8 içeriği. Apple provider ekranı bu dört alanı tek tek istiyor, doldur
+ve etkinleştir. Ayrıca:
+
+- **Authentication → Settings → "Allow manual linking"** açık mı kontrol et
+  (kapalıysa anonim→Apple hesap yükseltmesi `linkIdentity()` hatasıyla çöker).
+
+### 5. Push credential'ını Expo'nun push servisine tanıt
+
+Bu uygulama push'u kendi APNs bağlantısı yerine Expo'nun ortak push
+servisi üzerinden gönderiyor (`exp.host/--/api/v2/push/send` —
+`notify`/`message-digest` fonksiyonlarında). Expo'nun bu servisi senin
+adına APNs'e konuşabilmesi için 2. adımdaki push .p8 key'ini Expo'nun
+credential sistemine yüklemen gerekiyor.
+
+> ⚠️ Bunun için resmi yol `eas credentials` komutu — **`eas build` değil**,
+> hiçbir şeyi derlemiyor/cloud'da build başlatmıyor, yalnızca bu key'i
+> Expo'nun credential deposuna kaydediyor. Yine de `eas-cli`/bir Expo hesabı
+> gerektiriyor, o yüzden madem "eas build kullanmak istemiyorum" dedin, bu
+> adımı atlamadan önce sana danışmak istedim: `eas credentials` → iOS →
+> Push Notifications → "Set up a push key" → 2. adımdaki .p8'i + Key ID'yi +
+> Team ID'ni gir, kaydet. Bu komutu çalıştırmak istemiyorsan haber ver,
+> alternatifi (Expo'nun push servisini hiç kullanmayıp doğrudan kendi APNs
+> bağlantımızı kurmak, epeyce daha fazla iş) birlikte konuşuruz.
+
+### 6. App Store Connect → yeni app kaydı
+
+1. [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → My Apps
+   → + → New App.
+2. Platform iOS, isim "Halkora" (veya App Store'da görünecek başka bir isim —
+   isim benzersiz olmalı, doluysa varyasyon dene), Primary language, Bundle ID
+   açılır listesinden `com.halkora.app`'i seç (1. adımda Developer portalda
+   var olduğu için burada listede çıkar), SKU (örn. `halkora-ios`, sana özel,
+   App Store'da görünmez).
+3. Kayıt oluştuktan sonra App Information, Pricing, Privacy (App Privacy
+   soru formu — hangi veriyi topladığını beyan ediyorsun: hesap, mesajlar,
+   push token vb.) sekmelerini doldurman gerekecek ama bunlar submission
+   öncesi, push/Apple girişini test etmek için şart değil.
+
+### 7. Doğrulama
+
+Yeni bir production build'de (nasıl derlediğine bağlı — Ek I §5 ve Ek J §3'te
+anlatılan adımlar hâlâ geçerli, sadece `eas build` kısmı kendi
+tercihine kalıyor):
+- Push: gerçek cihazda bildirim gelmeli (simülatörde asla gelmez).
+- Apple girişi: Welcome → "Apple ile devam et" → sistem Apple sheet'i açılıp
+  bağlanmalı, Ayarlar → "Hesap" satırı "Apple ile bağlı"ya dönmeli.
