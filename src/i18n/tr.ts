@@ -304,9 +304,11 @@ export const tr = {
     statCompletion: 'tamamlama',
     // Gelişmiş istatistikler — Halkora Pro (Faz 4). Mevcut check_ins'ten
     // hesaplanır, ekstra veri saklanmaz.
+    storyTitle: 'Halkanın hikâyesi',
     advancedTitle: 'Gelişmiş istatistikler',
     advancedUnlockCta: 'Pro ile aç',
     advancedPerfectDays: 'kusursuz gün',
+    advancedPerfectDaysSub: 'Herkesin check-in yaptığı günler',
     advancedStreak: 'en uzun seri',
     advancedDaysFmt: (done: number, total: number) => `${done}/${total} gün`,
     stakeResult: (text: string) => `Bahis: ${text}`,
@@ -339,6 +341,17 @@ export const tr = {
     },
     cta: "Halkora Pro'ya geç",
     restore: 'Satın alımları geri yükle',
+    legal: 'Kullanım Koşulları · Gizlilik',
+    // Fiyat bloğu — Faz A'da placeholder (gerçek fiyatlar RevenueCat'ten, Faz B).
+    planMonthlyLabel: 'Aylık',
+    planAnnualLabel: 'Yıllık',
+    monthlyPrice: '₺59',
+    monthlyPer: '/ay',
+    monthlyNote: 'İstediğin an iptal',
+    annualPrice: '₺399',
+    annualPer: '/yıl',
+    annualNote: "≈₺33/ay'a denk gelir",
+    saveBadge: '2 ay bedava',
     // Faz A: satın alma henüz bağlı değil (RevenueCat = Faz B).
     notReadyTitle: 'Neredeyse hazır',
     notReadyBody: 'Abonelikler çok yakında açılıyor.',

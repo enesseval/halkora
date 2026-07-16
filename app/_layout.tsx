@@ -192,7 +192,7 @@ function RootNavigator() {
       <Stack.Screen name="j/[code]" options={{ animation: 'none' }} />
       <Stack.Screen
         name="paywall"
-        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
       />
     </Stack>
   );
