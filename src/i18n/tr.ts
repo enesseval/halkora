@@ -317,6 +317,11 @@ export const tr = {
     rematch: 'Yeni bir halka kur',
     shareResult: 'Sonucu paylaş',
     shareMessage: (title: string, totalDays: number) => `"${title}" tamamlandı — ${totalDays} gün, birlikte. 🔥`,
+    // Paylaşım kartı (9:16 PNG — Instagram vb. için)
+    sharePreparing: 'Hazırlanıyor…',
+    shareCardDays: 'Gün',
+    shareCardCompleted: 'Birlikte tamamlandı',
+    shareCardPerfect: (n: number) => `✦ ${n} kusursuz gün`,
   },
 
   pro: {
