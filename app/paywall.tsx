@@ -162,7 +162,7 @@ export default function Paywall() {
       <Pressable style={{ flex: 1 }} onPress={close} />
 
       <Animated.View
-        entering={SlideInDown.springify().damping(20)}
+        entering={SlideInDown.duration(280)}
         style={{
           backgroundColor: colors.bgElevated,
           borderTopLeftRadius: radius.sheet,

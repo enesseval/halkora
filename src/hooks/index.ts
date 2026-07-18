@@ -33,6 +33,7 @@ import {
   getInviteJoiners,
 } from '@/data/mock';
 import { formatLongDate, waitingNames } from '@/lib/day';
+import { useAuth } from './useAuth';
 import { firstName } from '@/stores/mockStore';
 import { Challenge, Participant } from '@/data/types';
 import { useT } from '@/i18n';
@@ -598,6 +599,30 @@ export function useChallengeActions(id: string) {
     restart: doRestart,
     endEarly: doEndEarly,
     updateDetails: doUpdateDetails,
+  };
+}
+
+/**
+ * Free-plan create gate, checked at the ENTRY of the create flow (not only
+ * at the final server insert) so a capped user sees the paywall before
+ * filling the whole form, not after. Returns true when creating is allowed;
+ * otherwise routes to the paywall and returns false. The DB trigger
+ * (docs/db-pro.sql) stays as the authoritative backstop — this is UX only.
+ */
+export function useCreateGate(): () => boolean {
+  const { isPro } = useAuth();
+  const challenges = useMockStore((s) => s.challenges);
+  return () => {
+    if (!isSupabaseConfigured || isPro) return true;
+    // Mirror the server trigger: only challenges I OWN that are still
+    // running occupy a free slot ('completed' here is already date-aware —
+    // mapRow derives it client-side).
+    const running = challenges.filter((c) => c.isOwner && c.status !== 'completed').length;
+    if (running >= 2) {
+      router.push('/paywall?reason=challengeLimit');
+      return false;
+    }
+    return true;
   };
 }
 

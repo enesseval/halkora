@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -7,6 +7,8 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { extractCode } from '@/lib/invite';
+import { useCreateGate } from '@/hooks';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { AppText } from './ui';
 
@@ -76,6 +78,8 @@ export function QuickStartSheet({
 }) {
   const router = useRouter();
   const { t } = useT();
+  const canCreate = useCreateGate();
+  const keyboardHeight = useKeyboardHeight();
   const [mode, setMode] = useState<'choose' | 'join'>('choose');
   const [input, setInput] = useState('');
   const [clip, setClip] = useState<string | null>(null);
@@ -103,6 +107,9 @@ export function QuickStartSheet({
 
   const goCreate = () => {
     onClose();
+    // Capped free users see the paywall HERE, before the form — not after
+    // filling all four steps (the gate routes to /paywall itself).
+    if (!canCreate()) return;
     router.push('/create');
   };
 
@@ -125,14 +132,10 @@ export function QuickStartSheet({
         zIndex: 30,
       }}
     >
-      {/* Backdrop + sheet live INSIDE the KeyboardAvoidingView (not before
-          it) so 'padding' has a flex:1 box to measure against — otherwise
-          the keyboard just covers the join-code input instead of pushing
-          the sheet up. */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* Live keyboard-height padding, not KeyboardAvoidingView — KAV
+          mis-measures inside absolute overlays (relative frame vs the
+          keyboard's screen coords) and left the join-code input covered. */}
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
       <Pressable style={{ flex: 1 }} onPress={onClose} />
       <Animated.View
         entering={SlideInDown.duration(260)}
@@ -258,7 +261,7 @@ export function QuickStartSheet({
           </>
         )}
       </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Animated.View>
   );
 }

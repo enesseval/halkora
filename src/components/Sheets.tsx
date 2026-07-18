@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
 import { errMessage } from '@/lib/errors';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Button } from './ui';
@@ -216,6 +217,7 @@ export function UsernameSheet({
   const [value, setValue] = useState(current ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -259,14 +261,11 @@ export function UsernameSheet({
         zIndex: 30,
       }}
     >
-      {/* The backdrop Pressable + sheet both live INSIDE the
-          KeyboardAvoidingView (not as a sibling before it) — otherwise
-          'padding' has no flex:1 box to measure against and the keyboard
-          just covers the input instead of pushing the sheet up. */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* paddingBottom = the LIVE keyboard height (useKeyboardHeight) — not
+          KeyboardAvoidingView, which mis-measures inside absolute overlays
+          (relative frame vs the keyboard's screen coords) and left the input
+          partly covered on device. */}
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
@@ -344,7 +343,7 @@ export function UsernameSheet({
             />
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Animated.View>
   );
 }
@@ -406,6 +405,7 @@ export function OwnerSettingsSheet({
   const [stakeText, setStakeText] = useState(challenge.stake?.text ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -450,13 +450,9 @@ export function OwnerSettingsSheet({
         zIndex: 30,
       }}
     >
-      {/* See UsernameSheet's comment: backdrop + sheet live INSIDE the
-          KeyboardAvoidingView, not before it, or 'padding' has nothing to
-          measure against and the keyboard covers the inputs instead. */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* See UsernameSheet's comment: live keyboard-height padding, not
+          KeyboardAvoidingView (which mis-measures inside absolute overlays). */}
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
@@ -512,7 +508,7 @@ export function OwnerSettingsSheet({
             />
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Animated.View>
   );
 }
