@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, Share, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +11,7 @@ import { AppText, Avatar, Button, Card, Screen, SectionLabel } from '@/component
 import { ProgressRing } from '@/components/ProgressRing';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { ShareCardSheet } from '@/components/ShareCard';
 import { useT } from '@/i18n';
 import type { SegmentState } from '@/hooks';
 
@@ -43,6 +45,7 @@ export default function CompleteScreen() {
   const challenge = useChallenge(id);
   const { isPro } = useAuth();
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (!challenge) {
     return (
@@ -68,11 +71,9 @@ export default function CompleteScreen() {
     (a, b) => (b.completedDays ?? 0) - (a.completedDays ?? 0),
   );
 
-  const share = () => {
-    Share.share({
-      message: t.complete.shareMessage(challenge.title, challenge.totalDays),
-    }).catch(() => {});
-  };
+  // Opens the 9:16 share-card preview (image share) instead of a bare text
+  // share — the card is the thing people actually post.
+  const share = () => setShareOpen(true);
 
   const openPaywall = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -270,6 +271,8 @@ export default function CompleteScreen() {
           <Button label={t.complete.shareResult} variant="secondary" onPress={share} />
         </View>
       </ScrollView>
+
+      <ShareCardSheet challenge={challenge} visible={shareOpen} onClose={() => setShareOpen(false)} />
     </Screen>
   );
 }

@@ -57,6 +57,10 @@ Deno.serve(async (req) => {
     await admin.from('message_reactions').delete().eq('user_id', userId);
     await admin.from('messages').delete().eq('user_id', userId);
     await admin.from('nudges').delete().or(`from_user.eq.${userId},to_user.eq.${userId}`);
+    // invites.from_user/to_user reference auth.users WITHOUT cascade — leaving
+    // any invite row behind makes deleteUser() below fail with an FK violation,
+    // i.e. anyone who ever sent/received an invite couldn't delete their account.
+    await admin.from('invites').delete().or(`from_user.eq.${userId},to_user.eq.${userId}`);
     await admin.from('stake_votes').delete().eq('user_id', userId);
     await admin.from('push_tokens').delete().eq('user_id', userId);
     await admin.from('participants').delete().eq('user_id', userId);

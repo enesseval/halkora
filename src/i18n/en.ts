@@ -310,6 +310,10 @@ export const en: Dictionary = {
     shareResult: 'Share result',
     shareMessage: (title: string, totalDays: number) =>
       `"${title}" completed — ${totalDays} days, together. 🔥`,
+    sharePreparing: 'Preparing…',
+    shareCardDays: 'Days',
+    shareCardCompleted: 'Completed together',
+    shareCardPerfect: (n: number) => `✦ ${n} perfect days`,
   },
 
   pro: {
