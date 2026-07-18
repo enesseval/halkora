@@ -185,16 +185,20 @@ Deno.serve(async (req) => {
       });
     if (messages.length === 0) return ok();
 
-    const res = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(messages),
-    });
-    if (!res.ok) {
-      return ok({ sent: 0, expoStatus: res.status });
+    // Expo's push endpoint accepts at most 100 messages per request — group
+    // size is deliberately uncapped, so send in chunks instead of one POST
+    // that would be rejected (or partially dropped) past that limit.
+    let sent = 0;
+    for (let i = 0; i < messages.length; i += 100) {
+      const res = await fetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(messages.slice(i, i + 100)),
+      });
+      if (res.ok) sent += Math.min(100, messages.length - i);
     }
 
-    return ok({ sent: messages.length });
+    return ok({ sent });
   } catch (e) {
     // A webhook is fire-and-forget from Postgres's perspective — never let a
     // push failure surface as a DB-visible error. Log-and-200 instead.

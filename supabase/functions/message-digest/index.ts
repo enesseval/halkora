@@ -154,11 +154,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (messages.length > 0) {
+    // Expo's push endpoint accepts at most 100 messages per request — this
+    // loop covers EVERY user with a token, so chunk instead of one POST that
+    // would be rejected (or partially dropped) past 100 users.
+    for (let i = 0; i < messages.length; i += 100) {
       await fetch(EXPO_PUSH_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(messages),
+        body: JSON.stringify(messages.slice(i, i + 100)),
       });
     }
 
