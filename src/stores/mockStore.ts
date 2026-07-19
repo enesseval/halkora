@@ -24,6 +24,10 @@ export interface CreateChallengeInput {
   stake?: Stake;
   /** Ek M — kurucu davet penceresini "yalnızca ilk gün" ile sınırlayabilir. */
   firstDayJoinOnly?: boolean;
+  /** Saha testi bulgusu — "kurucu-tetiklemeli başlangıç" (lobi). true ise
+   * startDateISO/startTomorrow yok sayılır; challenge status='lobby' ile
+   * kurulur, gerçek başlangıç sonradan startChallenge ile verilir. */
+  lobby?: boolean;
 }
 
 interface MockState {
@@ -52,6 +56,11 @@ interface MockState {
   joinByCode: (code: string, name: string) => string;
   restart: (id: string) => void;
   endEarly: (id: string) => void;
+  removeChallenge: (id: string) => void;
+  /** Lobby → started (mock mode has no real dates, so this just flips the
+   * status/day-1 fields directly instead of round-tripping through a
+   * start_date, matching how `startTomorrow: false` create already works). */
+  startChallenge: (id: string) => void;
   /** Faz 3C madde 3 — owner-only edit of title/daily action/stake text. */
   updateDetails: (id: string, title: string, dailyAction: string, stakeText: string) => void;
   openMomentumDemo: (id: string) => void;
@@ -231,23 +240,27 @@ export const useMockStore = create<MockState>((set, get) => ({
       dailyAction: `${t.common.today}: ${input.dailyAction || t.common.completeYourGoalFallback}`,
       dailyActionRaw: input.dailyAction || t.common.completeYourGoalFallback,
       totalDays: input.totalDays,
-      currentDay: input.startTomorrow ? 0 : 1,
-      days: buildDays(
+      currentDay: input.lobby ? 0 : input.startTomorrow ? 0 : 1,
+      days: input.lobby ? [] : buildDays(
         input.totalDays,
         input.startTomorrow ? [] : ['today'],
       ),
-      status: input.startTomorrow ? 'upcoming' : 'active',
-      startsLabel: input.startTomorrow
-        ? input.startsLabel ?? t.common.startsTomorrow
-        : undefined,
+      status: input.lobby ? 'lobby' : input.startTomorrow ? 'upcoming' : 'active',
+      startsLabel: input.lobby
+        ? t.common.lobbyWaiting
+        : input.startTomorrow
+          ? input.startsLabel ?? t.common.startsTomorrow
+          : undefined,
       meCheckedInToday: false,
       jokerRemaining: input.joker ?? 1,
       hasMissedYesterday: false,
       inviteCode: override?.inviteCode ?? id.slice(-6),
       scheduleSummary: t.common.scheduleSummary(input.dailyAction || t.common.dailyGoalFallback, input.totalDays),
-      startsWhen: input.startTomorrow
-        ? input.startsLabel ?? t.common.tomorrowSixAm
-        : t.common.startsToday,
+      startsWhen: input.lobby
+        ? t.common.lobbyWaiting
+        : input.startTomorrow
+          ? input.startsLabel ?? t.common.tomorrowSixAm
+          : t.common.startsToday,
       stake: input.stake,
       firstDayJoinOnly: input.firstDayJoinOnly ?? false,
       // Mock data doesn't simulate real elapsed time, so a just-created demo
@@ -339,6 +352,27 @@ export const useMockStore = create<MockState>((set, get) => ({
       ),
       momentumDemoId: null,
     })),
+
+  removeChallenge: (id) =>
+    set((s) => ({ challenges: s.challenges.filter((c) => c.id !== id) })),
+
+  startChallenge: (id) =>
+    set((s) => {
+      const t = getDict();
+      return {
+        challenges: s.challenges.map((c) => {
+          if (c.id !== id || c.status !== 'lobby') return c;
+          return {
+            ...c,
+            status: 'active',
+            currentDay: 1,
+            days: buildDays(c.totalDays, ['today']),
+            startsLabel: undefined,
+            startsWhen: t.common.startsToday,
+          };
+        }),
+      };
+    }),
 
   openMomentumDemo: (id) => set({ momentumDemoId: id }),
   closeMomentumDemo: () => set({ momentumDemoId: null }),

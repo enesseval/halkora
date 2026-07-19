@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -12,9 +12,12 @@ import DateTimePicker, {
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import {
   useCreateChallenge,
+  useChallenge,
   TEMPLATES,
   STAKE_PRESETS,
 } from '@/hooks';
+import { sendInvite, isDuplicateInviteError } from '@/data/invites';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { addDays, formatLongDate, formatShortDate, isSameDay } from '@/lib/day';
 import { AppText, Button, Chip, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
@@ -283,13 +286,22 @@ export default function CreateScreen() {
   const { t } = useT();
   const create = useCreateChallenge();
 
+  // "Aynı grupla tekrar halka kur" (ROADMAP MVP-sonrası) — the finish screen
+  // links here with the just-completed challenge's id; its own data (still
+  // in the local cache) prefills the form and, once created, every past
+  // participant gets auto-invited (below).
+  const { rematchOf } = useLocalSearchParams<{ rematchOf?: string }>();
+  const rematchSource = useChallenge(rematchOf);
+
   const [step, setStep] = useState(0);
-  const [title, setTitle] = useState('');
-  const [action, setAction] = useState('');
-  const [totalDays, setTotalDays] = useState(14);
+  const [title, setTitle] = useState(() => rematchSource?.title ?? '');
+  const [action, setAction] = useState(() => rematchSource?.dailyActionRaw ?? '');
+  const [totalDays, setTotalDays] = useState(() => rematchSource?.totalDays ?? 14);
   // False while a 7/30 preset chip is active; true once the wheel picker has
   // been used to pick a custom count (starts already "custom" — 14 isn't a preset).
-  const [customDays, setCustomDays] = useState(true);
+  const [customDays, setCustomDays] = useState(
+    () => !DAY_OPTIONS.includes(rematchSource?.totalDays ?? 14),
+  );
   const [showDayPicker, setShowDayPicker] = useState(false);
   const pickPresetDays = (d: number) => {
     setTotalDays(d);
@@ -305,14 +317,18 @@ export default function CreateScreen() {
   const [startDate, setStartDate] = useState<Date>(tomorrow);
   const [showPicker, setShowPicker] = useState(false);
   const [joker, setJoker] = useState(1);
+  // Kurucu-tetiklemeli başlangıç (saha testi bulgusu) — true iken start
+  // seçimindeki 3 pill (Bugün/Yarın/Tarih seç) yok sayılır, challenge
+  // status='lobby' ile kurulur (startChallenge sonradan gerçek başlangıcı verir).
+  const [lobby, setLobby] = useState(false);
 
   const isToday = isSameDay(startDate, today);
   const isTomorrow = isSameDay(startDate, tomorrow);
   const isCustom = !isToday && !isTomorrow;
-  const [stakeMode, setStakeMode] = useState<'direct' | 'vote'>('direct');
-  const [stakeText, setStakeText] = useState('');
+  const [stakeMode, setStakeMode] = useState<'direct' | 'vote'>(rematchSource?.stake?.mode ?? 'direct');
+  const [stakeText, setStakeText] = useState(() => rematchSource?.stake?.text ?? '');
   const [creating, setCreating] = useState(false);
-  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(false);
+  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(() => rematchSource?.firstDayJoinOnly ?? false);
 
   const titles = t.create.titles;
 
@@ -337,12 +353,27 @@ export default function CreateScreen() {
       startsLabel: isToday ? undefined : startsLabel,
       stake: stakeText ? { mode: stakeMode, text: stakeText } : undefined,
       firstDayJoinOnly,
+      lobby,
     });
     // null = the create was rejected (e.g. free-plan cap → paywall shown by
     // the hook). Stay on this screen so the user can retry after upgrading.
     if (!id) {
       setCreating(false);
       return;
+    }
+    // Rematch: auto-invite everyone who was in the old ring (except me, the
+    // new owner — I'm already a participant via `create` above). Best-effort
+    // — a failed/duplicate invite here shouldn't block landing on the new
+    // ring's invite screen, which still shows the code as a manual fallback.
+    if (rematchSource && isSupabaseConfigured) {
+      const others = rematchSource.participants.filter((p) => !p.isMe);
+      await Promise.all(
+        others.map((p) =>
+          sendInvite(id, p.id).catch((e) => {
+            if (!isDuplicateInviteError(e)) console.error('rematch auto-invite failed', e);
+          }),
+        ),
+      );
     }
     router.replace(`/challenge/${id}/invite`);
   };
@@ -435,12 +466,13 @@ export default function CreateScreen() {
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 8 }}>
               {t.create.start}
             </AppText>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flexDirection: 'row', gap: 10, opacity: lobby ? 0.4 : 1 }}>
               <DatePill
                 dayLabel={t.create.todayLabel}
                 dateLabel={formatShortDate(today)}
-                selected={isToday}
+                selected={isToday && !lobby}
                 onPress={() => {
+                  setLobby(false);
                   setStartDate(today);
                   setShowPicker(false);
                 }}
@@ -448,8 +480,9 @@ export default function CreateScreen() {
               <DatePill
                 dayLabel={t.create.tomorrowLabel}
                 dateLabel={formatShortDate(tomorrow)}
-                selected={isTomorrow}
+                selected={isTomorrow && !lobby}
                 onPress={() => {
+                  setLobby(false);
                   setStartDate(tomorrow);
                   setShowPicker(false);
                 }}
@@ -458,12 +491,31 @@ export default function CreateScreen() {
                 icon
                 dayLabel={isCustom ? formatShortDate(startDate) : t.create.calendar}
                 dateLabel={isCustom ? t.create.selected : t.create.futureDate}
-                selected={isCustom}
-                onPress={() => setShowPicker((v) => !v)}
+                selected={isCustom && !lobby}
+                onPress={() => {
+                  setLobby(false);
+                  setShowPicker((v) => !v);
+                }}
               />
             </View>
 
-            {showPicker ? (
+            {/* Kurucu-tetiklemeli başlangıç (saha testi bulgusu) — tarih
+                vermeden kur, grup toplandığında challenge içinden başlat. */}
+            <View style={{ marginTop: 10 }}>
+              <Chip
+                label={t.create.lobbyOption}
+                selected={lobby}
+                onPress={() => {
+                  setLobby(!lobby);
+                  setShowPicker(false);
+                }}
+              />
+            </View>
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }}>
+              {lobby ? t.create.lobbyOptionHint : t.create.lobbyOptionHintOff}
+            </AppText>
+
+            {showPicker && !lobby ? (
               <View
                 style={{
                   marginTop: 12,
@@ -497,7 +549,7 @@ export default function CreateScreen() {
               </View>
             ) : null}
 
-            {isCustom ? (
+            {isCustom && !lobby ? (
               <AppText
                 variant="secondary"
                 color={colors.textSecondary}

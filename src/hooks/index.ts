@@ -16,6 +16,9 @@ import {
   restartChallenge,
   endChallengeEarly,
   updateChallengeDetails,
+  deleteChallenge as deleteChallengeRemote,
+  leaveChallenge as leaveChallengeRemote,
+  startChallenge as startChallengeRemote,
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
@@ -137,7 +140,10 @@ export function useTodayStatus() {
     const active = challenges.filter((c) => c.status === 'active');
     const pending = active.filter((c) => !c.meCheckedInToday);
     const done = active.filter((c) => c.meCheckedInToday);
-    const upcoming = challenges.filter((c) => c.status === 'upcoming');
+    // 'lobby' (kurucu-tetiklemeli başlangıç) buraya da katılıyor — "henüz
+    // başlamadı ama görünür olsun" anlamıyla 'upcoming' ile aynı bucket'a
+    // giriyor; kartın startsWhen etiketi zaten lobi'ye özel metni gösteriyor.
+    const upcoming = challenges.filter((c) => c.status === 'upcoming' || c.status === 'lobby');
     return { pending, done, upcoming };
   }, [challenges]);
 
@@ -493,6 +499,8 @@ export function useChallengeActions(id: string) {
   const nudgeMock = useMockStore((s) => s.nudge);
   const restart = useMockStore((s) => s.restart);
   const endEarly = useMockStore((s) => s.endEarly);
+  const removeChallengeMock = useMockStore((s) => s.removeChallenge);
+  const startChallengeMock = useMockStore((s) => s.startChallenge);
   const updateDetailsMock = useMockStore((s) => s.updateDetails);
   const setChallenges = useMockStore((s) => s.setChallenges);
   const challenge = useChallenge(id);
@@ -590,6 +598,38 @@ export function useChallengeActions(id: string) {
     }
   };
 
+  /** Owner-only. Awaited by the caller (like updateDetails) so it can
+   * navigate away only once the delete is actually confirmed server-side —
+   * there's no sensible "optimistic" delete to roll back if it fails. */
+  const doDelete = async (): Promise<void> => {
+    if (isSupabaseConfigured) {
+      await deleteChallengeRemote(id);
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    } else {
+      removeChallengeMock(id);
+    }
+  };
+
+  /** Non-owner participants only — the RPC itself also rejects the owner. */
+  const doLeave = async (): Promise<void> => {
+    if (isSupabaseConfigured) {
+      await leaveChallengeRemote(id);
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    } else {
+      removeChallengeMock(id);
+    }
+  };
+
+  /** Owner-only — leaves lobby state. `startDateISO` omitted starts today. */
+  const doStart = async (startDateISO?: string): Promise<void> => {
+    if (isSupabaseConfigured) {
+      await startChallengeRemote(id, startDateISO);
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    } else {
+      startChallengeMock(id);
+    }
+  };
+
   return {
     useJoker: doUseJoker,
     ackMissed: () => ackMissed(id),
@@ -599,6 +639,9 @@ export function useChallengeActions(id: string) {
     restart: doRestart,
     endEarly: doEndEarly,
     updateDetails: doUpdateDetails,
+    deleteChallenge: doDelete,
+    leaveChallenge: doLeave,
+    startChallenge: doStart,
   };
 }
 

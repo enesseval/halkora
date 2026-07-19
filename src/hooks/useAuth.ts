@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { create } from 'zustand';
 import * as Notifications from 'expo-notifications';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -39,16 +39,35 @@ async function loadProfileName(session: Session | null): Promise<void> {
     useAuthStore.setState({ name: null, username: null, isPro: false });
     return;
   }
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('name, username, is_pro')
     .eq('id', session.user.id)
     .maybeSingle();
+  if (error) {
+    // Never silently clobber known-good state (e.g. isPro) with a false
+    // default just because this one fetch failed (network blip, stale
+    // PostgREST schema cache right after an ALTER TABLE, etc.) — that
+    // previously made a real Pro user look free again for no visible reason.
+    console.error('loadProfileName failed', error);
+    return;
+  }
   useAuthStore.setState({
     name: data?.name ?? null,
     username: data?.username ?? null,
     isPro: !!data?.is_pro,
   });
+}
+
+/**
+ * Re-reads this device's OWN profile row (name/username/is_pro) from the
+ * server. Called on every foreground resume (useAuthInit below) so a value
+ * changed elsewhere — you flipping is_pro in the SQL editor, a future
+ * RevenueCat webhook — shows up the next time the user opens/returns to the
+ * app, without needing a full app restart.
+ */
+export async function refreshProfile(): Promise<void> {
+  await loadProfileName(useAuthStore.getState().session);
 }
 
 /**
@@ -96,9 +115,21 @@ export function useAuthInit(): void {
       }
     });
 
+    // Re-read the profile every time the app comes back to the foreground —
+    // is_pro (or name/username) may have changed while this device was
+    // backgrounded (you flipping it manually, a subscription lapsing, a
+    // future RevenueCat webhook) and a single fetch at cold-start would
+    // otherwise never notice short of a full app restart.
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && useAuthStore.getState().session) {
+        refreshProfile().catch(() => {});
+      }
+    });
+
     return () => {
       active = false;
       sub.subscription.unsubscribe();
+      appStateSub.remove();
     };
   }, []);
 }

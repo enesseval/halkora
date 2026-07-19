@@ -271,7 +271,7 @@ export default function CompleteScreen() {
           <Button
             label={t.complete.rematch}
             onPress={() => {
-              if (canCreate()) router.replace('/create');
+              if (canCreate()) router.replace(`/create?rematchOf=${challenge.id}`);
             }}
           />
           <Button label={t.complete.shareResult} variant="secondary" onPress={share} />

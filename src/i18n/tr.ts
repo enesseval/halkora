@@ -34,6 +34,7 @@ export const tr = {
     startsOn: (dateStr: string) => `${dateStr}'da başlıyor`,
     startsToday: 'Bugün başladı',
     ongoing: 'Devam ediyor',
+    lobbyWaiting: 'Kurucu başlatacak',
     tomorrowSixAm: 'Yarın 06:00',
     newChallengeFallback: 'Yeni Challenge',
     completeYourGoalFallback: 'hedefini tamamla',
@@ -89,6 +90,8 @@ export const tr = {
       TITLE_REQUIRED: 'Başlık boş olamaz.',
       DAILY_ACTION_REQUIRED: 'Günlük eylem boş olamaz.',
       CHALLENGE_LIMIT_REACHED: 'Ücretsiz planda aynı anda en fazla 2 halka kurabilirsin.',
+      OWNER_CANNOT_LEAVE: 'Kurucu halkadan ayrılamaz — bunun yerine halkayı silebilirsin.',
+      NOT_IN_LOBBY: 'Bu halka zaten başlamış.',
     },
   },
 
@@ -194,6 +197,9 @@ export const tr = {
     joinUnlimited: 'Sınırsız',
     joinFirstDayOnly: 'Sadece ilk gün',
     joinUnlimitedHint: 'Herkes istediği zaman katılabilir.',
+    lobbyOption: 'Grup dolunca başlat',
+    lobbyOptionHint: 'Tarih vermeden kur — istediğin an ya da ileri bir tarih seçerek halka içinden başlatırsın.',
+    lobbyOptionHintOff: 'Yerine tarih vermeden kurup daha sonra başlatmak istersen seç.',
     joinFirstDayOnlyHint: 'İlk gün bitince davet kapanır — sonradan katılınamaz.',
     jokerIntro: 'Joker, kaçırılan bir günü kural içinde telafi eder. Halkada amber görünür — kimse utanmaz.',
     jokerNone: 'Yok',
@@ -225,6 +231,11 @@ export const tr = {
     usernamePlaceholder: 'kullaniciadi',
     usernameSave: 'Kaydet',
     usernameSaving: 'Kaydediliyor…',
+    nameEditTitle: 'İsmini düzenle',
+    nameEditHint: 'Grubun seni bu isimle görür.',
+    namePlaceholder: 'Adın',
+    nameSave: 'Kaydet',
+    nameSaving: 'Kaydediliyor…',
     language: 'Dil',
     languageTurkish: 'Türkçe',
     languageEnglish: 'English',
@@ -271,6 +282,25 @@ export const tr = {
     ownerSettingsStakePlaceholder: 'Kendi bahsini yaz...',
     ownerSettingsSave: 'Kaydet',
     ownerSettingsSaving: 'Kaydediliyor…',
+    deleteChallenge: 'Halkayı sil',
+    deletingChallenge: 'Siliniyor…',
+    deleteChallengeConfirmTitle: 'Bu halkayı sil?',
+    deleteChallengeConfirmBody:
+      'Tüm check-in\'ler, sohbet ve geçmiş kalıcı olarak silinir — bu işlem geri alınamaz.',
+    deleteChallengeFailed: 'Halka silinemedi',
+    leaveChallenge: 'Halkadan ayrıl',
+    leavingChallenge: 'Ayrılıyor…',
+    leaveChallengeConfirmTitle: 'Bu halkadan ayrıl?',
+    leaveChallengeConfirmBody: 'Kendi check-in geçmişin silinir. Grubun geri kalanı devam eder.',
+    leaveChallengeFailed: 'Halkadan ayrılınamadı',
+    // Kurucu-tetiklemeli başlangıç — lobi ekranı
+    lobbyTitle: 'Grup toplanıyor',
+    lobbySubtitle: (n: number) => (n === 1 ? '1 kişi katıldı' : `${n} kişi katıldı`),
+    lobbyStartNow: 'Şimdi başlat',
+    lobbyStarting: 'Başlatılıyor…',
+    lobbyPickDate: 'İleri bir tarih seç',
+    lobbyWaitingForOwner: 'Kurucu ne zaman isterse başlatacak.',
+    lobbyStartFailed: 'Başlatılamadı',
   },
 
   invite: {
@@ -312,8 +342,9 @@ export const tr = {
     advancedStreak: 'en uzun seri',
     advancedDaysFmt: (done: number, total: number) => `${done}/${total} gün`,
     stakeResult: (text: string) => `Bahis: ${text}`,
-    // Rematch (Faz 3B) henüz yok — aynı gruba otomatik davet göndermiyor,
-    // sadece boş create akışına götürüyor. Metin bunu vaat etmemeli.
+    // Aynı grupla tekrar: create formu bu challenge'ın verileriyle önceden
+    // dolu açılır, oluşunca eski katılımcılara otomatik davet gider
+    // (app/(main)/create.tsx `rematchOf` parametresi).
     rematch: 'Yeni bir halka kur',
     shareResult: 'Sonucu paylaş',
     shareMessage: (title: string, totalDays: number) => `"${title}" tamamlandı — ${totalDays} gün, birlikte. 🔥`,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
+import { Alert, Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -7,6 +7,7 @@ import { FlashList } from '@shopify/flash-list';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import {
   useChallenge,
@@ -22,7 +23,7 @@ import {
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
 import { errMessage } from '@/lib/errors';
-import { AppText, AvatarStack, IconButton } from '@/components/ui';
+import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
 import { StakeBadge } from '@/components/StakeBadge';
@@ -56,6 +57,10 @@ export default function DetailScreen() {
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
   const [showOwnerSettings, setShowOwnerSettings] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [showLobbyDatePicker, setShowLobbyDatePicker] = useState(false);
+  const [lobbyDate, setLobbyDate] = useState<Date | null>(null);
 
   const rows = useMemo<Row[]>(() => {
     if (!challenge) return [];
@@ -156,6 +161,39 @@ export default function DetailScreen() {
   const showMissed = challenge.hasMissedYesterday && !challenge.missedAcknowledged && !meCheckedInToday;
   const showMomentum = momentumDemoId === challenge.id;
 
+  const goHomeAfterExit = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
+  const confirmLeave = () => {
+    if (leaving) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Alert.alert(t.detail.leaveChallengeConfirmTitle, t.detail.leaveChallengeConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.detail.leaveChallenge,
+        style: 'destructive',
+        onPress: async () => {
+          setLeaving(true);
+          try {
+            await actions.leaveChallenge();
+            goHomeAfterExit();
+          } catch (e) {
+            Alert.alert(t.detail.leaveChallengeFailed, errMessage(e));
+            setLeaving(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const doDeleteChallenge = async () => {
+    await actions.deleteChallenge();
+    setShowOwnerSettings(false);
+    goHomeAfterExit();
+  };
+
   const topBar = (
     <View
       style={{
@@ -186,14 +224,126 @@ export default function DetailScreen() {
           <Feather name="settings" size={18} color={colors.textSecondary} />
         </IconButton>
       ) : (
-        <View style={{ width: 40 }} />
+        <IconButton size={40} onPress={confirmLeave}>
+          <Feather name="log-out" size={18} color={colors.textSecondary} />
+        </IconButton>
       )}
     </View>
   );
 
   const isUpcoming = challenge.status === 'upcoming';
+  const isLobby = challenge.status === 'lobby';
 
-  const header = (
+  const startNow = async () => {
+    if (starting) return;
+    setStarting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      await actions.startChallenge();
+    } catch (e) {
+      Alert.alert(t.detail.lobbyStartFailed, errMessage(e));
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const onChangeLobbyDate = async (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') setShowLobbyDatePicker(false);
+    if (event.type !== 'set' || !date) return;
+    setLobbyDate(date);
+    if (starting) return;
+    setStarting(true);
+    try {
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const iso = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      await actions.startChallenge(iso);
+      setShowLobbyDatePicker(false);
+    } catch (e) {
+      Alert.alert(t.detail.lobbyStartFailed, errMessage(e));
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const lobbyHeader = (
+    <View style={{ paddingBottom: 8, alignItems: 'center', marginTop: 24 }}>
+      <View
+        style={{
+          width: 88,
+          height: 88,
+          borderRadius: 44,
+          backgroundColor: colors.bgSurface,
+          borderWidth: hairline,
+          borderColor: colors.strokeSubtle,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather name="users" size={30} color={colors.textSecondary} />
+      </View>
+      <AppText variant="screenTitle" style={{ fontSize: 20, marginTop: 16, textAlign: 'center' }}>
+        {t.detail.lobbyTitle}
+      </AppText>
+      <AppText variant="secondary" color={colors.textSecondary} style={{ marginTop: 6, textAlign: 'center' }}>
+        {t.detail.lobbySubtitle(challenge.participants.length)}
+      </AppText>
+
+      {challenge.stake ? (
+        <View style={{ marginTop: 18 }}>
+          <StakeBadge text={challenge.stake.text} align="center" />
+        </View>
+      ) : null}
+
+      <View style={{ marginTop: 24, alignSelf: 'stretch' }}>
+        <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+      </View>
+
+      {challenge.isOwner ? (
+        <View style={{ marginTop: 24, alignSelf: 'stretch', gap: 10 }}>
+          <Button
+            label={starting ? t.detail.lobbyStarting : t.detail.lobbyStartNow}
+            onPress={startNow}
+            disabled={starting}
+          />
+          <Button
+            label={t.detail.lobbyPickDate}
+            variant="secondary"
+            onPress={() => setShowLobbyDatePicker((v) => !v)}
+            disabled={starting}
+          />
+          {showLobbyDatePicker ? (
+            <View
+              style={{
+                backgroundColor: colors.bgSurface,
+                borderRadius: radius.card,
+                borderWidth: hairline,
+                borderColor: colors.strokeSubtle,
+                padding: Platform.OS === 'ios' ? 8 : 16,
+                alignItems: 'center',
+              }}
+            >
+              <DateTimePicker
+                value={lobbyDate ?? new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                minimumDate={new Date()}
+                onChange={onChangeLobbyDate}
+                themeVariant="dark"
+                accentColor={colors.ember}
+                textColor={colors.textPrimary}
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 20 }}>
+          {t.detail.lobbyWaitingForOwner}
+        </AppText>
+      )}
+    </View>
+  );
+
+  const header = isLobby ? lobbyHeader : (
     <View style={{ paddingBottom: 8 }}>
       {/* action + day */}
       <View style={{ alignItems: 'center', marginTop: 8 }}>
@@ -453,6 +603,7 @@ export default function DetailScreen() {
           challenge={challenge}
           onClose={() => setShowOwnerSettings(false)}
           onSave={actions.updateDetails}
+          onDelete={doDeleteChallenge}
         />
       ) : null}
     </View>
