@@ -44,7 +44,7 @@ type Row =
   | { kind: 'system'; id: string; text: string };
 
 export default function DetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const router = useRouter();
   const { t } = useT();
   const challenge = useChallenge(id);
@@ -58,6 +58,13 @@ export default function DetailScreen() {
   const [draft, setDraft] = useState('');
   const [showOwnerSettings, setShowOwnerSettings] = useState(false);
   const [leaving, setLeaving] = useState(false);
+
+  // Home's swipe-to-edit action (saha testi bulgusu) lands here with
+  // ?edit=1 to jump straight to the owner settings sheet instead of making
+  // the owner tap the gear icon a second time.
+  useEffect(() => {
+    if (edit === '1' && challenge?.isOwner) setShowOwnerSettings(true);
+  }, [edit, challenge?.isOwner]);
   const [starting, setStarting] = useState(false);
   const [showLobbyDatePicker, setShowLobbyDatePicker] = useState(false);
   const [lobbyDate, setLobbyDate] = useState<Date | null>(null);
