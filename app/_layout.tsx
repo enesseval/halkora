@@ -13,6 +13,7 @@ import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/u
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
 import { initLocale, useT } from '@/i18n';
 import { ErrorState } from '@/components/ErrorState';
+import { BootSplash } from '@/components/BootSplash';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -133,6 +134,21 @@ function useLocaleInit(): boolean {
 }
 
 /**
+ * Keeps the boot screen (BootSplash) up for at least `ms`, regardless of how
+ * fast auth/locale actually resolve — a deliberate branding beat instead of
+ * a random flash that's there on a slow network and gone instantly on a warm
+ * cache.
+ */
+function useMinBootDelay(ms: number): boolean {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setDone(true), ms);
+    return () => clearTimeout(timer);
+  }, [ms]);
+  return done;
+}
+
+/**
  * Shown instead of the whole app when EXPO_PUBLIC_SUPABASE_* env vars weren't
  * present at build time (`isSupabaseConfigured` false) — a build/config bug,
  * never something a user or retry can fix. This used to silently fall back to
@@ -152,6 +168,7 @@ function ConfigErrorScreen() {
 function RootNavigator() {
   const { ready, configured } = useAuth();
   const localeReady = useLocaleInit();
+  const bootDelayDone = useMinBootDelay(1400);
   useAuthInit();
   useProtectedRoute();
   useSyncPushToken();
@@ -159,9 +176,10 @@ function RootNavigator() {
   useNotificationDeepLink(ready);
 
   // Avoid a flash of Home before the persisted session is restored, or of
-  // default-locale copy before the saved/detected language is applied.
-  if (!localeReady || (configured && !ready)) {
-    return <View style={{ flex: 1, backgroundColor: colors.bgBase }} />;
+  // default-locale copy before the saved/detected language is applied — and
+  // hold the boot screen open for its own minimum beat on top of that.
+  if (!localeReady || (configured && !ready) || !bootDelayDone) {
+    return <BootSplash />;
   }
 
   if (!configured) {
