@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useChallenge, useChallengesQuery, useCreateGate } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Avatar, Button, Card, Screen, SectionLabel } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { RingScreenSkeleton } from '@/components/Skeleton';
@@ -54,7 +54,7 @@ export default function CompleteScreen() {
         {loading ? (
           <RingScreenSkeleton />
         ) : firstLoadError ? (
-          <ErrorState message={t.complete.loadFailed} detail={errMessage(error)} onRetry={refetch} />
+          <ErrorState message={t.complete.loadFailed} detail={friendlyErrorMessage(error)} onRetry={refetch} />
         ) : (
           <ErrorState message={t.complete.notFound} />
         )}

@@ -118,7 +118,9 @@ export function PendingCard({ challenge, onPress, onCheckIn }: Props) {
           onCheckIn();
         }}
         style={({ pressed }) => ({
-          height: 56,
+          alignSelf: 'center',
+          height: 44,
+          paddingHorizontal: 36,
           borderRadius: radius.pill,
           backgroundColor: colors.ember,
           alignItems: 'center',
@@ -126,7 +128,7 @@ export function PendingCard({ challenge, onPress, onCheckIn }: Props) {
           transform: [{ scale: pressed ? 0.985 : 1 }],
         })}
       >
-        <Text style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>
+        <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.bgBase }}>
           {t.common.checkIn}
         </Text>
       </Pressable>

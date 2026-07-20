@@ -6,7 +6,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { colors, spacing } from '@/theme/tokens';
 import { useTodayStatus, useCheckIn, useChallengeActions, useRefreshChallenges, useCompletedChallenges } from '@/hooks';
 import type { Challenge, SegmentState } from '@/hooks';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
 import { SwipeableRow, SwipeAction } from '@/components/SwipeableRow';
@@ -76,7 +76,7 @@ function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
           try {
             await actions.deleteChallenge();
           } catch (e) {
-            Alert.alert(t.detail.deleteChallengeFailed, errMessage(e));
+            Alert.alert(t.detail.deleteChallengeFailed, friendlyErrorMessage(e));
           } finally {
             busy.current = false;
           }
@@ -97,7 +97,7 @@ function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
           try {
             await actions.leaveChallenge();
           } catch (e) {
-            Alert.alert(t.detail.leaveChallengeFailed, errMessage(e));
+            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
           } finally {
             busy.current = false;
           }
@@ -170,7 +170,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (backgroundError && !alerted.current) {
       alerted.current = true;
-      Alert.alert(t.errors.updateFailed, errMessage(error) || t.errors.checkConnection);
+      Alert.alert(t.errors.updateFailed, friendlyErrorMessage(error) || t.errors.checkConnection);
     } else if (!backgroundError) {
       alerted.current = false;
     }
@@ -219,7 +219,7 @@ export default function HomeScreen() {
           ) : firstLoadError ? (
             <ErrorState
               message={t.home.challengesLoadFailed}
-              detail={errMessage(error)}
+              detail={friendlyErrorMessage(error)}
               onRetry={retry}
             />
           ) : pending.length === 0 && done.length === 0 && upcoming.length === 0 && finished.length === 0 ? (

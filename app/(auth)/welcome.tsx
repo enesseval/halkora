@@ -6,7 +6,7 @@ import { colors, spacing } from '@/theme/tokens';
 import { ProgressRing } from '@/components/ProgressRing';
 import { AppText, Button, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { useT } from '@/i18n';
 import type { SegmentState } from '@/hooks';
 
@@ -36,7 +36,7 @@ export default function WelcomeScreen() {
       await fn();
     } catch (e) {
       // Surface the real reason (e.g. "Anonymous sign-ins are disabled").
-      setErr(errMessage(e) || t.errors.signInFailed);
+      setErr(friendlyErrorMessage(e) || t.errors.signInFailed);
       setBusy(false);
     }
   };
