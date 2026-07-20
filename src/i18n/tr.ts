@@ -15,6 +15,7 @@ export const tr = {
     cancel: 'Vazgeç',
     retry: 'Tekrar dene',
     done: 'Tamam',
+    edit: 'Düzenle',
     completed: 'Tamamlandı',
     copy: 'Kopyala',
     copied: 'Kopyalandı ✓',

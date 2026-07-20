@@ -14,6 +14,7 @@ export const en: Dictionary = {
     cancel: 'Cancel',
     retry: 'Retry',
     done: 'Done',
+    edit: 'Edit',
     completed: 'Completed',
     copy: 'Copy',
     copied: 'Copied ✓',

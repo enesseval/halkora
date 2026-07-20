@@ -4,11 +4,12 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { colors, spacing } from '@/theme/tokens';
-import { useTodayStatus, useCheckIn, useRefreshChallenges, useCompletedChallenges } from '@/hooks';
+import { useTodayStatus, useCheckIn, useChallengeActions, useRefreshChallenges, useCompletedChallenges } from '@/hooks';
 import type { Challenge, SegmentState } from '@/hooks';
 import { errMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
+import { SwipeableRow, SwipeAction } from '@/components/SwipeableRow';
 import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
@@ -47,6 +48,103 @@ function PendingCardWithCheckIn({
 }) {
   const { checkIn } = useCheckIn(challenge.id);
   return <PendingCard challenge={challenge} onPress={onPress} onCheckIn={checkIn} />;
+}
+
+/**
+ * Home's own swipe-to-delete/leave (saha testi bulgusu — "iOS'taki klasik
+ * sağdan sola kaydırma"). Owner gets Düzenle (→ Detail with the owner
+ * settings sheet auto-opened) + Sil; anyone else just gets Ayrıl. Both
+ * destructive actions reuse the exact confirm copy already used inside
+ * Detail (t.detail.delete/leaveChallenge*) so the two entry points read as
+ * the same feature, not two different ones.
+ */
+function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
+  const { t } = useT();
+  const router = useRouter();
+  const actions = useChallengeActions(challenge.id);
+  const busy = useRef(false);
+
+  const confirmDelete = () => {
+    if (busy.current) return;
+    Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.detail.deleteChallenge,
+        style: 'destructive',
+        onPress: async () => {
+          busy.current = true;
+          try {
+            await actions.deleteChallenge();
+          } catch (e) {
+            Alert.alert(t.detail.deleteChallengeFailed, errMessage(e));
+          } finally {
+            busy.current = false;
+          }
+        },
+      },
+    ]);
+  };
+
+  const confirmLeave = () => {
+    if (busy.current) return;
+    Alert.alert(t.detail.leaveChallengeConfirmTitle, t.detail.leaveChallengeConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.detail.leaveChallenge,
+        style: 'destructive',
+        onPress: async () => {
+          busy.current = true;
+          try {
+            await actions.leaveChallenge();
+          } catch (e) {
+            Alert.alert(t.detail.leaveChallengeFailed, errMessage(e));
+          } finally {
+            busy.current = false;
+          }
+        },
+      },
+    ]);
+  };
+
+  if (challenge.isOwner) {
+    return [
+      {
+        label: t.common.edit,
+        icon: 'edit-2',
+        color: colors.ember,
+        onPress: () => router.push(`/challenge/${challenge.id}?edit=1`),
+      },
+      { label: t.detail.deleteChallenge, icon: 'trash-2', color: colors.joker, onPress: confirmDelete },
+    ];
+  }
+  return [{ label: t.detail.leaveChallenge, icon: 'log-out', color: colors.joker, onPress: confirmLeave }];
+}
+
+function SwipeablePendingCard({ challenge, onPress }: { challenge: Challenge; onPress: () => void }) {
+  const rowActions = useRowSwipeActions(challenge);
+  return (
+    <SwipeableRow actions={rowActions}>
+      <PendingCardWithCheckIn challenge={challenge} onPress={onPress} />
+    </SwipeableRow>
+  );
+}
+
+function SwipeableCompletedCard({ challenge, onPress }: { challenge: Challenge; onPress: () => void }) {
+  const rowActions = useRowSwipeActions(challenge);
+  return (
+    <SwipeableRow actions={rowActions}>
+      <CompletedCard challenge={challenge} onPress={onPress} />
+    </SwipeableRow>
+  );
+}
+
+function SwipeableUpcomingRow({ challenge, onPress }: { challenge: Challenge; onPress: () => void }) {
+  const rowActions = useRowSwipeActions(challenge);
+  return (
+    <SwipeableRow actions={rowActions}>
+      <UpcomingRow challenge={challenge} onPress={onPress} />
+    </SwipeableRow>
+  );
 }
 
 export default function HomeScreen() {
@@ -137,7 +235,7 @@ export default function HomeScreen() {
                     entering={FadeIn}
                     exiting={FadeOut.duration(200)}
                   >
-                    <PendingCardWithCheckIn challenge={c} onPress={() => goDetail(c.id)} />
+                    <SwipeablePendingCard challenge={c} onPress={() => goDetail(c.id)} />
                   </Animated.View>
                 ))}
               </View>
@@ -149,7 +247,7 @@ export default function HomeScreen() {
                   <View style={{ gap: 10, marginTop: 12 }}>
                     {done.map((c) => (
                       <Animated.View key={c.id} layout={LinearTransition} entering={FadeIn}>
-                        <CompletedCard challenge={c} onPress={() => goDetail(c.id)} />
+                        <SwipeableCompletedCard challenge={c} onPress={() => goDetail(c.id)} />
                       </Animated.View>
                     ))}
                   </View>
@@ -162,7 +260,7 @@ export default function HomeScreen() {
                   <SectionLabel>{t.home.upcoming}</SectionLabel>
                   <View style={{ marginTop: 4 }}>
                     {upcoming.map((c) => (
-                      <UpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />
+                      <SwipeableUpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />
                     ))}
                   </View>
                 </View>
