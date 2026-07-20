@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
 import { errMessage } from '@/lib/errors';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Button } from './ui';
@@ -199,6 +201,140 @@ export function MomentumSheet({
 }
 
 /* ------------------------------------------------------------------ */
+/* Ayarlar — görünen isim düzenleme (saha testi bulgusu, ROADMAP "MVP-öncesi") */
+/* ------------------------------------------------------------------ */
+export function NameSheet({
+  visible,
+  current,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  current: string;
+  onClose: () => void;
+  onSave: (name: string) => Promise<void>;
+}) {
+  const { t } = useT();
+  const [value, setValue] = useState(current);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const keyboardHeight = useKeyboardHeight();
+
+  useEffect(() => {
+    if (visible) {
+      setValue(current);
+      setError(null);
+    }
+  }, [visible, current]);
+
+  if (!visible) return null;
+
+  const canSave = value.trim().length > 0 && value.trim() !== current && !saving;
+
+  const submit = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(value.trim());
+      onClose();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        zIndex: 30,
+      }}
+    >
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 20,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+            {t.settings.nameEditTitle}
+          </AppText>
+          <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
+            {t.settings.nameEditHint}
+          </AppText>
+
+          <View
+            style={{
+              marginTop: 18,
+              backgroundColor: colors.bgElevated,
+              borderRadius: radius.pill,
+              borderWidth: hairline,
+              borderColor: error ? colors.joker : colors.strokeSubtle,
+              paddingHorizontal: 16,
+              height: 52,
+              justifyContent: 'center',
+            }}
+          >
+            <TextInput
+              value={value}
+              onChangeText={setValue}
+              placeholder={t.settings.namePlaceholder}
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              maxLength={40}
+              returnKeyType="done"
+              onSubmitEditing={submit}
+              style={{ color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
+            />
+          </View>
+
+          {error ? (
+            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+              {error}
+            </AppText>
+          ) : null}
+
+          <View style={{ marginTop: 20 }}>
+            <Button
+              label={saving ? t.settings.nameSaving : t.settings.nameSave}
+              onPress={submit}
+              disabled={!canSave}
+            />
+          </View>
+        </Animated.View>
+      </View>
+    </Animated.View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Ayarlar — @kullanıcıadı düzenleme (Faz 3C, docs "Ek O")             */
 /* ------------------------------------------------------------------ */
 export function UsernameSheet({
@@ -216,6 +352,7 @@ export function UsernameSheet({
   const [value, setValue] = useState(current ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -259,14 +396,11 @@ export function UsernameSheet({
         zIndex: 30,
       }}
     >
-      {/* The backdrop Pressable + sheet both live INSIDE the
-          KeyboardAvoidingView (not as a sibling before it) — otherwise
-          'padding' has no flex:1 box to measure against and the keyboard
-          just covers the input instead of pushing the sheet up. */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* paddingBottom = the LIVE keyboard height (useKeyboardHeight) — not
+          KeyboardAvoidingView, which mis-measures inside absolute overlays
+          (relative frame vs the keyboard's screen coords) and left the input
+          partly covered on device. */}
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
@@ -344,7 +478,7 @@ export function UsernameSheet({
             />
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Animated.View>
   );
 }
@@ -394,18 +528,22 @@ export function OwnerSettingsSheet({
   challenge,
   onClose,
   onSave,
+  onDelete,
 }: {
   visible: boolean;
   challenge: Challenge;
   onClose: () => void;
   onSave: (title: string, dailyAction: string, stakeText: string) => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const { t } = useT();
   const [title, setTitle] = useState(challenge.title);
   const [dailyAction, setDailyAction] = useState(challenge.dailyActionRaw ?? '');
   const [stakeText, setStakeText] = useState(challenge.stake?.text ?? '');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -437,6 +575,29 @@ export function OwnerSettingsSheet({
     }
   };
 
+  const confirmDelete = () => {
+    if (deleting) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.detail.deleteChallenge,
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await onDelete();
+            // onDelete's caller navigates away on success — no onClose() here,
+            // the sheet unmounts along with the screen it's attached to.
+          } catch (e) {
+            setError(errMessage(e));
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <Animated.View
       entering={FadeIn.duration(180)}
@@ -450,13 +611,9 @@ export function OwnerSettingsSheet({
         zIndex: 30,
       }}
     >
-      {/* See UsernameSheet's comment: backdrop + sheet live INSIDE the
-          KeyboardAvoidingView, not before it, or 'padding' has nothing to
-          measure against and the keyboard covers the inputs instead. */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* See UsernameSheet's comment: live keyboard-height padding, not
+          KeyboardAvoidingView (which mis-measures inside absolute overlays). */}
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
@@ -511,8 +668,25 @@ export function OwnerSettingsSheet({
               disabled={!canSave}
             />
           </View>
+
+          {/* Destructive — faint, never red, matches Settings' delete-account
+              pattern (a deliberate confirm dialog stands between the tap and
+              the actual delete, not the button's own color). */}
+          <Pressable
+            onPress={confirmDelete}
+            disabled={deleting}
+            style={({ pressed }) => ({
+              alignItems: 'center',
+              paddingTop: 18,
+              opacity: pressed || deleting ? 0.6 : 1,
+            })}
+          >
+            <AppText variant="secondary" color={colors.joker}>
+              {deleting ? t.detail.deletingChallenge : t.detail.deleteChallenge}
+            </AppText>
+          </Pressable>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Animated.View>
   );
 }

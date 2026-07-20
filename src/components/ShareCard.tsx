@@ -333,7 +333,7 @@ export function ShareCardSheet({
     >
       <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onClose} />
 
-      <Animated.View entering={SlideInDown.springify().damping(20)} style={{ alignItems: 'center', gap: 16 }}>
+      <Animated.View entering={SlideInDown.duration(280)} style={{ alignItems: 'center', gap: 16 }}>
         <View style={{ transform: [{ scale: 0.72 }], marginVertical: -CARD_H * 0.14 }}>
           <View
             style={{

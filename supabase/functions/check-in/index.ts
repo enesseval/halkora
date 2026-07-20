@@ -59,6 +59,12 @@ Deno.serve(async (req) => {
       .eq('id', challengeId)
       .single();
     if (chErr || !challenge) return fail('CHALLENGE_NOT_FOUND', 404);
+    // Lobby (docs/db-lobby.sql): start_date is null until the owner starts
+    // it. Without this guard, `new Date('nullT00:00:00Z')` below is an
+    // Invalid Date and every arithmetic comparison on it is false — the
+    // currentDay < 1 / > total_days checks would silently pass instead of
+    // rejecting, and the insert further down would write a NaN day_number.
+    if (!challenge.start_date) return fail('CHALLENGE_NOT_STARTED');
 
     const { data: participant, error: pErr } = await admin
       .from('participants')

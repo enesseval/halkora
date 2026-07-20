@@ -25,6 +25,9 @@ export async function insertChallenge(
   // (docs/PHASE2-SUPABASE.md "Ek F"/"Ek M") so every participant, regardless
   // of their own device's timezone, agrees on the same day boundary.
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Lobby (docs/db-lobby.sql): owner picks a start later from inside the
+  // challenge (startChallenge below) — no start_date yet, so the day math
+  // in mapRow/check-in never runs until then.
   const { data, error } = await supabase
     .from('challenges')
     .insert({
@@ -32,9 +35,9 @@ export async function insertChallenge(
       title: input.title,
       daily_action: input.dailyAction,
       total_days: input.totalDays,
-      start_date: input.startDateISO ?? todayInTimezone(timezone),
+      start_date: input.lobby ? null : (input.startDateISO ?? todayInTimezone(timezone)),
       timezone,
-      status: input.startTomorrow ? 'upcoming' : 'active',
+      status: input.lobby ? 'lobby' : input.startTomorrow ? 'upcoming' : 'active',
       joker_allowance: input.joker ?? 1,
       first_day_join_only: input.firstDayJoinOnly ?? false,
     })
@@ -70,7 +73,7 @@ interface ChallengeRow {
   title: string;
   daily_action: string;
   total_days: number;
-  start_date: string;
+  start_date: string | null; // null while status === 'lobby' (not started yet)
   timezone: string;
   status: string;
   invite_code: string;
@@ -166,6 +169,61 @@ function longestStreak(days: Set<number>): number {
   return best;
 }
 
+/**
+ * 'lobby' — kurucu henüz başlatmadı, start_date yok. Gerçek gün matematiğine
+ * (daysSinceStart vb.) HİÇ girmiyor — null bir start_date'i tarihe çevirmeye
+ * çalışmak Invalid Date/NaN üretir, sessizce yanlış bir "gün 1" ya da check-in
+ * kabulüne yol açabilirdi (check-in Edge Function'ında ayrıca ayrıca
+ * guard'landı, docs/db-lobby.sql). Katılımcı listesi check-in/nudge farkı
+ * gözetmeden minimal kuruluyor — henüz kimse check-in yapamaz.
+ */
+function mapLobbyRow(
+  row: ChallengeRow,
+  parts: ParticipantRow[],
+  profMap: Map<string, { name?: string; initials?: string }>,
+  myUserId: string,
+  stake?: StakeRow,
+): Challenge {
+  const t = getDict();
+  const participants: Participant[] = parts.map((p) => {
+    const prof = profMap.get(p.user_id);
+    const name = prof?.name ?? t.common.person;
+    return {
+      id: p.user_id,
+      name,
+      initials: prof?.initials ?? name.slice(0, 2).toUpperCase(),
+      isMe: p.user_id === myUserId,
+      checkedInToday: false,
+      completedDays: 0,
+      nudged: false,
+    };
+  });
+
+  return {
+    id: row.id,
+    title: row.title,
+    dailyAction: `${t.common.today}: ${row.daily_action}`,
+    dailyActionRaw: row.daily_action,
+    totalDays: row.total_days,
+    currentDay: 0,
+    days: [],
+    status: 'lobby',
+    startsLabel: t.common.lobbyWaiting,
+    meCheckedInToday: false,
+    jokerRemaining: row.joker_allowance,
+    hasMissedYesterday: false,
+    inviteCode: row.invite_code,
+    scheduleSummary: t.common.scheduleSummary(row.daily_action, row.total_days),
+    startsWhen: t.common.lobbyWaiting,
+    firstDayJoinOnly: row.first_day_join_only,
+    isOwner: row.owner_id === myUserId,
+    joinClosed: false, // lobby'de katılım penceresi kavramı henüz devrede değil
+    stake: stake ? { mode: stake.mode, text: stake.text ?? '' } : undefined,
+    participants,
+    messages: [],
+  };
+}
+
 function mapRow(
   row: ChallengeRow,
   parts: ParticipantRow[],
@@ -175,6 +233,9 @@ function mapRow(
   nudgedToday: Set<string>,
   stake?: StakeRow,
 ): Challenge {
+  if (row.status === 'lobby' || !row.start_date) {
+    return mapLobbyRow(row, parts, profMap, myUserId, stake);
+  }
   const diff = daysSinceStart(row.start_date, row.timezone, row.created_at);
   const rawDay = diff + 1; // day 1 == start day
   const dateBasedStatus: Challenge['status'] =
@@ -440,6 +501,32 @@ export async function restartChallenge(challengeId: string): Promise<void> {
 /** E10 "Erken bitir" — marks the challenge completed. */
 export async function endChallengeEarly(challengeId: string): Promise<void> {
   const { error } = await supabase.rpc('end_challenge_early', { p_challenge_id: challengeId });
+  if (error) throw error;
+}
+
+/** Owner-only hard delete — docs/db-challenge-lifecycle.sql cascades the rest. */
+export async function deleteChallenge(challengeId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_challenge', { p_challenge_id: challengeId });
+  if (error) throw error;
+}
+
+/** Non-owner participant removes themselves; the RPC rejects the owner. */
+export async function leaveChallenge(challengeId: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_challenge', { p_challenge_id: challengeId });
+  if (error) throw error;
+}
+
+/**
+ * Owner-only. Leaves lobby state: `p_start_date` omitted/undefined starts
+ * today (right now); pass a future "YYYY-MM-DD" for "start at X" instead —
+ * mapRow's normal date math takes over from here exactly like any other
+ * challenge (docs/db-lobby.sql).
+ */
+export async function startChallenge(challengeId: string, startDateISO?: string): Promise<void> {
+  const { error } = await supabase.rpc('start_challenge', {
+    p_challenge_id: challengeId,
+    p_start_date: startDateISO ?? null,
+  });
   if (error) throw error;
 }
 

@@ -10,7 +10,7 @@ import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
-import { UsernameSheet } from '@/components/Sheets';
+import { NameSheet, UsernameSheet } from '@/components/Sheets';
 import { useT, type Locale } from '@/i18n';
 
 /** null while the initial permission check is in flight. Push is native-only —
@@ -99,20 +99,24 @@ export default function SettingsScreen() {
   const { open } = useMomentumDemo();
   const {
     configured,
+    session,
     name,
     username,
     isAnonymous,
     isPro,
     linkAppleIdentity,
+    saveName,
     saveUsername,
     signOut,
     deleteAccount,
     resetOnboarding,
     setProDev,
   } = useAuth();
+  const debugUserId = session?.user.id.slice(0, 8);
   const [linking, setLinking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
+  const [editingName, setEditingName] = useState(false);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -234,7 +238,12 @@ export default function SettingsScreen() {
 
         <View style={{ marginTop: 20 }}>
           <Group>
-            <Row icon="user" label={t.settings.name} value={displayName} />
+            <Row
+              icon="user"
+              label={t.settings.name}
+              value={displayName}
+              onPress={configured ? () => setEditingName(true) : undefined}
+            />
             <Divider />
             <Row
               icon="bell"
@@ -320,10 +329,15 @@ export default function SettingsScreen() {
           </Pressable>
         ) : null}
 
-        {/* DEV-only: flip is_pro before RevenueCat (Faz B) exists, so the
-            paywall + advanced-stats gating can be exercised. __DEV__ is false
-            in every release build, so this row never ships. */}
-        {__DEV__ && configured ? (
+        {/* TEMPORARY (remove before public release / once Faz B's is_pro
+            hardening — docs/db-pro.sql §3 — is applied): flip is_pro before
+            RevenueCat exists, and show the raw stored value + short user id
+            so "is_pro=true'ye çevirdim ama görünmüyor" is self-diagnosable
+            (compare against `select id, is_pro from profiles;`) instead of
+            guessing. Deliberately NOT gated behind __DEV__ — that hid this
+            entirely in a Release/TestFlight-style build, which is exactly
+            the build most on-device testing happens in right now. */}
+        {configured ? (
           <View style={{ marginBottom: 24 }}>
             <SectionLabel>DEV</SectionLabel>
             <View style={{ marginTop: 10 }}>
@@ -339,6 +353,9 @@ export default function SettingsScreen() {
                 />
               </Group>
             </View>
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }} tabular>
+              uid: {debugUserId ?? '—'} · is_pro: {String(isPro)}
+            </AppText>
           </View>
         ) : null}
 
@@ -352,6 +369,13 @@ export default function SettingsScreen() {
         current={username}
         onClose={() => setEditingUsername(false)}
         onSave={saveUsername}
+      />
+
+      <NameSheet
+        visible={editingName}
+        current={displayName}
+        onClose={() => setEditingName(false)}
+        onSave={saveName}
       />
     </Screen>
   );

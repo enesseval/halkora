@@ -88,6 +88,12 @@ Deno.serve(async (req) => {
     const pendingByUser = new Map<string, Set<string>>();
 
     for (const challenge of eveningChallenges) {
+      // Lobby (docs/db-lobby.sql): start_date is null until the owner starts
+      // it. Without this, the Invalid Date below makes currentDay NaN, and
+      // NaN comparisons are always false — the "hasn't started yet" skip
+      // just below would never fire, and the group would get reminded about
+      // a challenge nobody has actually started.
+      if (!challenge.start_date) continue;
       const timeZone = challenge.timezone as string;
       const todayStr = localDateStr(timeZone);
       const startDate = new Date(`${challenge.start_date as string}T00:00:00Z`);

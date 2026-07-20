@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { useChallenge, useChallengesQuery } from '@/hooks';
+import { useChallenge, useChallengesQuery, useCreateGate } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { errMessage } from '@/lib/errors';
 import { AppText, Avatar, Button, Card, Screen, SectionLabel } from '@/components/ui';
@@ -46,6 +46,7 @@ export default function CompleteScreen() {
   const { isPro } = useAuth();
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const [shareOpen, setShareOpen] = useState(false);
+  const canCreate = useCreateGate();
 
   if (!challenge) {
     return (
@@ -267,7 +268,12 @@ export default function CompleteScreen() {
 
         {/* CTAs */}
         <View style={{ gap: 12, marginTop: spacing.section }}>
-          <Button label={t.complete.rematch} onPress={() => router.replace('/create')} />
+          <Button
+            label={t.complete.rematch}
+            onPress={() => {
+              if (canCreate()) router.replace(`/create?rematchOf=${challenge.id}`);
+            }}
+          />
           <Button label={t.complete.shareResult} variant="secondary" onPress={share} />
         </View>
       </ScrollView>

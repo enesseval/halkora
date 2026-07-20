@@ -1,7 +1,10 @@
 /** Visual state of a single day segment on the ProgressRing. */
 export type SegmentState = 'done' | 'joker' | 'missed' | 'empty' | 'today';
 
-export type ChallengeStatus = 'active' | 'completed' | 'upcoming';
+// 'lobby' — kurucu-tetiklemeli başlangıç (ROADMAP "Saha testi bulguları"):
+// start_date henüz yok, kurucu ne zaman isterse (ya da ileri bir tarih
+// seçerek) başlatana kadar bekler. Yalnızca gerçek modda mümkün.
+export type ChallengeStatus = 'active' | 'completed' | 'upcoming' | 'lobby';
 
 export interface Participant {
   id: string;
