@@ -209,6 +209,10 @@ function RootNavigator() {
       <Stack.Screen name="challenge/[id]/index" />
       <Stack.Screen name="challenge/[id]/invite" />
       <Stack.Screen name="challenge/[id]/complete" />
+      <Stack.Screen
+        name="challenge/[id]/share"
+        options={{ presentation: 'transparentModal', animation: 'none' }}
+      />
       <Stack.Screen name="join/[code]" options={{ animation: 'fade' }} />
       <Stack.Screen name="j/[code]" options={{ animation: 'none' }} />
       <Stack.Screen
