@@ -343,6 +343,11 @@ export const en: Dictionary = {
     shareCardDays: 'Days',
     shareCardCompleted: 'Completed together',
     shareCardPerfect: (n: number) => `✦ ${n} perfect days`,
+    shareTemplateHint: 'Swipe to try other designs',
+    shareTemplateClassic: 'Classic',
+    shareTemplateBold: 'Bold',
+    shareTemplateMono: 'Minimal',
+    shareTemplateStats: 'Stats',
   },
 
   pro: {
