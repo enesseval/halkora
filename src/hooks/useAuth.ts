@@ -115,12 +115,28 @@ export function useAuthInit(): void {
       }
     });
 
+    // supabase-js's token auto-refresh runs on a setInterval, which iOS/Android
+    // throttle or pause entirely while the app is backgrounded — the session
+    // can go quietly stale, and the first request fired right on resume (e.g.
+    // a chat message send) can hit the backend with an expired token before
+    // the client's had a chance to refresh it. Supabase's own docs call this
+    // out explicitly for native apps: start/stop the refresh loop with
+    // AppState so it isn't silently starved while backgrounded (saha testi
+    // bulgusu — an intermittent "new row violates row-level security policy"
+    // on message send that a plain retry always fixed, consistent with a
+    // once-off stale-token race rather than a real permission bug).
+    if (Platform.OS !== 'web') supabase.auth.startAutoRefresh();
+
     // Re-read the profile every time the app comes back to the foreground —
     // is_pro (or name/username) may have changed while this device was
     // backgrounded (you flipping it manually, a subscription lapsing, a
     // future RevenueCat webhook) and a single fetch at cold-start would
     // otherwise never notice short of a full app restart.
     const appStateSub = AppState.addEventListener('change', (state) => {
+      if (Platform.OS !== 'web') {
+        if (state === 'active') supabase.auth.startAutoRefresh();
+        else supabase.auth.stopAutoRefresh();
+      }
       if (state === 'active' && useAuthStore.getState().session) {
         refreshProfile().catch(() => {});
       }
