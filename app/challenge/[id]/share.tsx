@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, Share, View } from 'react-native';
+import { Platform, Pressable, Share, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, runOnJS } from 'react-native-reanimated';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
@@ -14,27 +15,30 @@ import { useChallenge } from '@/hooks';
 import { useT } from '@/i18n';
 
 /**
- * The finish-line share preview — swipe between the 4 templates
- * (src/components/ShareCard.tsx), then share or dismiss.
+ * The finish-line share preview — swipe (or tap a dot) to switch between the
+ * 4 templates (src/components/ShareCard.tsx), then share or dismiss.
  *
  * This is a real route presented as a `transparentModal` (app/_layout.tsx),
- * the exact same mechanism app/paywall.tsx uses — NOT a component rendered
- * inline as a sibling of a screen's ScrollView. That was the earlier design
- * (a manually `position: 'absolute'`-fill overlay embedded inside
- * complete.tsx's own Screen/ScrollView tree) and it came out visibly broken
- * on a real device (buttons pushed off screen, the card not actually
- * centered) — a plain sibling overlay is at the mercy of its parent's own
- * padding, safe-area handling and stacking order, none of which apply to it
- * the way they do to normal content. A dedicated transparentModal route is
- * its own top-level screen: react-native-screens gives it the true full
- * device viewport and guarantees it paints above everything else, so none
- * of that class of bug is possible here (saha testi bulgusu).
+ * the same mechanism app/paywall.tsx uses — its own top-level screen, so it
+ * always gets the true full device viewport and paints above everything
+ * else (an earlier version rendered this inline as a sibling of a screen's
+ * ScrollView and came out visibly broken on a real device).
+ *
+ * The template switcher itself is deliberately NOT a horizontal ScrollView:
+ * a `transform: scale` on a paging ScrollView rendered stretched/broken on
+ * real iOS in an earlier version. Only ONE template is ever mounted at a
+ * time here — a plain View sized to the true (already-scaled) preview
+ * dimensions, swapped via a Pan gesture or a dot tap, with a plain opacity
+ * fade on change. No ScrollView, no scale-on-a-scrollable-thing, nothing
+ * left to leak or stretch outside its box (saha testi bulgusu — two earlier
+ * rounds of this same bug class).
  */
 
 const CARD_PREVIEW_SCALE = 0.64;
 const PREVIEW_W = CARD_W * CARD_PREVIEW_SCALE;
 const PREVIEW_H = CARD_H * CARD_PREVIEW_SCALE;
 const TEMPLATE_IDS: ShareTemplateId[] = ['classic', 'bold', 'mono', 'stats'];
+const SWIPE_THRESHOLD = 50;
 
 export default function ShareScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -42,7 +46,7 @@ export default function ShareScreen() {
   const { t } = useT();
   const challenge = useChallenge(id);
   const insets = useSafeAreaInsets();
-  const shotRefs = useRef<Array<ViewShot | null>>([]);
+  const shotRef = useRef<ViewShot>(null);
   const [sharing, setSharing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -67,13 +71,16 @@ export default function ShareScreen() {
     stats: t.complete.shareTemplateStats,
   };
 
-  const onPageChange = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / PREVIEW_W);
-    if (idx !== activeIndex && idx >= 0 && idx < TEMPLATE_IDS.length) {
-      Haptics.selectionAsync().catch(() => {});
-      setActiveIndex(idx);
-    }
+  const goTo = (next: number) => {
+    if (next < 0 || next >= TEMPLATE_IDS.length || next === activeIndex) return;
+    Haptics.selectionAsync().catch(() => {});
+    setActiveIndex(next);
   };
+
+  const swipe = Gesture.Pan().onEnd((e) => {
+    if (e.translationX < -SWIPE_THRESHOLD) runOnJS(goTo)(activeIndex + 1);
+    else if (e.translationX > SWIPE_THRESHOLD) runOnJS(goTo)(activeIndex - 1);
+  });
 
   const shareText = () =>
     Share.share({ message: t.complete.shareMessage(challenge.title, challenge.totalDays) }).catch(() => {});
@@ -83,7 +90,7 @@ export default function ShareScreen() {
     setSharing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
-      const capture = shotRefs.current[activeIndex]?.capture;
+      const capture = shotRef.current?.capture;
       if (Platform.OS === 'web' || !capture || !(await Sharing.isAvailableAsync())) {
         await shareText();
         return;
@@ -97,81 +104,68 @@ export default function ShareScreen() {
     }
   };
 
-  // Preview at a smaller true pixel size (not a CSS-style transform on the
-  // scroll view) — a `transform: scale` applied to a horizontal, paging
-  // ScrollView rendered visibly wrong on real iOS even though it looked fine
-  // in the web preview. Each page is instead a fixed PREVIEW_W×PREVIEW_H box
-  // that clips its content (overflow: hidden), with the actual 360×640 card
-  // scaled down *inside* it via a plain (non-scrolling) View's transform,
-  // anchored to the top-left corner so it exactly fills the smaller box with
-  // nothing left to leak outside it. ViewShot still captures the full-size,
-  // unscaled card.
+  const activeId = TEMPLATE_IDS[activeIndex];
+
   return (
     <Animated.View entering={FadeIn.duration(160)} style={{ flex: 1, backgroundColor: colors.scrim }}>
       <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={close} />
 
       <View pointerEvents="box-none" style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Animated.View entering={SlideInDown.duration(280)} style={{ alignItems: 'center', gap: 12 }}>
-          <Animated.ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={onPageChange}
-            style={{ width: PREVIEW_W, height: PREVIEW_H }}
-          >
-            {TEMPLATE_IDS.map((id, i) => (
-              <View
-                key={id}
+        <View style={{ alignItems: 'center', gap: 12 }}>
+          <GestureDetector gesture={swipe}>
+            <View
+              style={{
+                width: PREVIEW_W,
+                height: PREVIEW_H,
+                borderRadius: radius.card,
+                overflow: 'hidden',
+                borderWidth: hairline,
+                borderColor: colors.strokeSubtle,
+              }}
+            >
+              <Animated.View
+                key={activeId}
+                entering={FadeIn.duration(180)}
                 style={{
-                  width: PREVIEW_W,
-                  height: PREVIEW_H,
-                  borderRadius: radius.card,
-                  overflow: 'hidden',
-                  borderWidth: hairline,
-                  borderColor: colors.strokeSubtle,
+                  width: CARD_W,
+                  height: CARD_H,
+                  transform: [{ scale: CARD_PREVIEW_SCALE }],
+                  transformOrigin: 'top left',
                 }}
               >
-                <View
-                  style={{
-                    width: CARD_W,
-                    height: CARD_H,
-                    transform: [{ scale: CARD_PREVIEW_SCALE }],
-                    transformOrigin: 'top left',
-                  }}
-                >
-                  <ViewShot ref={(r) => { shotRefs.current[i] = r; }} options={{ format: 'png', quality: 1 }}>
-                    <ShareCard challenge={challenge} variant={id} />
-                  </ViewShot>
-                </View>
-              </View>
-            ))}
-          </Animated.ScrollView>
+                <ViewShot ref={shotRef} options={{ format: 'png', quality: 1 }}>
+                  <ShareCard challenge={challenge} variant={activeId} />
+                </ViewShot>
+              </Animated.View>
+            </View>
+          </GestureDetector>
 
           <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
             {t.complete.shareTemplateHint}
           </AppText>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {TEMPLATE_IDS.map((id, i) => (
-              <View
-                key={id}
-                style={{
-                  width: i === activeIndex ? 16 : 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: i === activeIndex ? colors.ember : colors.strokeSubtle,
-                }}
-              />
+            {TEMPLATE_IDS.map((tid, i) => (
+              <Pressable key={tid} onPress={() => goTo(i)} hitSlop={8}>
+                <View
+                  style={{
+                    width: i === activeIndex ? 16 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: i === activeIndex ? colors.ember : colors.strokeSubtle,
+                  }}
+                />
+              </Pressable>
             ))}
             <AppText
               variant="meta"
               color={colors.textSecondary}
               style={{ marginLeft: 6, fontFamily: fonts.bodyMedium }}
             >
-              {templateLabel[TEMPLATE_IDS[activeIndex]]}
+              {templateLabel[activeId]}
             </AppText>
           </View>
-        </Animated.View>
+        </View>
       </View>
 
       <View
