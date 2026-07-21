@@ -30,6 +30,8 @@ const CARD_H = 640;
 // Shrunk from the original 0.72 to leave more headroom on shorter screens
 // now that hint text + a dot/label row sit below the card preview too.
 const CARD_PREVIEW_SCALE = 0.64;
+const PREVIEW_W = CARD_W * CARD_PREVIEW_SCALE;
+const PREVIEW_H = CARD_H * CARD_PREVIEW_SCALE;
 
 export type ShareTemplateId = 'classic' | 'bold' | 'mono' | 'stats';
 
@@ -697,7 +699,7 @@ export function ShareCardSheet({
   };
 
   const onPageChange = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_W);
+    const idx = Math.round(e.nativeEvent.contentOffset.x / PREVIEW_W);
     if (idx !== activeIndex && idx >= 0 && idx < TEMPLATE_IDS.length) {
       Haptics.selectionAsync().catch(() => {});
       setActiveIndex(idx);
@@ -726,16 +728,15 @@ export function ShareCardSheet({
     }
   };
 
-  // Scale the fixed 360×640 cards down to fit smaller screens; ViewShot still
-  // captures each card at its own (unscaled) layout size, so output stays sharp.
-  //
-  // The close/share buttons live in their OWN bottom-pinned row, outside the
-  // centered card+hint+dots group — a saha testi bulgusu: with everything in
-  // one centered column, the buttons could end up pushed below the visible
-  // screen (unreachable) on shorter devices, and the whole group read as
-  // shifted toward the top instead of centered. Splitting them into a
-  // flex:1 centered area + a separate fixed-height footer guarantees the
-  // buttons are always on screen regardless of how tall the card group gets.
+  // Preview at a smaller true pixel size (not a CSS-style transform on the
+  // scroll view) — a `transform: scale` applied to a horizontal, paging
+  // ScrollView rendered visibly wrong on real iOS (the card stretching past
+  // its own box, saha testi bulgusu) even though it looked fine in the web
+  // preview. Each page is instead a fixed PREVIEW_W×PREVIEW_H box that clips
+  // its content (overflow: hidden), with the actual 360×640 card scaled down
+  // *inside* it via a plain (non-scrolling) View's transform, anchored to the
+  // top-left corner so it exactly fills the smaller box with nothing left to
+  // leak outside it. ViewShot still captures the full-size, unscaled card.
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
@@ -745,33 +746,40 @@ export function ShareCardSheet({
 
       <View pointerEvents="box-none" style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Animated.View entering={SlideInDown.duration(280)} style={{ alignItems: 'center', gap: 12 }}>
-          <View style={{ transform: [{ scale: CARD_PREVIEW_SCALE }], marginVertical: -CARD_H * ((1 - CARD_PREVIEW_SCALE) / 2) }}>
-            <Animated.ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={onPageChange}
-              style={{ width: CARD_W, height: CARD_H }}
-            >
-              {TEMPLATE_IDS.map((id, i) => (
+          <Animated.ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onPageChange}
+            style={{ width: PREVIEW_W, height: PREVIEW_H }}
+          >
+            {TEMPLATE_IDS.map((id, i) => (
+              <View
+                key={id}
+                style={{
+                  width: PREVIEW_W,
+                  height: PREVIEW_H,
+                  borderRadius: radius.card,
+                  overflow: 'hidden',
+                  borderWidth: hairline,
+                  borderColor: colors.strokeSubtle,
+                }}
+              >
                 <View
-                  key={id}
                   style={{
                     width: CARD_W,
                     height: CARD_H,
-                    borderRadius: radius.card,
-                    overflow: 'hidden',
-                    borderWidth: hairline,
-                    borderColor: colors.strokeSubtle,
+                    transform: [{ scale: CARD_PREVIEW_SCALE }],
+                    transformOrigin: 'top left',
                   }}
                 >
                   <ViewShot ref={(r) => { shotRefs.current[i] = r; }} options={{ format: 'png', quality: 1 }}>
                     <ShareCard challenge={challenge} variant={id} />
                   </ViewShot>
                 </View>
-              ))}
-            </Animated.ScrollView>
-          </View>
+              </View>
+            ))}
+          </Animated.ScrollView>
 
           <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
             {t.complete.shareTemplateHint}
