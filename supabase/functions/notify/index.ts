@@ -1,18 +1,27 @@
 // Supabase Edge Function — pushes a notification to the OTHER participants of
-// a challenge whenever a check-in or nudge is inserted (invites too — see
-// below). Chat messages do NOT page through here anymore: per-message push
-// was too noisy, so new messages are batched into a periodic digest instead
-// (supabase/functions/message-digest, docs/PHASE2-SUPABASE.md "Ek P"). If
-// you still have the old "notify-message" DB Webhook configured, it's
-// harmless to leave it (this function now just no-ops on that table) but
-// you can delete it in the Dashboard to save the wasted invocation.
+// a challenge whenever a check-in, chat message, or nudge is inserted
+// (invites too — see below).
+//
+// Chat messages push INSTANTLY again (saha testi bulgusu — the periodic
+// digest this used to batch into, supabase/functions/message-digest, read as
+// messages just not arriving). Each recipient's own
+// profiles.notify_message_preview controls whether the push body shows the
+// real message text or a generic "sent a message" — see docs/db-nudge-and-message-notify.sql.
+// If message-digest's pg_cron job is still scheduled, unschedule it
+// (`select cron.unschedule('message-digest');`) — instant + hourly-batched
+// pushes for the same messages would double-notify people.
+//
+// A nudge carries its own chosen message (`nudges.message`, one of a
+// handful of picker options — src/components/Sheets.tsx's NudgeMessageSheet)
+// instead of always the same generic line; nudgeBody below is only the
+// fallback for a null/old-format message.
 //
 // Deploy + wiring (DB Webhooks + the shared secret below): see
 // docs/PHASE2-SUPABASE.md "Ek I". Locale-aware copy: see "Ek N".
 //
 // Invoked by Database Webhooks (one per table), each posting the standard
 // Supabase webhook payload:
-//   { type: 'INSERT', table: 'check_ins' | 'nudges' | 'invites', record: {...} }
+//   { type: 'INSERT', table: 'check_ins' | 'messages' | 'nudges' | 'invites', record: {...} }
 //
 // Deployed with --no-verify-jwt (the caller is Supabase's own webhook
 // dispatcher, not a signed-in user) — WEBHOOK_SECRET is what stands in for
@@ -29,6 +38,12 @@ const CORS_HEADERS = {
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
+// Push bodies shouldn't blow up over a long pasted message.
+const MESSAGE_PREVIEW_MAX = 120;
+function truncate(text: string): string {
+  return text.length > MESSAGE_PREVIEW_MAX ? `${text.slice(0, MESSAGE_PREVIEW_MAX - 1)}…` : text;
+}
+
 // Kept in sync by hand with src/i18n/tr.ts + en.ts — this function runs in
 // Deno, isolated from the RN app's bundle, so it can't import those directly.
 // Only the copy actually composed server-side needs an entry here: a chat
@@ -39,6 +54,8 @@ const COPY = {
     checkedIn: (name: string) => `${name} check-in yaptı ✓`,
     nudgeTitle: 'El salla 👋',
     nudgeBody: 'Sana el salladı — sıra sende.',
+    messageBody: (name: string, text: string) => `${name}: ${text}`,
+    messageBodyHidden: (name: string) => `${name} bir mesaj gönderdi`,
     inviteTitle: 'Halka daveti 💌',
     inviteBody: (name: string, challengeTitle: string) => `${name} seni "${challengeTitle}" halkasına davet etti.`,
     someone: 'Biri',
@@ -48,6 +65,8 @@ const COPY = {
     checkedIn: (name: string) => `${name} checked in ✓`,
     nudgeTitle: 'Nudge 👋',
     nudgeBody: "Someone nudged you — you're up.",
+    messageBody: (name: string, text: string) => `${name}: ${text}`,
+    messageBodyHidden: (name: string) => `${name} sent a message`,
     inviteTitle: 'Ring invite 💌',
     inviteBody: (name: string, challengeTitle: string) => `${name} invited you to "${challengeTitle}".`,
     someone: 'Someone',
@@ -101,14 +120,14 @@ Deno.serve(async (req) => {
 
     const { table, record } = payload;
 
-    // Messages are batched into the periodic digest now, not pushed
-    // instantly — see the file header comment.
-    if (table === 'messages') return ok();
+    // System messages ("X joined", etc.) aren't something to interrupt
+    // someone for — only a real user-typed chat message pushes.
+    if (table === 'messages' && record.kind !== 'message') return ok();
 
     let challengeId: string | undefined;
     let actorUserId: string | undefined;
-    // nudges and invites target exactly one recipient; check_ins notifies
-    // every other participant in the challenge.
+    // nudges and invites target exactly one recipient; check_ins and
+    // messages notify every other participant in the challenge.
     let onlyRecipient: string | undefined;
 
     if (table === 'check_ins') {
@@ -119,6 +138,9 @@ Deno.serve(async (req) => {
         .eq('id', record.participant_id as string)
         .single();
       actorUserId = participant?.user_id as string | undefined;
+    } else if (table === 'messages') {
+      challengeId = record.challenge_id as string;
+      actorUserId = record.user_id as string;
     } else if (table === 'nudges') {
       challengeId = record.challenge_id as string;
       actorUserId = record.from_user as string;
@@ -159,10 +181,17 @@ Deno.serve(async (req) => {
 
     const [{ data: tokenRows }, { data: recipientProfiles }] = await Promise.all([
       admin.from('push_tokens').select('user_id, token').in('user_id', recipientIds),
-      admin.from('profiles').select('id, locale').in('id', recipientIds),
+      admin.from('profiles').select('id, locale, notify_message_preview').in('id', recipientIds),
     ]);
     const localeByUser = new Map(
       (recipientProfiles ?? []).map((p) => [p.id as string, p.locale as string | null]),
+    );
+    // Per-recipient "show the real message text in the push, or just say
+    // someone sent one" — defaults to showing it (matches the column's own
+    // DB default) so a profile row fetched before this feature existed still
+    // behaves the same as it always did.
+    const previewByUser = new Map(
+      (recipientProfiles ?? []).map((p) => [p.id as string, (p.notify_message_preview as boolean | null) ?? true]),
     );
 
     const messages = (tokenRows ?? [])
@@ -174,9 +203,15 @@ Deno.serve(async (req) => {
         if (table === 'check_ins') {
           title = challengeTitle ?? c.challengeFallback;
           body = c.checkedIn(actorName ?? c.someone);
+        } else if (table === 'messages') {
+          title = challengeTitle ?? c.challengeFallback;
+          const showPreview = previewByUser.get(r.user_id as string) ?? true;
+          body = showPreview
+            ? c.messageBody(actorName ?? c.someone, truncate((record.text as string) ?? ''))
+            : c.messageBodyHidden(actorName ?? c.someone);
         } else if (table === 'nudges') {
           title = c.nudgeTitle;
-          body = c.nudgeBody;
+          body = (record.message as string | null) || c.nudgeBody;
         } else {
           title = c.inviteTitle;
           body = c.inviteBody(actorName ?? c.someone, challengeTitle ?? c.challengeFallback);

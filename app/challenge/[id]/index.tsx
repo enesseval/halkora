@@ -30,7 +30,7 @@ import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
 import { ParticipantRow } from '@/components/ParticipantRow';
 import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
-import { MissedDaySheet, MomentumSheet, OwnerSettingsSheet } from '@/components/Sheets';
+import { MissedDaySheet, MomentumSheet, OwnerSettingsSheet, NudgeMessageSheet } from '@/components/Sheets';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
@@ -97,6 +97,7 @@ export default function DetailScreen() {
   const [draft, setDraft] = useState('');
   const [showOwnerSettings, setShowOwnerSettings] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [nudgeTarget, setNudgeTarget] = useState<Participant | null>(null);
 
   // Home's swipe-to-edit action (saha testi bulgusu) lands here with
   // ?edit=1 to jump straight to the owner settings sheet instead of making
@@ -520,7 +521,7 @@ export default function DetailScreen() {
             participant={item.p}
             totalDays={challenge.totalDays}
             currentDay={challenge.currentDay}
-            onNudge={() => actions.nudge(item.p.id)}
+            onNudge={() => setNudgeTarget(item.p)}
           />
         );
       case 'chatDay':
@@ -676,6 +677,19 @@ export default function DetailScreen() {
           onClose={() => setShowOwnerSettings(false)}
           onSave={actions.updateDetails}
           onDelete={doDeleteChallenge}
+        />
+      ) : null}
+
+      {/* El sallama artık tek genel mesaj değil, birkaç anlamlı seçenekten
+          biri (saha testi bulgusu) */}
+      {nudgeTarget ? (
+        <NudgeMessageSheet
+          participantName={nudgeTarget.name}
+          onSend={(message) => {
+            actions.nudge(nudgeTarget.id, message);
+            setNudgeTarget(null);
+          }}
+          onClose={() => setNudgeTarget(null)}
         />
       ) : null}
     </View>

@@ -84,7 +84,7 @@ export async function insertReaction(messageId: string, emoji: string): Promise<
   if (error && error.code !== '23505') throw error;
 }
 
-export async function insertNudge(challengeId: string, toUserId: string): Promise<void> {
+export async function insertNudge(challengeId: string, toUserId: string, message?: string): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -92,7 +92,7 @@ export async function insertNudge(challengeId: string, toUserId: string): Promis
   if (!user) throw new Error(getDict().errors.sessionMissing);
   const { error } = await supabase
     .from('nudges')
-    .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId });
+    .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId, message });
   // 23505 = unique violation — the DB's own "one nudge per person per day"
   // limit (docs/PHASE2-SUPABASE.md "Ek K") already tripped; not a real error,
   // the UI already shows the nudge as sent.

@@ -690,3 +690,79 @@ export function OwnerSettingsSheet({
     </Animated.View>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Nudge — pick one of a few meaningful messages instead of one generic  */
+/* "wave" (saha testi bulgusu: the old single nudge felt random/pointless) */
+/* ------------------------------------------------------------------ */
+export function NudgeMessageSheet({
+  participantName,
+  onSend,
+  onClose,
+}: {
+  participantName: string;
+  onSend: (message: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        justifyContent: 'flex-end',
+        zIndex: 30,
+      }}
+    >
+      <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onClose} />
+
+      <Animated.View
+        entering={SlideInDown.duration(280)}
+        style={{
+          backgroundColor: colors.bgElevated,
+          borderTopLeftRadius: radius.sheet,
+          borderTopRightRadius: radius.sheet,
+          paddingHorizontal: 24,
+          paddingTop: 12,
+          paddingBottom: 40,
+        }}
+      >
+        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.strokeSubtle }} />
+        </View>
+
+        <AppText variant="screenTitle" style={{ fontSize: 20, marginTop: 8, marginBottom: 16 }}>
+          {t.participant.nudgeSheetTitle(participantName)}
+        </AppText>
+
+        <View style={{ gap: 10 }}>
+          {t.participant.nudgeOptions.map((option) => (
+            <Pressable
+              key={option}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                onSend(option);
+              }}
+              style={({ pressed }) => ({
+                backgroundColor: colors.bgSurface,
+                borderRadius: radius.badge,
+                borderWidth: hairline,
+                borderColor: colors.strokeSubtle,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <AppText variant="bodyMedium">{option}</AppText>
+            </Pressable>
+          ))}
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+}

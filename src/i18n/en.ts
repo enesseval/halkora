@@ -215,6 +215,9 @@ export const en: Dictionary = {
     notifications: 'Notifications',
     notificationsOn: 'On',
     notificationsOff: 'Off',
+    notifyMessagePreview: 'Message content in notifications',
+    notifyMessagePreviewOn: 'Visible',
+    notifyMessagePreviewOff: 'Hidden',
     account: 'Account',
     accountLinking: 'Linking…',
     accountUnsecured: 'Not secured',
@@ -418,6 +421,14 @@ export const en: Dictionary = {
     waiting: 'Waiting',
     nudge: 'Nudge 👋',
     nudged: 'Nudged ✓',
+    nudgeSheetTitle: (name: string) => `What should we send ${name}?`,
+    nudgeOptions: [
+      "Come on, we're waiting for you! 👋",
+      "Don't miss today, it's the perfect time ⏰",
+      'Where have you been? 👀',
+      "Almost there, don't give up 💪",
+      'We miss you, check-in time 🔥',
+    ],
   },
 
   mock: {
