@@ -120,9 +120,13 @@ Deno.serve(async (req) => {
 
     const { table, record } = payload;
 
-    // System messages ("X joined", etc.) aren't something to interrupt
-    // someone for — only a real user-typed chat message pushes.
-    if (table === 'messages' && record.kind !== 'message') return ok();
+    // messages.notify_others (docs/db-nudge-and-message-notify.sql) is the
+    // one real gate here — a nudge's own system message sets it false since
+    // the nudge already sent its own targeted push via the nudges table
+    // (this would otherwise double-notify the recipient for one nudge), but
+    // a challenge-details-change system message leaves it true (default) so
+    // it's worth pushing to the group, same as a real chat message.
+    if (table === 'messages' && record.notify_others === false) return ok();
 
     let challengeId: string | undefined;
     let actorUserId: string | undefined;
@@ -219,10 +223,17 @@ Deno.serve(async (req) => {
           body = c.checkedIn(actorName ?? c.someone);
         } else if (table === 'messages') {
           title = challengeTitle ?? c.challengeFallback;
-          const showPreview = previewByUser.get(r.user_id as string) ?? true;
-          body = showPreview
-            ? c.messageBody(actorName ?? c.someone, truncate((record.text as string) ?? ''))
-            : c.messageBodyHidden(actorName ?? c.someone);
+          if (record.kind === 'message') {
+            const showPreview = previewByUser.get(r.user_id as string) ?? true;
+            body = showPreview
+              ? c.messageBody(actorName ?? c.someone, truncate((record.text as string) ?? ''))
+              : c.messageBodyHidden(actorName ?? c.someone);
+          } else {
+            // A system announcement (e.g. a challenge-details change) is
+            // already a complete, safe-to-show line — no name prefix, no
+            // content-hiding (there's no private content here to hide).
+            body = truncate((record.text as string) ?? '');
+          }
         } else if (table === 'nudges') {
           title = c.nudgeTitle;
           body = (record.message as string | null) || c.nudgeBody;

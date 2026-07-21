@@ -286,6 +286,11 @@ export const tr = {
     ownerSettingsStakePlaceholder: 'Kendi bahsini yaz...',
     ownerSettingsSave: 'Kaydet',
     ownerSettingsSaving: 'Kaydediliyor…',
+    // Halka ayarları değiştiğinde sohbette görünen sistem mesajları — saha
+    // testi bulgusu: "grup adını değiştirdim ama chatte gözükmedi".
+    changedTitle: (from: string, to: string) => `📝 Halka adı değişti: "${from}" → "${to}"`,
+    changedDailyAction: (action: string) => `📝 Günlük hedef değişti: ${action}`,
+    changedStake: (stake: string) => `📝 Bahis güncellendi: ${stake}`,
     deleteChallenge: 'Halkayı sil',
     deletingChallenge: 'Siliniyor…',
     deleteChallengeConfirmTitle: 'Bu halkayı sil?',

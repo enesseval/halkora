@@ -71,10 +71,25 @@ export async function insertMessage(challengeId: string, dayNumber: number, text
   if (error) throw error;
 }
 
-/** A 'system' event visible to the whole group (e.g. a nudge) — same table/
- * RLS as a real message, just a different `kind` so the chat UI renders it
- * as a centered plain-text line instead of a bubble (src/components/Chat.tsx). */
-export async function insertSystemMessage(challengeId: string, dayNumber: number, text: string): Promise<void> {
+/**
+ * A 'system' event visible to the whole group (a nudge, a challenge-details
+ * change) — same table/RLS as a real message, just a different `kind` so
+ * the chat UI renders it as a centered plain-text line instead of a bubble
+ * (src/components/Chat.tsx).
+ *
+ * `notifyOthers` controls whether this ALSO pushes to the other participants
+ * (supabase/functions/notify's `messages` branch checks this column) —
+ * default true (a details change is worth a push), but a nudge's own system
+ * message passes false since the nudge already sent its own targeted push
+ * via the `nudges` table; without this it'd double-notify the recipient for
+ * one nudge.
+ */
+export async function insertSystemMessage(
+  challengeId: string,
+  dayNumber: number,
+  text: string,
+  notifyOthers = true,
+): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -82,7 +97,14 @@ export async function insertSystemMessage(challengeId: string, dayNumber: number
   if (!user) throw new Error(getDict().errors.sessionMissing);
   const { error } = await supabase
     .from('messages')
-    .insert({ challenge_id: challengeId, user_id: user.id, day_number: dayNumber, kind: 'system', text });
+    .insert({
+      challenge_id: challengeId,
+      user_id: user.id,
+      day_number: dayNumber,
+      kind: 'system',
+      text,
+      notify_others: notifyOthers,
+    });
   if (error) throw error;
 }
 
