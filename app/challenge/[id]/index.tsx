@@ -95,9 +95,9 @@ export default function DetailScreen() {
 
   // Auto-finish: once everyone's checked in on the LAST day, there's no
   // reason to sit around waiting for the calendar date to roll over —
-  // close it out now and take whoever's here straight to the celebration
-  // screen, instead of the challenge just quietly flipping to 'completed'
-  // overnight with nobody ever seeing E9.
+  // close it out now instead of the challenge just quietly flipping to
+  // 'completed' overnight. The actual navigation away happens in the
+  // status-watching effect below, not here.
   const isLastDayFullyDone =
     !!challenge &&
     challenge.status === 'active' &&
@@ -105,13 +105,26 @@ export default function DetailScreen() {
     challenge.participants.length > 0 &&
     completedCount(challenge) === challenge.participants.length;
   useEffect(() => {
-    if (!isLastDayFullyDone || !challenge) return;
+    if (!isLastDayFullyDone) return;
     actions.endEarly();
-    router.replace(`/challenge/${challenge.id}/complete`);
-    // Deliberately only watches isLastDayFullyDone — actions/router/challenge
-    // are stable enough here and re-running this on every challenge poll
-    // tick would just re-fire the (idempotent) endEarly + replace call.
+    // Deliberately only watches isLastDayFullyDone — actions is stable enough
+    // here and re-running this on every challenge poll tick would just
+    // re-fire the (idempotent) endEarly call.
   }, [isLastDayFullyDone]);
+
+  // Leave Detail for the celebration screen the moment the challenge is
+  // 'completed' — whether that's the instant-finish above, or simply because
+  // the calendar day rolled past the last one while this screen happened to
+  // be open (mapRow recomputes status from today's date on every poll, no
+  // check-in required). This used to only ever get picked up on the NEXT
+  // mount, so a Detail screen left open past the challenge's actual end kept
+  // showing a stale "waiting for tomorrow" view until backing out and back in
+  // (saha testi bulgusu).
+  useEffect(() => {
+    if (challenge?.status === 'completed') {
+      router.replace(`/challenge/${challenge.id}/complete`);
+    }
+  }, [challenge?.status]);
 
   if (!challenge) {
     // Not in the store yet — tell "still loading" and "genuinely failed" apart
