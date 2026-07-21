@@ -447,6 +447,9 @@ export const tr = {
       'Az kaldı, pes etme 💪',
       'Seni özledik, check-in zamanı 🔥',
     ],
+    // El sallamayı özel bir push'ta gizli kalmak yerine sohbette de görünür
+    // kılıyor (saha testi bulgusu: "chatte gözüksün, ne yaptın diye").
+    nudgeSystemMessage: (from: string, to: string, msg: string) => `👋 ${from}, ${to}'a el salladı: "${msg}"`,
   },
 
   // Phase-1 demo/mock content (src/data/mock.ts) — shown only when no

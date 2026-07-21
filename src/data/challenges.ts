@@ -105,6 +105,7 @@ interface StakeRow {
 
 interface NudgeRow {
   to_user: string;
+  challenge_id: string;
   created_at: string;
 }
 
@@ -435,10 +436,13 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
       .select('participant_id, challenge_id, day_number, type, created_at')
       .in('challenge_id', ids),
     supabase.from('stakes').select('challenge_id, mode, text').in('challenge_id', ids),
-    // "Have I already nudged this person today?" — the DB only allows one
-    // nudge per (from_user, to_user) per UTC day regardless of challenge
-    // (Ek K), so this is intentionally not scoped to `ids`.
-    supabase.from('nudges').select('to_user, created_at').eq('from_user', user.id),
+    // "Have I already nudged this person today, IN THIS CHALLENGE?" — the DB's
+    // uniqueness window is now (from_user, to_user, challenge_id, day)
+    // (docs/db-nudge-and-message-notify.sql §5): nudging someone in one
+    // challenge no longer shows them as already-nudged in a completely
+    // different one you happen to share (saha testi bulgusu — "yeni challange
+    // oluşturdum onda bile sallandı gözüküyor").
+    supabase.from('nudges').select('to_user, challenge_id, created_at').eq('from_user', user.id).in('challenge_id', ids),
   ]);
   if (e2) throw e2;
   if (e3) throw e3;
@@ -447,11 +451,14 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
   if (e6) throw e6;
 
   const todayUTC = new Date().toISOString().slice(0, 10);
-  const nudgedToday = new Set(
-    ((myNudges ?? []) as NudgeRow[])
-      .filter((n) => utcDateOf(n.created_at) === todayUTC)
-      .map((n) => n.to_user),
-  );
+  // challenge_id -> Set(recipient user_id) nudged today, in THAT challenge.
+  const nudgedTodayByChallenge = new Map<string, Set<string>>();
+  for (const n of (myNudges ?? []) as NudgeRow[]) {
+    if (utcDateOf(n.created_at) !== todayUTC) continue;
+    const set = nudgedTodayByChallenge.get(n.challenge_id) ?? new Set<string>();
+    set.add(n.to_user);
+    nudgedTodayByChallenge.set(n.challenge_id, set);
+  }
 
   const parts = (allParts ?? []) as ParticipantRow[];
   const userIds = Array.from(new Set(parts.map((p) => p.user_id)));
@@ -488,7 +495,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
       profMap,
       checkInsByChallenge.get(row.id) ?? [],
       user.id,
-      nudgedToday,
+      nudgedTodayByChallenge.get(row.id) ?? new Set<string>(),
       stakeByChallenge.get(row.id),
     );
   });

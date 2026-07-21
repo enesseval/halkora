@@ -71,6 +71,21 @@ export async function insertMessage(challengeId: string, dayNumber: number, text
   if (error) throw error;
 }
 
+/** A 'system' event visible to the whole group (e.g. a nudge) — same table/
+ * RLS as a real message, just a different `kind` so the chat UI renders it
+ * as a centered plain-text line instead of a bubble (src/components/Chat.tsx). */
+export async function insertSystemMessage(challengeId: string, dayNumber: number, text: string): Promise<void> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) throw new Error(getDict().errors.sessionMissing);
+  const { error } = await supabase
+    .from('messages')
+    .insert({ challenge_id: challengeId, user_id: user.id, day_number: dayNumber, kind: 'system', text });
+  if (error) throw error;
+}
+
 export async function insertReaction(messageId: string, emoji: string): Promise<void> {
   const {
     data: { session },

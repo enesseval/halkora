@@ -429,6 +429,7 @@ export const en: Dictionary = {
       "Almost there, don't give up 💪",
       'We miss you, check-in time 🔥',
     ],
+    nudgeSystemMessage: (from: string, to: string, msg: string) => `👋 ${from} nudged ${to}: "${msg}"`,
   },
 
   mock: {

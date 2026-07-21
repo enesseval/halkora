@@ -22,7 +22,7 @@ import {
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
-import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
+import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
 import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
 import { FAST_DAYS } from '@/lib/fastDays';
@@ -505,6 +505,7 @@ export function useChallengeActions(id: string) {
   const setChallenges = useMockStore((s) => s.setChallenges);
   const challenge = useChallenge(id);
   const queryClient = useQueryClient();
+  const { name: myName } = useAuth();
 
   const doUseJoker = () => {
     useJoker(id); // optimistic: yesterday's segment flips to amber immediately
@@ -561,10 +562,22 @@ export function useChallengeActions(id: string) {
     }
   };
 
-  const doNudge = (participantId: string, message?: string) => {
+  const doNudge = (participantId: string, recipientName: string, message: string) => {
     nudgeMock(id, participantId); // optimistic "Sallandı ✓"
-    if (isSupabaseConfigured) {
-      insertNudge(id, participantId, message).catch(() => {});
+    if (isSupabaseConfigured && challenge) {
+      insertNudge(id, participantId, message)
+        // Visible to the whole group in chat, not just a private push to the
+        // recipient (saha testi bulgusu: "chatte gözüksün, ne yaptın diye").
+        // Best-effort — a failure here shouldn't undo the nudge itself.
+        .then(() =>
+          insertSystemMessage(
+            id,
+            challenge.currentDay,
+            t.participant.nudgeSystemMessage(myName ?? t.common.person, recipientName, message),
+          ),
+        )
+        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+        .catch(() => {});
     }
   };
 

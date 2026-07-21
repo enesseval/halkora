@@ -179,10 +179,24 @@ Deno.serve(async (req) => {
     }
     if (recipientIds.length === 0) return ok();
 
-    const [{ data: tokenRows }, { data: recipientProfiles }] = await Promise.all([
+    const [{ data: tokenRows }, profilesResult] = await Promise.all([
       admin.from('push_tokens').select('user_id, token').in('user_id', recipientIds),
       admin.from('profiles').select('id, locale, notify_message_preview').in('id', recipientIds),
     ]);
+    // notify_message_preview might not exist yet if
+    // docs/db-nudge-and-message-notify.sql hasn't been run — never let that
+    // silently kill EVERY notification type (check-ins, nudges, invites too,
+    // not just messages), which is what happened when this column was
+    // selected unconditionally: the whole query threw, the outer catch below
+    // swallowed it, and nothing sent. Fall back to locale-only and default
+    // every preview to "shown" (the column's own DB default) until the
+    // migration actually runs.
+    let recipientProfiles = profilesResult.data;
+    if (profilesResult.error) {
+      console.error('profiles select w/ notify_message_preview failed, falling back', profilesResult.error);
+      const fallback = await admin.from('profiles').select('id, locale').in('id', recipientIds);
+      recipientProfiles = fallback.data;
+    }
     const localeByUser = new Map(
       (recipientProfiles ?? []).map((p) => [p.id as string, p.locale as string | null]),
     );
@@ -191,7 +205,7 @@ Deno.serve(async (req) => {
     // DB default) so a profile row fetched before this feature existed still
     // behaves the same as it always did.
     const previewByUser = new Map(
-      (recipientProfiles ?? []).map((p) => [p.id as string, (p.notify_message_preview as boolean | null) ?? true]),
+      (recipientProfiles ?? []).map((p) => [p.id as string, (p as { notify_message_preview?: boolean }).notify_message_preview ?? true]),
     );
 
     const messages = (tokenRows ?? [])

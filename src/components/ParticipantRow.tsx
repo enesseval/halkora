@@ -32,8 +32,12 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
   // hasn't checked in yet today; the "X gündür sessiz" status line is its
   // own, stricter condition below (that escalation is still worth calling
   // out specifically, separately from whether the button shows).
-  const notCheckedInToday = !participant.checkedInToday;
-  const reallySilent = notCheckedInToday && (participant.silentDays ?? 0) >= 2;
+  // Never on your own row — nudging yourself makes no sense (saha testi
+  // bulgusu: "kendime de atabiliyorum saçma"), and the old 2-day gate
+  // happened to hide this because you're never "silent" relative to
+  // yourself the same way, but removing that gate exposed it.
+  const canNudge = !participant.isMe && !participant.checkedInToday;
+  const reallySilent = canNudge && (participant.silentDays ?? 0) >= 2;
   const shakeX = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }));
 
@@ -107,7 +111,7 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
         </AppText>
       </View>
 
-      {notCheckedInToday ? (
+      {canNudge ? (
         <Animated.View style={shakeStyle}>
           <Pressable
             onPress={onPressNudge}
