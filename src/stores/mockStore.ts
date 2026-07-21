@@ -253,6 +253,7 @@ export const useMockStore = create<MockState>((set, get) => ({
           : undefined,
       meCheckedInToday: false,
       jokerRemaining: input.joker ?? 1,
+      jokerAllowance: input.joker ?? 1,
       hasMissedYesterday: false,
       inviteCode: override?.inviteCode ?? id.slice(-6),
       scheduleSummary: t.common.scheduleSummary(input.dailyAction || t.common.dailyGoalFallback, input.totalDays),

@@ -6,7 +6,13 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { registerForPushToken } from '@/lib/push';
-import { savePushToken, clearPushToken, saveLocale, deleteAccount as deleteAccountRequest } from '@/data/profile';
+import {
+  savePushToken,
+  clearPushToken,
+  saveLocale,
+  saveMessagePreviewPref,
+  deleteAccount as deleteAccountRequest,
+} from '@/data/profile';
 import { slugifyUsername, usernameCandidates } from '@/lib/username';
 import { getDict, useI18nStore } from '@/i18n';
 
@@ -24,6 +30,10 @@ interface AuthState {
   name: string | null; // profiles.name (null => needs onboarding)
   username: string | null; // profiles.username (@handle, docs "Ek O")
   isPro: boolean; // profiles.is_pro (Halkora Pro, docs "Ek R")
+  // profiles.notify_message_preview — show the real chat message text in a
+  // push notification, or just "X sent a message" (Settings toggle).
+  // Defaults true (matches the column's own DB default) until loaded.
+  messagePreview: boolean;
 }
 
 const useAuthStore = create<AuthState>(() => ({
@@ -32,16 +42,17 @@ const useAuthStore = create<AuthState>(() => ({
   name: null,
   username: null,
   isPro: false,
+  messagePreview: true,
 }));
 
 async function loadProfileName(session: Session | null): Promise<void> {
   if (!session) {
-    useAuthStore.setState({ name: null, username: null, isPro: false });
+    useAuthStore.setState({ name: null, username: null, isPro: false, messagePreview: true });
     return;
   }
   const { data, error } = await supabase
     .from('profiles')
-    .select('name, username, is_pro')
+    .select('name, username, is_pro, notify_message_preview')
     .eq('id', session.user.id)
     .maybeSingle();
   if (error) {
@@ -56,6 +67,7 @@ async function loadProfileName(session: Session | null): Promise<void> {
     name: data?.name ?? null,
     username: data?.username ?? null,
     isPro: !!data?.is_pro,
+    messagePreview: data?.notify_message_preview ?? true,
   });
 }
 
@@ -115,12 +127,28 @@ export function useAuthInit(): void {
       }
     });
 
+    // supabase-js's token auto-refresh runs on a setInterval, which iOS/Android
+    // throttle or pause entirely while the app is backgrounded — the session
+    // can go quietly stale, and the first request fired right on resume (e.g.
+    // a chat message send) can hit the backend with an expired token before
+    // the client's had a chance to refresh it. Supabase's own docs call this
+    // out explicitly for native apps: start/stop the refresh loop with
+    // AppState so it isn't silently starved while backgrounded (saha testi
+    // bulgusu — an intermittent "new row violates row-level security policy"
+    // on message send that a plain retry always fixed, consistent with a
+    // once-off stale-token race rather than a real permission bug).
+    if (Platform.OS !== 'web') supabase.auth.startAutoRefresh();
+
     // Re-read the profile every time the app comes back to the foreground —
     // is_pro (or name/username) may have changed while this device was
     // backgrounded (you flipping it manually, a subscription lapsing, a
     // future RevenueCat webhook) and a single fetch at cold-start would
     // otherwise never notice short of a full app restart.
     const appStateSub = AppState.addEventListener('change', (state) => {
+      if (Platform.OS !== 'web') {
+        if (state === 'active') supabase.auth.startAutoRefresh();
+        else supabase.auth.stopAutoRefresh();
+      }
       if (state === 'active' && useAuthStore.getState().session) {
         refreshProfile().catch(() => {});
       }
@@ -360,6 +388,15 @@ async function setProDev(next: boolean): Promise<void> {
   useAuthStore.setState({ isPro: next });
 }
 
+/** Settings' "show message content in notifications" toggle — optimistic
+ * (Settings just flips it back on failure, same as the language switcher). */
+async function setMessagePreview(next: boolean): Promise<void> {
+  const session = useAuthStore.getState().session;
+  if (!session) return;
+  useAuthStore.setState({ messagePreview: next });
+  await saveMessagePreviewPref(session.user.id, next);
+}
+
 /** Auth state + actions for screens. */
 export function useAuth() {
   const ready = useAuthStore((s) => s.ready);
@@ -367,6 +404,7 @@ export function useAuth() {
   const name = useAuthStore((s) => s.name);
   const username = useAuthStore((s) => s.username);
   const isPro = useAuthStore((s) => s.isPro);
+  const messagePreview = useAuthStore((s) => s.messagePreview);
   return {
     ready,
     session,
@@ -376,6 +414,7 @@ export function useAuth() {
     name,
     username,
     isPro,
+    messagePreview,
     needsOnboarding: !!session && !name,
     signInAnonymously,
     signInWithApple,
@@ -387,5 +426,6 @@ export function useAuth() {
     deleteAccount,
     resetOnboarding,
     setProDev,
+    setMessagePreview,
   };
 }

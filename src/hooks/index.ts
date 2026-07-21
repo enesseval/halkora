@@ -561,10 +561,10 @@ export function useChallengeActions(id: string) {
     }
   };
 
-  const doNudge = (participantId: string) => {
+  const doNudge = (participantId: string, message?: string) => {
     nudgeMock(id, participantId); // optimistic "Sallandı ✓"
     if (isSupabaseConfigured) {
-      insertNudge(id, participantId).catch(() => {});
+      insertNudge(id, participantId, message).catch(() => {});
     }
   };
 

@@ -26,7 +26,14 @@ function personalDays(p: Participant, total: number, currentDay: number): Segmen
 
 export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: Props) {
   const { t } = useT();
-  const silent = !participant.checkedInToday && (participant.silentDays ?? 0) >= 2;
+  // The nudge button used to only appear once someone had been silent 2+
+  // days — showed up so rarely it read as broken (saha testi bulgusu: "1-2
+  // kere gördüm öylece kaldı"). Now it's available for anyone who simply
+  // hasn't checked in yet today; the "X gündür sessiz" status line is its
+  // own, stricter condition below (that escalation is still worth calling
+  // out specifically, separately from whether the button shows).
+  const notCheckedInToday = !participant.checkedInToday;
+  const reallySilent = notCheckedInToday && (participant.silentDays ?? 0) >= 2;
   const shakeX = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }));
 
@@ -54,7 +61,7 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
     status = participant.isMe && participant.checkinTime
       ? t.participant.checkedInTodayAt(participant.checkinTime)
       : t.participant.checkedInToday;
-  } else if (silent) {
+  } else if (reallySilent) {
     status = t.participant.silentDays(participant.silentDays ?? 0);
   } else {
     status = t.participant.waiting;
@@ -100,7 +107,7 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
         </AppText>
       </View>
 
-      {silent ? (
+      {notCheckedInToday ? (
         <Animated.View style={shakeStyle}>
           <Pressable
             onPress={onPressNudge}

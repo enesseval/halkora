@@ -219,6 +219,9 @@ export const tr = {
     notifications: 'Bildirimler',
     notificationsOn: 'Açık',
     notificationsOff: 'Kapalı',
+    notifyMessagePreview: 'Bildirimde mesaj içeriği',
+    notifyMessagePreviewOn: 'Görünür',
+    notifyMessagePreviewOff: 'Gizli',
     account: 'Hesap',
     accountLinking: 'Bağlanıyor…',
     accountUnsecured: 'Güvence yok',
@@ -258,6 +261,7 @@ export const tr = {
     upcomingRing: 'Henüz başlamadı',
     todayCheckIn: "Bugünün check-in'i",
     useJoker: (n: number) => `Dün için joker kullan · ${n} hakkın var`,
+    jokerInfo: (remaining: number, allowance: number) => `${remaining}/${allowance} joker hakkı`,
     completedRank: (n: number) => `Sen ${n}. tamamlayansın`,
     everyoneWaiting: 'Herkes tamamladı',
     waitingFor: (name: string) => `${name}'i bekliyoruz`,
@@ -432,6 +436,17 @@ export const tr = {
     waiting: 'Bekliyor',
     nudge: 'El salla 👋',
     nudged: 'Sallandı ✓',
+    // El sallama artık tek genel mesaj yerine 4-5 anlamlı seçenekten biri
+    // olarak gönderiliyor (saha testi bulgusu) — seçilen metin doğrudan
+    // alıcının push bildirimine gidiyor (supabase/functions/notify).
+    nudgeSheetTitle: (name: string) => `${name}'e ne yazalım?`,
+    nudgeOptions: [
+      'Hadi, seni bekliyoruz! 👋',
+      'Bugünü kaçırma, tam zamanı ⏰',
+      'Nerelerdesin? 👀',
+      'Az kaldı, pes etme 💪',
+      'Seni özledik, check-in zamanı 🔥',
+    ],
   },
 
   // Phase-1 demo/mock content (src/data/mock.ts) — shown only when no

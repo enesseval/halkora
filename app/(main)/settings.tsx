@@ -104,6 +104,7 @@ export default function SettingsScreen() {
     username,
     isAnonymous,
     isPro,
+    messagePreview,
     linkAppleIdentity,
     saveName,
     saveUsername,
@@ -111,6 +112,7 @@ export default function SettingsScreen() {
     deleteAccount,
     resetOnboarding,
     setProDev,
+    setMessagePreview,
   } = useAuth();
   const debugUserId = session?.user.id.slice(0, 8);
   const [linking, setLinking] = useState(false);
@@ -253,6 +255,15 @@ export default function SettingsScreen() {
             />
             {configured ? (
               <>
+                <Divider />
+                <Row
+                  icon="eye"
+                  label={t.settings.notifyMessagePreview}
+                  value={messagePreview ? t.settings.notifyMessagePreviewOn : t.settings.notifyMessagePreviewOff}
+                  onPress={() => {
+                    void setMessagePreview(!messagePreview);
+                  }}
+                />
                 <Divider />
                 <Row
                   icon="key"

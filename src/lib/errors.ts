@@ -72,16 +72,38 @@ export function isNetworkError(e: unknown): boolean {
 }
 
 /**
+ * True for a raw Postgres/PostgREST permission failure — an RLS policy
+ * rejected the request (SQLSTATE 42501, or the literal "row-level security
+ * policy" wording Postgres always uses for it). This is NOT one of our own
+ * RPC/Edge Function codes (those `raise`/`fail` with a stable UPPER_SNAKE_CASE
+ * string we map via `errors.codes`) — it's Postgres's own internal error text,
+ * which `errMessage` has no code to localize, so it used to fall through to
+ * the user completely raw (e.g. `new row violates row-level security policy
+ * for table "messages"`). Collapses to the same calm generic line as any
+ * other unexpected failure instead.
+ */
+export function isPermissionError(e: unknown): boolean {
+  if (e && typeof e === 'object' && 'code' in e) {
+    const c = (e as { code?: unknown }).code;
+    if (c === '42501') return true;
+  }
+  return /row-level security policy/i.test(rawMessage(e));
+}
+
+/**
  * `errMessage()`, but a genuine offline/network failure ALWAYS collapses to
  * the localized "check your connection" line, never the raw TypeError (or,
  * at any call site that used to pair it with a dev-only diagnostic, never
- * that either). Prefer this over `errMessage()` at every place an error
+ * that either), and a raw Postgres/RLS permission failure collapses to the
+ * generic "something went wrong" line rather than leaking Postgres's own
+ * internal wording. Prefer this over `errMessage()` at every place an error
  * reaches the user directly (an Alert, an inline error line) — reserve the
  * plain `errMessage()` for places that specifically need the raw/localized
  * server code (e.g. deciding which UI to show).
  */
 export function friendlyErrorMessage(e: unknown): string {
   if (isNetworkError(e)) return getDict().errors.checkConnection;
+  if (isPermissionError(e)) return getDict().errors.generic;
   return errMessage(e);
 }
 

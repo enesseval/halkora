@@ -33,6 +33,17 @@ export async function saveLocale(userId: string, locale: string): Promise<void> 
 }
 
 /**
+ * Whether push notifications for chat messages show the real text or just
+ * "X sent a message" — Settings' own toggle (docs/db-nudge-and-message-notify.sql).
+ * Read server-side by the `notify` Edge Function per-recipient; this is the
+ * client's only write path to it.
+ */
+export async function saveMessagePreviewPref(userId: string, preview: boolean): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ notify_message_preview: preview }).eq('id', userId);
+  if (error) throw error;
+}
+
+/**
  * Permanently deletes the signed-in user's account (App Store Review
  * Guideline 5.1.1(v) — required whenever account creation exists). Runs
  * server-side under the `delete-account` Edge Function so it can call the

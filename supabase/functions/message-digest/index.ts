@@ -1,3 +1,11 @@
+// SUPERSEDED (saha testi bulgusu) — chat messages push instantly again via
+// `notify` (supabase/functions/notify, the `messages` table branch). Users
+// wanted a notification per message, not an hourly summary. Unschedule this
+// function's cron job (docs/db-nudge-and-message-notify.sql:
+// `select cron.unschedule('message-digest');`) so it doesn't double-notify
+// alongside the instant push. Left in the repo only in case a future batching
+// need comes back — not deployed/scheduled going forward.
+//
 // Supabase Edge Function — batched chat-message digest ("3 yeni mesaj"),
 // replacing an instant push per message (too noisy for an active group chat).
 //
