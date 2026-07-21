@@ -168,7 +168,10 @@ function ConfigErrorScreen() {
 function RootNavigator() {
   const { ready, configured } = useAuth();
   const localeReady = useLocaleInit();
-  const bootDelayDone = useMinBootDelay(1400);
+  // 2600ms == one full lap of BootSplash's chase animation (8 segments at
+  // 260ms + a 2-step pause) — the old 1400ms cut it off mid-loop, so the
+  // ring never actually finished a visible cycle (saha testi bulgusu).
+  const bootDelayDone = useMinBootDelay(2600);
   useAuthInit();
   useProtectedRoute();
   useSyncPushToken();

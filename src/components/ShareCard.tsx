@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, Share, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -26,6 +27,9 @@ import type { Challenge } from '@/data/types';
 
 const CARD_W = 360;
 const CARD_H = 640;
+// Shrunk from the original 0.72 to leave more headroom on shorter screens
+// now that hint text + a dot/label row sit below the card preview too.
+const CARD_PREVIEW_SCALE = 0.64;
 
 export type ShareTemplateId = 'classic' | 'bold' | 'mono' | 'stats';
 
@@ -678,6 +682,7 @@ export function ShareCardSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const insets = useSafeAreaInsets();
   const shotRefs = useRef<Array<ViewShot | null>>([]);
   const [sharing, setSharing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -723,77 +728,83 @@ export function ShareCardSheet({
 
   // Scale the fixed 360×640 cards down to fit smaller screens; ViewShot still
   // captures each card at its own (unscaled) layout size, so output stays sharp.
+  //
+  // The close/share buttons live in their OWN bottom-pinned row, outside the
+  // centered card+hint+dots group — a saha testi bulgusu: with everything in
+  // one centered column, the buttons could end up pushed below the visible
+  // screen (unreachable) on shorter devices, and the whole group read as
+  // shifted toward the top instead of centered. Splitting them into a
+  // flex:1 centered area + a separate fixed-height footer guarantees the
+  // buttons are always on screen regardless of how tall the card group gets.
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.scrim }}
     >
       <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onClose} />
 
-      <Animated.View entering={SlideInDown.duration(280)} style={{ alignItems: 'center', gap: 14 }}>
-        <View style={{ transform: [{ scale: 0.72 }], marginVertical: -CARD_H * 0.14 }}>
-          <Animated.ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={onPageChange}
-            style={{ width: CARD_W, height: CARD_H }}
-          >
+      <View pointerEvents="box-none" style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.View entering={SlideInDown.duration(280)} style={{ alignItems: 'center', gap: 12 }}>
+          <View style={{ transform: [{ scale: CARD_PREVIEW_SCALE }], marginVertical: -CARD_H * ((1 - CARD_PREVIEW_SCALE) / 2) }}>
+            <Animated.ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={onPageChange}
+              style={{ width: CARD_W, height: CARD_H }}
+            >
+              {TEMPLATE_IDS.map((id, i) => (
+                <View
+                  key={id}
+                  style={{
+                    width: CARD_W,
+                    height: CARD_H,
+                    borderRadius: radius.card,
+                    overflow: 'hidden',
+                    borderWidth: hairline,
+                    borderColor: colors.strokeSubtle,
+                  }}
+                >
+                  <ViewShot ref={(r) => { shotRefs.current[i] = r; }} options={{ format: 'png', quality: 1 }}>
+                    <ShareCard challenge={challenge} variant={id} />
+                  </ViewShot>
+                </View>
+              ))}
+            </Animated.ScrollView>
+          </View>
+
+          <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
+            {t.complete.shareTemplateHint}
+          </AppText>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {TEMPLATE_IDS.map((id, i) => (
               <View
                 key={id}
                 style={{
-                  width: CARD_W,
-                  height: CARD_H,
-                  borderRadius: radius.card,
-                  overflow: 'hidden',
-                  borderWidth: hairline,
-                  borderColor: colors.strokeSubtle,
+                  width: i === activeIndex ? 16 : 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: i === activeIndex ? colors.ember : colors.strokeSubtle,
                 }}
-              >
-                <ViewShot ref={(r) => { shotRefs.current[i] = r; }} options={{ format: 'png', quality: 1 }}>
-                  <ShareCard challenge={challenge} variant={id} />
-                </ViewShot>
-              </View>
+              />
             ))}
-          </Animated.ScrollView>
-        </View>
+            <AppText
+              variant="meta"
+              color={colors.textSecondary}
+              style={{ marginLeft: 6, fontFamily: fonts.bodyMedium }}
+            >
+              {templateLabel[TEMPLATE_IDS[activeIndex]]}
+            </AppText>
+          </View>
+        </Animated.View>
+      </View>
 
-        <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
-          {t.complete.shareTemplateHint}
-        </AppText>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {TEMPLATE_IDS.map((id, i) => (
-            <View
-              key={id}
-              style={{
-                width: i === activeIndex ? 16 : 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: i === activeIndex ? colors.ember : colors.strokeSubtle,
-              }}
-            />
-          ))}
-          <AppText
-            variant="meta"
-            color={colors.textSecondary}
-            style={{ marginLeft: 6, fontFamily: fonts.bodyMedium }}
-          >
-            {templateLabel[TEMPLATE_IDS[activeIndex]]}
-          </AppText>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 4 }}>
+      <View
+        pointerEvents="box-none"
+        style={{ alignItems: 'center', paddingTop: 12, paddingBottom: insets.bottom + 20 }}
+      >
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
           <Pressable
             onPress={onClose}
             style={{
@@ -815,7 +826,7 @@ export function ShareCardSheet({
             style={{ paddingHorizontal: 36 }}
           />
         </View>
-      </Animated.View>
+      </View>
     </Animated.View>
   );
 }
