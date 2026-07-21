@@ -99,6 +99,7 @@ function ClassicCard({ challenge }: { challenge: Challenge }) {
   const { t } = useT();
   const stats = challenge.finishStats;
   const perfectDays = challenge.advancedStats?.perfectDays ?? 0;
+  const stakeText = challenge.stakeResult ?? (challenge.stake?.text ? t.complete.stakeResult(challenge.stake.text) : undefined);
 
   return (
     <View style={{ width: CARD_W, height: CARD_H, backgroundColor: colors.bgBase, overflow: 'hidden' }}>
@@ -251,6 +252,23 @@ function ClassicCard({ challenge }: { challenge: Challenge }) {
           </View>
         ) : null}
 
+        {/* the bet/stake — what the group put on the line, only when set */}
+        {stakeText ? (
+          <View
+            style={{
+              marginTop: 10,
+              backgroundColor: colors.bgElevated,
+              borderRadius: radius.pill,
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+            }}
+          >
+            <AppText numberOfLines={1} style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textSecondary }}>
+              {stakeText}
+            </AppText>
+          </View>
+        ) : null}
+
         {/* the ring's people */}
         <View style={{ marginTop: 18 }}>
           <AvatarStack people={challenge.participants} max={6} size={30} surface={colors.bgBase} />
@@ -267,6 +285,7 @@ function BoldCard({ challenge }: { challenge: Challenge }) {
   const { t } = useT();
   const stats = challenge.finishStats;
   const perfectDays = challenge.advancedStats?.perfectDays ?? 0;
+  const stakeText = challenge.stakeResult ?? (challenge.stake?.text ? t.complete.stakeResult(challenge.stake.text) : undefined);
 
   return (
     <View style={{ width: CARD_W, height: CARD_H, backgroundColor: colors.bgBase, overflow: 'hidden' }}>
@@ -409,9 +428,17 @@ function BoldCard({ challenge }: { challenge: Challenge }) {
 
         {perfectDays > 0 ? (
           <AppText
-            style={{ marginBottom: 14, fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.joker }}
+            style={{ marginBottom: 8, fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.joker }}
           >
             {t.complete.shareCardPerfect(perfectDays)}
+          </AppText>
+        ) : null}
+        {stakeText ? (
+          <AppText
+            numberOfLines={1}
+            style={{ marginBottom: 14, fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textSecondary }}
+          >
+            {stakeText}
           </AppText>
         ) : null}
 
@@ -427,6 +454,7 @@ function MonoCard({ challenge }: { challenge: Challenge }) {
   const { t } = useT();
   const stats = challenge.finishStats;
   const perfectDays = challenge.advancedStats?.perfectDays ?? 0;
+  const stakeText = challenge.stakeResult ?? (challenge.stake?.text ? t.complete.stakeResult(challenge.stake.text) : undefined);
   const roster = challenge.participants.slice(0, 3);
   const extra = challenge.participants.length - roster.length;
 
@@ -528,6 +556,14 @@ function MonoCard({ challenge }: { challenge: Challenge }) {
             {t.complete.shareCardPerfect(perfectDays)}
           </AppText>
         ) : null}
+        {stakeText ? (
+          <AppText
+            numberOfLines={1}
+            style={{ marginTop: 6, fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textSecondary }}
+          >
+            {stakeText}
+          </AppText>
+        ) : null}
 
         <Footer />
       </View>
@@ -575,6 +611,7 @@ function StatsCard({ challenge }: { challenge: Challenge }) {
   const { t } = useT();
   const stats = challenge.finishStats;
   const perfectDays = challenge.advancedStats?.perfectDays ?? 0;
+  const stakeText = challenge.stakeResult ?? (challenge.stake?.text ? t.complete.stakeResult(challenge.stake.text) : undefined);
 
   return (
     <View style={{ width: CARD_W, height: CARD_H, backgroundColor: colors.bgBase, overflow: 'hidden' }}>
@@ -630,6 +667,21 @@ function StatsCard({ challenge }: { challenge: Challenge }) {
           >
             <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.joker }}>
               {t.complete.shareCardPerfect(perfectDays)}
+            </AppText>
+          </View>
+        ) : null}
+        {stakeText ? (
+          <View
+            style={{
+              marginTop: perfectDays > 0 ? 10 : 0,
+              backgroundColor: colors.bgElevated,
+              borderRadius: radius.card,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+            }}
+          >
+            <AppText numberOfLines={1} style={{ fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.textSecondary }}>
+              {stakeText}
             </AppText>
           </View>
         ) : null}

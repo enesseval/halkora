@@ -43,6 +43,45 @@ type Row =
   | { kind: 'message'; m: Message }
   | { kind: 'system'; id: string; text: string };
 
+/** Small "fact about this challenge" pill — same visual language as
+ * StakeBadge (emoji-in-circle + text), used for joker allowance/remaining
+ * and the join-window policy (saha testi bulgusu: both existed on the
+ * Challenge object already but were never actually shown anywhere in
+ * Detail). */
+function InfoChip({ emoji, label }: { emoji: string; label: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: colors.bgElevated,
+        borderColor: colors.strokeSubtle,
+        borderWidth: hairline,
+        borderRadius: radius.pill,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+      }}
+    >
+      <View
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          backgroundColor: colors.emberSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <AppText style={{ fontSize: 11 }}>{emoji}</AppText>
+      </View>
+      <AppText variant="secondary" color={colors.textSecondary}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
 export default function DetailScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const router = useRouter();
@@ -314,6 +353,11 @@ export default function DetailScreen() {
         </View>
       ) : null}
 
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 14 }}>
+        <InfoChip emoji="🃏" label={t.detail.jokerInfo(challenge.jokerRemaining, challenge.jokerAllowance)} />
+        {challenge.firstDayJoinOnly ? <InfoChip emoji="⏱️" label={t.create.joinFirstDayOnly} /> : null}
+      </View>
+
       <View style={{ marginTop: 24, alignSelf: 'stretch' }}>
         <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
       </View>
@@ -423,6 +467,14 @@ export default function DetailScreen() {
           <StakeBadge text={challenge.stake.text} align="center" />
         </View>
       ) : null}
+
+      {/* challenge facts — joker allowance/remaining + join-window policy;
+          existed on the Challenge object already but were never shown
+          anywhere in Detail (saha testi bulgusu). */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 14 }}>
+        <InfoChip emoji="🃏" label={t.detail.jokerInfo(challenge.jokerRemaining, challenge.jokerAllowance)} />
+        {challenge.firstDayJoinOnly ? <InfoChip emoji="⏱️" label={t.create.joinFirstDayOnly} /> : null}
+      </View>
 
       {/* upcoming: invite is still open — let the owner pull people in later too */}
       {isUpcoming ? (

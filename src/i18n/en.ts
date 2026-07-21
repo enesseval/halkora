@@ -254,6 +254,7 @@ export const en: Dictionary = {
     upcomingRing: "Hasn't started yet",
     todayCheckIn: "Today's check-in",
     useJoker: (n: number) => `Use a joker for yesterday · ${n} left`,
+    jokerInfo: (remaining: number, allowance: number) => `${remaining}/${allowance} jokers left`,
     completedRank: (n: number) => `You're #${n} to finish`,
     everyoneWaiting: 'Everyone finished',
     waitingFor: (name: string) => `Waiting on ${name}`,

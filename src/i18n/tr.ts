@@ -258,6 +258,7 @@ export const tr = {
     upcomingRing: 'Henüz başlamadı',
     todayCheckIn: "Bugünün check-in'i",
     useJoker: (n: number) => `Dün için joker kullan · ${n} hakkın var`,
+    jokerInfo: (remaining: number, allowance: number) => `${remaining}/${allowance} joker hakkı`,
     completedRank: (n: number) => `Sen ${n}. tamamlayansın`,
     everyoneWaiting: 'Herkes tamamladı',
     waitingFor: (name: string) => `${name}'i bekliyoruz`,

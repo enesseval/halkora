@@ -69,6 +69,9 @@ export interface Challenge {
   myCheckinTime?: string;
   myOrder?: number; // "Sen 5. tamamlayansın"
   jokerRemaining: number;
+  /** The challenge's total joker allowance (owner's choice at creation) —
+   * jokerRemaining alone can't show "2 of 3 left" without this. */
+  jokerAllowance: number;
   hasMissedYesterday: boolean;
   missedAcknowledged?: boolean;
   inviteCode: string;
