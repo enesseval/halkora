@@ -353,6 +353,13 @@ export const tr = {
     shareCardDays: 'Gün',
     shareCardCompleted: 'Birlikte tamamlandı',
     shareCardPerfect: (n: number) => `✦ ${n} kusursuz gün`,
+    // 3-5 kaydırmalı paylaşım şablonu — saha testi bulgusu (tek tasarım çok
+    // yalın duruyordu). İçerik aynı, sadece görsel düzen değişiyor.
+    shareTemplateHint: 'Kaydırarak farklı tasarımları dene',
+    shareTemplateClassic: 'Klasik',
+    shareTemplateBold: 'Vurgulu',
+    shareTemplateMono: 'Sade',
+    shareTemplateStats: 'İstatistik',
   },
 
   pro: {
