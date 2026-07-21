@@ -45,6 +45,7 @@ export const tr = {
   errors: {
     generic: 'Bir şeyler ters gitti. Tekrar dene.',
     checkConnection: 'Bağlantını kontrol et.',
+    offlineTitle: 'Bağlantı yok',
     loadFailed: 'Veriler yüklenemedi.',
     appUnavailable: 'Uygulama şu an kullanılamıyor',
     appUnavailableDetail: 'Sunucu bağlantısı kurulamadı. Lütfen daha sonra tekrar dene.',
@@ -63,9 +64,7 @@ export const tr = {
     linkFailed: 'Bağlanamadı',
     deleteFailed: 'Silinemedi',
     saveFailed: 'Kaydedilemedi. Bağlantını kontrol edip tekrar dene.',
-    supabaseWriteFailed: 'Supabase kaydı başarısız',
-    supabaseWriteFailedDetail: (msg: string) =>
-      `${msg}\n\nchallenges/participants tablolarını ve RLS'i kurdun mu? (docs/PHASE2-SUPABASE.md · Ek A)`,
+    createFailed: 'Halka oluşturulamadı',
     // Stable codes returned by RPCs/Edge Functions (Ek F/M/G/L), mapped to
     // localized copy here. Any code without an entry just falls back to
     // showing the server's raw message — never a blank/broken alert.

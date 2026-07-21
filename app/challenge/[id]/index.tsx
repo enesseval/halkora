@@ -22,7 +22,7 @@ import {
   waitingLine,
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
@@ -141,7 +141,7 @@ export default function DetailScreen() {
           {backButton}
           <ErrorState
             message={t.detail.loadFailed}
-            detail={errMessage(error)}
+            detail={friendlyErrorMessage(error)}
             onRetry={refetch}
           />
         </SafeAreaView>
@@ -187,7 +187,7 @@ export default function DetailScreen() {
             await actions.leaveChallenge();
             goHomeAfterExit();
           } catch (e) {
-            Alert.alert(t.detail.leaveChallengeFailed, errMessage(e));
+            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
             setLeaving(false);
           }
         },
@@ -248,7 +248,7 @@ export default function DetailScreen() {
     try {
       await actions.startChallenge();
     } catch (e) {
-      Alert.alert(t.detail.lobbyStartFailed, errMessage(e));
+      Alert.alert(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
     } finally {
       setStarting(false);
     }
@@ -266,7 +266,7 @@ export default function DetailScreen() {
       await actions.startChallenge(iso);
       setShowLobbyDatePicker(false);
     } catch (e) {
-      Alert.alert(t.detail.lobbyStartFailed, errMessage(e));
+      Alert.alert(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
     } finally {
       setStarting(false);
     }
@@ -481,7 +481,7 @@ export default function DetailScreen() {
             }}
           >
             <AppText variant="meta" color={colors.textTertiary} style={{ flex: 1 }}>
-              {t.detail.chatLoadFailed}{chatErrorDetail ? `: ${errMessage(chatErrorDetail)}` : '.'}
+              {t.detail.chatLoadFailed}{chatErrorDetail ? `: ${friendlyErrorMessage(chatErrorDetail)}` : '.'}
             </AppText>
             <AppText variant="meta" color={colors.ember} onPress={() => retryChat()}>
               {t.common.retry}

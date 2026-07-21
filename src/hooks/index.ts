@@ -23,7 +23,7 @@ import {
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
-import { errMessage, isErrorCode } from '@/lib/errors';
+import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
 import { FAST_DAYS } from '@/lib/fastDays';
 import {
@@ -324,7 +324,7 @@ export function useCheckIn(id: string) {
         })
         .catch((e) => {
           undo(id); // roll back the optimistic update
-          Alert.alert(t.errors.checkInFailed, errMessage(e));
+          Alert.alert(t.errors.checkInFailed, friendlyErrorMessage(e));
         });
     }
   };
@@ -526,7 +526,7 @@ export function useChallengeActions(id: string) {
           } catch {
             // best-effort resync; the alert below still tells the user it failed
           }
-          Alert.alert(t.errors.jokerFailed, errMessage(e));
+          Alert.alert(t.errors.jokerFailed, friendlyErrorMessage(e));
         });
     }
   };
@@ -545,7 +545,7 @@ export function useChallengeActions(id: string) {
         return true;
       } catch (e) {
         removeMessageMock(id, localId); // roll back — it never actually sent
-        Alert.alert(t.errors.messageFailed, errMessage(e));
+        Alert.alert(t.errors.messageFailed, friendlyErrorMessage(e));
         return false;
       }
     }
@@ -573,7 +573,7 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       restartChallenge(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert(t.errors.restartFailed, errMessage(e)));
+        .catch((e) => Alert.alert(t.errors.restartFailed, friendlyErrorMessage(e)));
     }
   };
 
@@ -582,7 +582,7 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       endChallengeEarly(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert(t.errors.endEarlyFailed, errMessage(e)));
+        .catch((e) => Alert.alert(t.errors.endEarlyFailed, friendlyErrorMessage(e)));
     }
   };
 
@@ -599,24 +599,31 @@ export function useChallengeActions(id: string) {
   };
 
   /** Owner-only. Awaited by the caller (like updateDetails) so it can
-   * navigate away only once the delete is actually confirmed server-side —
-   * there's no sensible "optimistic" delete to roll back if it fails. */
+   * navigate away only once the delete is actually confirmed server-side.
+   * Strips the challenge from the local store IMMEDIATELY on success rather
+   * than only invalidating the query — a bug let a just-deleted challenge
+   * keep showing on Home (and fail with CHALLENGE_NOT_FOUND on check-in)
+   * because invalidateQueries's background refetch isn't guaranteed to land
+   * before the next render/tap. */
   const doDelete = async (): Promise<void> => {
     if (isSupabaseConfigured) {
       await deleteChallengeRemote(id);
+    }
+    removeChallengeMock(id);
+    if (isSupabaseConfigured) {
       queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
-    } else {
-      removeChallengeMock(id);
     }
   };
 
-  /** Non-owner participants only — the RPC itself also rejects the owner. */
+  /** Non-owner participants only — the RPC itself also rejects the owner.
+   * Same immediate local removal as doDelete, same reason. */
   const doLeave = async (): Promise<void> => {
     if (isSupabaseConfigured) {
       await leaveChallengeRemote(id);
+    }
+    removeChallengeMock(id);
+    if (isSupabaseConfigured) {
       queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
-    } else {
-      removeChallengeMock(id);
     }
   };
 
@@ -703,8 +710,14 @@ export function useCreateChallenge() {
             router.push('/paywall?reason=challengeLimit');
             return null;
           }
-          const msg = errMessage(e);
-          Alert.alert(t.errors.supabaseWriteFailed, t.errors.supabaseWriteFailedDetail(msg));
+          // Offline gets its own calm message — never the raw TypeError, and
+          // never the old dev-only "did you set up RLS?" diagnostic, which
+          // read as a broken app to a real user who simply has no signal.
+          if (isNetworkError(e)) {
+            Alert.alert(t.errors.offlineTitle, t.errors.checkConnection);
+          } else {
+            Alert.alert(t.errors.createFailed, friendlyErrorMessage(e));
+          }
           return null;
         }
       }

@@ -44,6 +44,7 @@ export const en: Dictionary = {
   errors: {
     generic: 'Something went wrong. Try again.',
     checkConnection: 'Check your connection.',
+    offlineTitle: 'No connection',
     loadFailed: "Couldn't load data.",
     appUnavailable: 'The app is currently unavailable',
     appUnavailableDetail: "We couldn't reach the server. Please try again later.",
@@ -62,9 +63,7 @@ export const en: Dictionary = {
     linkFailed: "Couldn't link",
     deleteFailed: "Couldn't delete",
     saveFailed: "Couldn't save. Check your connection and try again.",
-    supabaseWriteFailed: 'Supabase write failed',
-    supabaseWriteFailedDetail: (msg: string) =>
-      `${msg}\n\nHave you set up the challenges/participants tables and RLS? (docs/PHASE2-SUPABASE.md · Ek A)`,
+    createFailed: "Couldn't create the ring",
     codes: {
       INVITE_NOT_FOUND: 'Invite code not found.',
       JOIN_WINDOW_CLOSED: 'Joining this challenge has closed — it only allowed joins on day one.',

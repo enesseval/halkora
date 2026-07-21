@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
@@ -239,7 +239,7 @@ export function NameSheet({
       await onSave(value.trim());
       onClose();
     } catch (e) {
-      setError(errMessage(e));
+      setError(friendlyErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -377,7 +377,7 @@ export function UsernameSheet({
       await onSave(value);
       onClose();
     } catch (e) {
-      setError(errMessage(e));
+      setError(friendlyErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -569,7 +569,7 @@ export function OwnerSettingsSheet({
       await onSave(title.trim(), dailyAction.trim(), stakeText.trim());
       onClose();
     } catch (e) {
-      setError(errMessage(e));
+      setError(friendlyErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -590,7 +590,7 @@ export function OwnerSettingsSheet({
             // onDelete's caller navigates away on success — no onClose() here,
             // the sheet unmounts along with the screen it's attached to.
           } catch (e) {
-            setError(errMessage(e));
+            setError(friendlyErrorMessage(e));
             setDeleting(false);
           }
         },

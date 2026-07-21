@@ -8,7 +8,7 @@ import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useChallenge, useChallengesQuery, INVITE_JOINERS } from '@/hooks';
 import type { Challenge, Participant } from '@/hooks';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { useAuth } from '@/hooks/useAuth';
 import { findUserByUsername, sendInvite, isDuplicateInviteError } from '@/data/invites';
 import { AppText, Avatar, Button, IconButton, Screen } from '@/components/ui';
@@ -49,7 +49,7 @@ export default function InviteScreen() {
         {loading ? (
           <RingScreenSkeleton />
         ) : firstLoadError ? (
-          <ErrorState message={t.detail.loadFailed} detail={errMessage(error)} onRetry={refetch} />
+          <ErrorState message={t.detail.loadFailed} detail={friendlyErrorMessage(error)} onRetry={refetch} />
         ) : (
           <ErrorState message={t.detail.notFound} />
         )}
@@ -173,7 +173,7 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
     } catch (e) {
       setStatus({
         kind: 'error',
-        text: isDuplicateInviteError(e) ? t.invite.handleAlreadyInvited : errMessage(e),
+        text: isDuplicateInviteError(e) ? t.invite.handleAlreadyInvited : friendlyErrorMessage(e),
       });
     } finally {
       setSending(false);

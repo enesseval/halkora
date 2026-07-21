@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useJoinPreview, useJoin } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, AvatarStack, Button, IconButton, Screen } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StakeBadge } from '@/components/StakeBadge';
@@ -52,7 +52,7 @@ export default function JoinScreen() {
       const id = await join(code ?? '', name.trim());
       router.replace(`/challenge/${id}`);
     } catch (e) {
-      setErr(errMessage(e) || t.errors.messageFailedGeneric);
+      setErr(friendlyErrorMessage(e) || t.errors.messageFailedGeneric);
       setJoining(false);
     }
   };
@@ -74,7 +74,7 @@ export default function JoinScreen() {
         {closeButton}
         <ErrorState
           message={t.join.loadFailed}
-          detail={errMessage(preview.error)}
+          detail={friendlyErrorMessage(preview.error)}
           onRetry={preview.retry}
         />
       </Screen>

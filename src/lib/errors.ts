@@ -53,6 +53,38 @@ export function isErrorCode(e: unknown, code: string): boolean {
   return rawMessage(e).includes(code);
 }
 
+/**
+ * True for a genuine network failure — the request never reached the server
+ * at all (device offline, DNS down, timeout). React Native's and the web's
+ * fetch both throw a bare TypeError for this ("Network request failed" /
+ * "Failed to fetch"), with none of the structure a real Postgrest/Auth/Edge
+ * Function error always has. Used to show a calm "check your connection"
+ * instead of a raw TypeError or a scary/meaningless dev diagnostic — the
+ * user is offline, not looking at a broken backend.
+ */
+export function isNetworkError(e: unknown): boolean {
+  if (e instanceof TypeError) return true;
+  if (e && typeof e === 'object' && 'message' in e) {
+    const m = (e as { message?: unknown }).message;
+    if (typeof m === 'string') return /network request failed|failed to fetch|network error/i.test(m);
+  }
+  return false;
+}
+
+/**
+ * `errMessage()`, but a genuine offline/network failure ALWAYS collapses to
+ * the localized "check your connection" line, never the raw TypeError (or,
+ * at any call site that used to pair it with a dev-only diagnostic, never
+ * that either). Prefer this over `errMessage()` at every place an error
+ * reaches the user directly (an Alert, an inline error line) — reserve the
+ * plain `errMessage()` for places that specifically need the raw/localized
+ * server code (e.g. deciding which UI to show).
+ */
+export function friendlyErrorMessage(e: unknown): string {
+  if (isNetworkError(e)) return getDict().errors.checkConnection;
+  return errMessage(e);
+}
+
 /** Pull the real `{ error }` JSON body out of a failed Edge Function call. */
 export async function edgeFunctionError(e: unknown): Promise<Error> {
   if (e instanceof FunctionsHttpError) {

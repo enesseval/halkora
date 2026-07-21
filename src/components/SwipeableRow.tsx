@@ -25,7 +25,7 @@ export function SwipeableRow({ children, actions }: { children: ReactNode; actio
   const ref = useRef<Swipeable>(null);
 
   const renderRightActions = (progress: RNAnimated.AnimatedInterpolation<number>) => (
-    <View style={{ flexDirection: 'row', height: '100%' }}>
+    <View style={{ flexDirection: 'row', height: '100%', alignItems: 'center', paddingVertical: 8 }}>
       {actions.map((action, i) => {
         const isLast = i === actions.length - 1;
         // Each button's own [0,1] progress so they fan in slightly staggered
@@ -38,7 +38,12 @@ export function SwipeableRow({ children, actions }: { children: ReactNode; actio
         return (
           <RNAnimated.View
             key={action.label}
-            style={{ transform: [{ scale }], marginLeft: i === 0 ? 8 : 0 }}
+            style={{
+              transform: [{ scale }],
+              marginLeft: i === 0 ? 8 : 6,
+              marginRight: isLast ? 8 : 0,
+              height: '100%',
+            }}
           >
             <Pressable
               onPress={() => {
@@ -53,8 +58,7 @@ export function SwipeableRow({ children, actions }: { children: ReactNode; actio
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 4,
-                borderTopRightRadius: isLast ? radius.card : 0,
-                borderBottomRightRadius: isLast ? radius.card : 0,
+                borderRadius: radius.badge,
               }}
             >
               <Feather name={action.icon} size={17} color={colors.bgBase} />

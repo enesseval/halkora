@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
 import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
-import { errMessage } from '@/lib/errors';
+import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { NameSheet, UsernameSheet } from '@/components/Sheets';
 import { useT, type Locale } from '@/i18n';
@@ -128,7 +128,7 @@ export default function SettingsScreen() {
     try {
       await linkAppleIdentity();
     } catch (e) {
-      Alert.alert(t.errors.linkFailed, errMessage(e));
+      Alert.alert(t.errors.linkFailed, friendlyErrorMessage(e));
     } finally {
       setLinking(false);
     }
@@ -174,7 +174,7 @@ export default function SettingsScreen() {
     try {
       await deleteAccount(); // guard routes to /welcome once the session clears
     } catch (e) {
-      Alert.alert(t.errors.deleteFailed, errMessage(e));
+      Alert.alert(t.errors.deleteFailed, friendlyErrorMessage(e));
       setDeleting(false);
     }
   };
