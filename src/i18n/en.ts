@@ -282,6 +282,9 @@ export const en: Dictionary = {
     ownerSettingsStakePlaceholder: 'Write your own stake...',
     ownerSettingsSave: 'Save',
     ownerSettingsSaving: 'Saving…',
+    changedTitle: (from: string, to: string) => `📝 Ring name changed: "${from}" → "${to}"`,
+    changedDailyAction: (action: string) => `📝 Daily goal changed: ${action}`,
+    changedStake: (stake: string) => `📝 Stake updated: ${stake}`,
     deleteChallenge: 'Delete ring',
     deletingChallenge: 'Deleting…',
     deleteChallengeConfirmTitle: 'Delete this ring?',
@@ -429,6 +432,7 @@ export const en: Dictionary = {
       "Almost there, don't give up 💪",
       'We miss you, check-in time 🔥',
     ],
+    nudgeSystemMessage: (from: string, to: string, msg: string) => `👋 ${from} nudged ${to}: "${msg}"`,
   },
 
   mock: {

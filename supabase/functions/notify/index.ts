@@ -120,9 +120,13 @@ Deno.serve(async (req) => {
 
     const { table, record } = payload;
 
-    // System messages ("X joined", etc.) aren't something to interrupt
-    // someone for — only a real user-typed chat message pushes.
-    if (table === 'messages' && record.kind !== 'message') return ok();
+    // messages.notify_others (docs/db-nudge-and-message-notify.sql) is the
+    // one real gate here — a nudge's own system message sets it false since
+    // the nudge already sent its own targeted push via the nudges table
+    // (this would otherwise double-notify the recipient for one nudge), but
+    // a challenge-details-change system message leaves it true (default) so
+    // it's worth pushing to the group, same as a real chat message.
+    if (table === 'messages' && record.notify_others === false) return ok();
 
     let challengeId: string | undefined;
     let actorUserId: string | undefined;
@@ -179,10 +183,24 @@ Deno.serve(async (req) => {
     }
     if (recipientIds.length === 0) return ok();
 
-    const [{ data: tokenRows }, { data: recipientProfiles }] = await Promise.all([
+    const [{ data: tokenRows }, profilesResult] = await Promise.all([
       admin.from('push_tokens').select('user_id, token').in('user_id', recipientIds),
       admin.from('profiles').select('id, locale, notify_message_preview').in('id', recipientIds),
     ]);
+    // notify_message_preview might not exist yet if
+    // docs/db-nudge-and-message-notify.sql hasn't been run — never let that
+    // silently kill EVERY notification type (check-ins, nudges, invites too,
+    // not just messages), which is what happened when this column was
+    // selected unconditionally: the whole query threw, the outer catch below
+    // swallowed it, and nothing sent. Fall back to locale-only and default
+    // every preview to "shown" (the column's own DB default) until the
+    // migration actually runs.
+    let recipientProfiles = profilesResult.data;
+    if (profilesResult.error) {
+      console.error('profiles select w/ notify_message_preview failed, falling back', profilesResult.error);
+      const fallback = await admin.from('profiles').select('id, locale').in('id', recipientIds);
+      recipientProfiles = fallback.data;
+    }
     const localeByUser = new Map(
       (recipientProfiles ?? []).map((p) => [p.id as string, p.locale as string | null]),
     );
@@ -191,7 +209,7 @@ Deno.serve(async (req) => {
     // DB default) so a profile row fetched before this feature existed still
     // behaves the same as it always did.
     const previewByUser = new Map(
-      (recipientProfiles ?? []).map((p) => [p.id as string, (p.notify_message_preview as boolean | null) ?? true]),
+      (recipientProfiles ?? []).map((p) => [p.id as string, (p as { notify_message_preview?: boolean }).notify_message_preview ?? true]),
     );
 
     const messages = (tokenRows ?? [])
@@ -205,10 +223,17 @@ Deno.serve(async (req) => {
           body = c.checkedIn(actorName ?? c.someone);
         } else if (table === 'messages') {
           title = challengeTitle ?? c.challengeFallback;
-          const showPreview = previewByUser.get(r.user_id as string) ?? true;
-          body = showPreview
-            ? c.messageBody(actorName ?? c.someone, truncate((record.text as string) ?? ''))
-            : c.messageBodyHidden(actorName ?? c.someone);
+          if (record.kind === 'message') {
+            const showPreview = previewByUser.get(r.user_id as string) ?? true;
+            body = showPreview
+              ? c.messageBody(actorName ?? c.someone, truncate((record.text as string) ?? ''))
+              : c.messageBodyHidden(actorName ?? c.someone);
+          } else {
+            // A system announcement (e.g. a challenge-details change) is
+            // already a complete, safe-to-show line — no name prefix, no
+            // content-hiding (there's no private content here to hide).
+            body = truncate((record.text as string) ?? '');
+          }
         } else if (table === 'nudges') {
           title = c.nudgeTitle;
           body = (record.message as string | null) || c.nudgeBody;

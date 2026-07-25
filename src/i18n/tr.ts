@@ -286,6 +286,11 @@ export const tr = {
     ownerSettingsStakePlaceholder: 'Kendi bahsini yaz...',
     ownerSettingsSave: 'Kaydet',
     ownerSettingsSaving: 'Kaydediliyor…',
+    // Halka ayarları değiştiğinde sohbette görünen sistem mesajları — saha
+    // testi bulgusu: "grup adını değiştirdim ama chatte gözükmedi".
+    changedTitle: (from: string, to: string) => `📝 Halka adı değişti: "${from}" → "${to}"`,
+    changedDailyAction: (action: string) => `📝 Günlük hedef değişti: ${action}`,
+    changedStake: (stake: string) => `📝 Bahis güncellendi: ${stake}`,
     deleteChallenge: 'Halkayı sil',
     deletingChallenge: 'Siliniyor…',
     deleteChallengeConfirmTitle: 'Bu halkayı sil?',
@@ -447,6 +452,9 @@ export const tr = {
       'Az kaldı, pes etme 💪',
       'Seni özledik, check-in zamanı 🔥',
     ],
+    // El sallamayı özel bir push'ta gizli kalmak yerine sohbette de görünür
+    // kılıyor (saha testi bulgusu: "chatte gözüksün, ne yaptın diye").
+    nudgeSystemMessage: (from: string, to: string, msg: string) => `👋 ${from}, ${to}'a el salladı: "${msg}"`,
   },
 
   // Phase-1 demo/mock content (src/data/mock.ts) — shown only when no

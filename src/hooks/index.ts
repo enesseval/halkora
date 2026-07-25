@@ -22,7 +22,7 @@ import {
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
-import { fetchMessages, insertMessage, insertReaction, insertNudge } from '@/data/chat';
+import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
 import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
 import { FAST_DAYS } from '@/lib/fastDays';
@@ -505,6 +505,7 @@ export function useChallengeActions(id: string) {
   const setChallenges = useMockStore((s) => s.setChallenges);
   const challenge = useChallenge(id);
   const queryClient = useQueryClient();
+  const { name: myName } = useAuth();
 
   const doUseJoker = () => {
     useJoker(id); // optimistic: yesterday's segment flips to amber immediately
@@ -561,10 +562,23 @@ export function useChallengeActions(id: string) {
     }
   };
 
-  const doNudge = (participantId: string, message?: string) => {
+  const doNudge = (participantId: string, recipientName: string, message: string) => {
     nudgeMock(id, participantId); // optimistic "Sallandı ✓"
-    if (isSupabaseConfigured) {
-      insertNudge(id, participantId, message).catch(() => {});
+    if (isSupabaseConfigured && challenge) {
+      insertNudge(id, participantId, message)
+        // Visible to the whole group in chat, not just a private push to the
+        // recipient (saha testi bulgusu: "chatte gözüksün, ne yaptın diye").
+        // Best-effort — a failure here shouldn't undo the nudge itself.
+        .then(() =>
+          insertSystemMessage(
+            id,
+            challenge.currentDay,
+            t.participant.nudgeSystemMessage(myName ?? t.common.person, recipientName, message),
+            false, // already pushed via the nudges table above — don't double-notify
+          ),
+        )
+        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+        .catch(() => {});
     }
   };
 
@@ -591,8 +605,29 @@ export function useChallengeActions(id: string) {
    * actions here, there's no optimistic UI to roll back if it fails. */
   const doUpdateDetails = async (title: string, dailyAction: string, stakeText: string): Promise<void> => {
     if (isSupabaseConfigured) {
+      // Snapshot BEFORE the write so the system message can say what
+      // actually changed (the sheet always submits all three fields,
+      // whether or not the owner touched them).
+      const prevTitle = challenge?.title;
+      const prevAction = challenge?.dailyActionRaw;
+      const prevStake = challenge?.stake?.text ?? '';
       await updateChallengeDetails(id, title, dailyAction, stakeText);
       queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+      // Visible to the whole group in chat — saha testi bulgusu: "grup adını
+      // değiştirdim ama chatte gözükmedi". Worth a push too (unlike a nudge's
+      // own system message, there's no separate targeted push already
+      // covering this), so notifyOthers stays true. Best-effort.
+      if (challenge) {
+        const changes: string[] = [];
+        if (prevTitle !== undefined && prevTitle !== title) changes.push(t.detail.changedTitle(prevTitle, title));
+        if (prevAction !== undefined && prevAction !== dailyAction) changes.push(t.detail.changedDailyAction(dailyAction));
+        if (prevStake !== stakeText) changes.push(t.detail.changedStake(stakeText));
+        if (changes.length > 0) {
+          insertSystemMessage(id, challenge.currentDay, changes.join('\n'))
+            .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+            .catch(() => {});
+        }
+      }
     } else {
       updateDetailsMock(id, title, dailyAction, stakeText);
     }

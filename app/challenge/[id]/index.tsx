@@ -686,7 +686,7 @@ export default function DetailScreen() {
         <NudgeMessageSheet
           participantName={nudgeTarget.name}
           onSend={(message) => {
-            actions.nudge(nudgeTarget.id, message);
+            actions.nudge(nudgeTarget.id, nudgeTarget.name, message);
             setNudgeTarget(null);
           }}
           onClose={() => setNudgeTarget(null)}
