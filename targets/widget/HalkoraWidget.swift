@@ -56,7 +56,10 @@ private func loadSnapshot() -> HalkoraSnapshot? {
 
 struct HalkoraEntry: TimelineEntry {
   let date: Date
-  let snapshot: HalkoraSnapshot?
+  // fileprivate, not the struct's default internal — it exposes the
+  // `private` HalkoraSnapshot type, and Swift requires a member's access
+  // level to be no wider than the types it exposes.
+  fileprivate let snapshot: HalkoraSnapshot?
 }
 
 struct HalkoraProvider: TimelineProvider {
@@ -82,8 +85,11 @@ struct HalkoraProvider: TimelineProvider {
   }
 }
 
-private let accentColor = Color(red: 1.0, green: 0.42, blue: 0.28)
-private let backgroundColor = Color(red: 0.051, green: 0.055, blue: 0.067)
+// Named to avoid colliding with SwiftUI's own `View.accentColor(_:)`
+// modifier — a top-level constant with that exact name gets shadowed by
+// the method inside a View's body, silently resolving to the wrong thing.
+private let halkoraEmber = Color(red: 1.0, green: 0.42, blue: 0.28)
+private let halkoraBg = Color(red: 0.051, green: 0.055, blue: 0.067)
 
 struct HalkoraWidgetView: View {
   var entry: HalkoraProvider.Entry
@@ -108,7 +114,7 @@ struct HalkoraWidgetView: View {
             Text(checkedIn ? c.doneLabel : c.checkInCta)
               .font(.system(size: 12, weight: .medium))
           }
-          .foregroundStyle(checkedIn ? accentColor : .white)
+          .foregroundStyle(checkedIn ? halkoraEmber : .white)
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -135,7 +141,7 @@ struct HalkoraWidgetView: View {
         .widgetURL(URL(string: "halkora://"))
       }
     }
-    .containerBackground(backgroundColor, for: .widget)
+    .containerBackground(halkoraBg, for: .widget)
   }
 }
 
