@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -23,6 +23,7 @@ import {
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { setActiveChallengeId } from '@/lib/push';
 import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
@@ -108,6 +109,19 @@ export default function DetailScreen() {
   const [starting, setStarting] = useState(false);
   const [showLobbyDatePicker, setShowLobbyDatePicker] = useState(false);
   const [lobbyDate, setLobbyDate] = useState<Date | null>(null);
+  const listRef = useRef<FlashListRef<Row>>(null);
+
+  // Saha testi bulgusu: "bu challange içindeyken onunla ilgili bildirim
+  // üstte gözükmesin, zaten bakıyorum" — src/lib/push.ts's notification
+  // handler reads this to suppress just THIS challenge's foreground banner;
+  // every other challenge's push is unaffected. Cleared on unmount/id change
+  // so leaving the screen (or switching to a different challenge) doesn't
+  // leave a stale id silently suppressing that ring's real notifications.
+  useEffect(() => {
+    if (!id) return;
+    setActiveChallengeId(id);
+    return () => setActiveChallengeId(null);
+  }, [id]);
 
   const rows = useMemo<Row[]>(() => {
     if (!challenge) return [];
@@ -132,6 +146,23 @@ export default function DetailScreen() {
     }
     return out;
   }, [challenge, chatError, t]);
+
+  // Auto-scroll to the newest row whenever chat grows — sending your own
+  // message (saha testi bulgusu: "mesaj attığım zaman aşağıda kalıyor, ben
+  // manuel kaydırmak zorunda kalıyorum") or a new one arriving via realtime.
+  // `null` on the very first render so the initial load (participants +
+  // full history) doesn't yank the screen down to the end before the user's
+  // even looked at it — only a length INCREASE from a previous real count
+  // triggers the scroll.
+  const prevRowsLength = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevRowsLength.current;
+    prevRowsLength.current = rows.length;
+    if (prev !== null && rows.length > prev) {
+      const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [rows.length]);
 
   // Auto-finish: once everyone's checked in on the LAST day, there's no
   // reason to sit around waiting for the calendar date to roll over —
@@ -566,6 +597,7 @@ export default function DetailScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <FlashList
+            ref={listRef}
             data={rows}
             renderItem={renderItem}
             keyExtractor={(item, i) =>
