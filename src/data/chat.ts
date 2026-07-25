@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/data/types';
 import { getDict } from '@/i18n';
+import { FAST_DAYS } from '@/lib/fastDays';
 
 interface MessageRow {
   id: string;
@@ -127,6 +128,21 @@ export async function insertNudge(challengeId: string, toUserId: string, message
   } = await supabase.auth.getSession();
   const user = session?.user;
   if (!user) throw new Error(getDict().errors.sessionMissing);
+  if (FAST_DAYS) {
+    // TEST-ONLY: the DB's one-nudge-per-recipient-per-challenge-per-day unique
+    // index (docs/db-nudge-and-message-notify.sql) counts a real calendar
+    // day, not a fast-day — under FAST_DAYS a 7-day challenge finishes in ~7
+    // minutes, so every nudge past the first would otherwise silently no-op
+    // as "already nudged today". Clear today's row for this pair first so
+    // the insert below never conflicts. Never runs in a production build
+    // (FAST_DAYS is hard-false unless EXPO_PUBLIC_FAST_DAYS=1 is set).
+    await supabase
+      .from('nudges')
+      .delete()
+      .eq('from_user', user.id)
+      .eq('to_user', toUserId)
+      .eq('challenge_id', challengeId);
+  }
   const { error } = await supabase
     .from('nudges')
     .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId, message });
