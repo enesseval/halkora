@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Keyboard,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  RefreshControl,
+  TextInput,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -110,6 +119,12 @@ export default function DetailScreen() {
   const [showLobbyDatePicker, setShowLobbyDatePicker] = useState(false);
   const [lobbyDate, setLobbyDate] = useState<Date | null>(null);
   const listRef = useRef<FlashListRef<Row>>(null);
+  // Tracks scroll position without re-rendering on every scroll tick — read
+  // inside the rows-length effect below instead of depending on state there
+  // (which would re-run that effect, and re-trigger the scroll, on every
+  // single scroll event).
+  const isNearBottomRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   // Saha testi bulgusu: "bu challange içindeyken onunla ilgili bildirim
   // üstte gözükmesin, zaten bakıyorum" — src/lib/push.ts's notification
@@ -153,16 +168,40 @@ export default function DetailScreen() {
   // `null` on the very first render so the initial load (participants +
   // full history) doesn't yank the screen down to the end before the user's
   // even looked at it — only a length INCREASE from a previous real count
-  // triggers the scroll.
+  // triggers anything below.
+  //
+  // If the user's already near the bottom (or it's their OWN send — see the
+  // composer's onPress, which force-scrolls directly), snap down smoothly.
+  // If they've scrolled UP into history, don't yank them back down; show a
+  // WhatsApp-style "jump to latest" pill instead (saha testi bulgusu:
+  // "başkasından mesaj geldiğinde aşağıya doğru ok yanıp sönebilir").
   const prevRowsLength = useRef<number | null>(null);
   useEffect(() => {
     const prev = prevRowsLength.current;
     prevRowsLength.current = rows.length;
-    if (prev !== null && rows.length > prev) {
-      const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    if (prev === null || rows.length <= prev) return;
+    if (isNearBottomRef.current) {
+      const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
       return () => clearTimeout(timer);
     }
+    setShowJumpToLatest(true);
   }, [rows.length]);
+
+  const NEAR_BOTTOM_THRESHOLD = 120;
+  const handleListScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+    const nearBottom = distanceFromBottom < NEAR_BOTTOM_THRESHOLD;
+    isNearBottomRef.current = nearBottom;
+    if (nearBottom && showJumpToLatest) setShowJumpToLatest(false);
+  };
+
+  const jumpToLatest = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    isNearBottomRef.current = true;
+    setShowJumpToLatest(false);
+    listRef.current?.scrollToEnd({ animated: true });
+  };
 
   // Auto-finish: once everyone's checked in on the LAST day, there's no
   // reason to sit around waiting for the calendar date to roll over —
@@ -610,10 +649,36 @@ export default function DetailScreen() {
             ListHeaderComponent={header}
             contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
+            onScroll={handleListScroll}
+            scrollEventThrottle={100}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
             }
           />
+
+          {showJumpToLatest ? (
+            <Pressable
+              onPress={jumpToLatest}
+              style={{
+                position: 'absolute',
+                right: spacing.screenX,
+                bottom: 76,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.ember,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOpacity: 0.25,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 4,
+              }}
+            >
+              <Feather name="arrow-down" size={20} color={colors.bgBase} />
+            </Pressable>
+          ) : null}
 
           {/* note / chat input */}
           <View
@@ -653,8 +718,22 @@ export default function DetailScreen() {
                 if (!text) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDraft('');
+                // Force the jump regardless of where the user was scrolled —
+                // sending your own message should always land you on it, the
+                // same as the "jump to latest" pill does for someone else's.
+                // Fired a few times: once now (the optimistic bubble is
+                // already in `rows` synchronously), and again after the
+                // keyboard's close animation settles (Keyboard.dismiss()
+                // below shifts the KeyboardAvoidingView's layout a beat
+                // later, which can leave the first scroll short of the true
+                // bottom — saha testi bulgusu: "hala en alta inmiyor").
+                isNearBottomRef.current = true;
+                setShowJumpToLatest(false);
+                listRef.current?.scrollToEnd({ animated: true });
                 const sent = await actions.sendMessage(text);
                 if (sent) Keyboard.dismiss();
+                setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 120);
+                setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 400);
               }}
               style={{
                 width: 44,
