@@ -19,6 +19,9 @@
         "CFBundleLocalizations": ["tr", "en"],
         "CFBundleDevelopmentRegion": "tr",
         "ITSAppUsesNonExemptEncryption" : false
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.halkora.app.widget"]
       }
     },
     "android": {
@@ -74,7 +77,8 @@
           "imageWidth": 160,
           "backgroundColor": "#0D0E11"
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "extra": {
       "router": {},
