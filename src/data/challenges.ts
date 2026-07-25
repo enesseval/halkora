@@ -309,7 +309,12 @@ function mapRow(
       // Reflects the DB's real "one nudge per person per day" state (Ek K) —
       // not just an ephemeral optimistic flag — so it survives a refetch and
       // the UI can tell a genuine re-attempt apart from a fresh nudge.
-      nudged: nudgedToday.has(p.user_id),
+      // Under FAST_DAYS this always reads false: the DB limit counts a real
+      // calendar day, not a fast-day, and insertNudge already clears today's
+      // row before every test-mode insert — showing the stale "already
+      // nudged" state here would just make ParticipantRow block the retry
+      // before that clear-then-insert ever runs.
+      nudged: !FAST_DAYS && nudgedToday.has(p.user_id),
     };
   });
 
