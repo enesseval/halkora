@@ -119,6 +119,15 @@ Deno.serve(async (req) => {
     );
 
     const { table, record } = payload;
+    // TEMP diagnostic (saha testi: mesaj bildirimi gitmiyor, check-in/nudge
+    // gidiyor) — kaldırılacak, bkz. docs/db-nudge-and-message-notify.sql notu.
+    console.log('notify: payload', {
+      table,
+      kind: record.kind,
+      notify_others: record.notify_others,
+      challenge_id: record.challenge_id,
+      user_id: record.user_id,
+    });
 
     // messages.notify_others (docs/db-nudge-and-message-notify.sql) is the
     // one real gate here — a nudge's own system message sets it false since
@@ -126,7 +135,10 @@ Deno.serve(async (req) => {
     // (this would otherwise double-notify the recipient for one nudge), but
     // a challenge-details-change system message leaves it true (default) so
     // it's worth pushing to the group, same as a real chat message.
-    if (table === 'messages' && record.notify_others === false) return ok();
+    if (table === 'messages' && record.notify_others === false) {
+      console.log('notify: blocked by notify_others === false');
+      return ok();
+    }
 
     let challengeId: string | undefined;
     let actorUserId: string | undefined;
@@ -181,6 +193,7 @@ Deno.serve(async (req) => {
         .neq('user_id', actorUserId);
       recipientIds = (participants ?? []).map((p) => p.user_id as string);
     }
+    console.log('notify: recipients resolved', { count: recipientIds.length, recipientIds });
     if (recipientIds.length === 0) return ok();
 
     const [{ data: tokenRows }, profilesResult] = await Promise.all([
@@ -243,6 +256,7 @@ Deno.serve(async (req) => {
         }
         return { to: r.token as string, title, body, data: { challengeId, inviteCode } };
       });
+    console.log('notify: tokenRows', { tokenRowCount: (tokenRows ?? []).length, composedCount: messages.length });
     if (messages.length === 0) return ok();
 
     // Expo's push endpoint accepts at most 100 messages per request — group
@@ -255,6 +269,12 @@ Deno.serve(async (req) => {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(messages.slice(i, i + 100)),
       });
+      // res.ok only reflects Expo's HTTP-level acceptance of the batch — a
+      // per-message rejection (DeviceNotRegistered, InvalidCredentials, ...)
+      // still comes back with HTTP 200 nested inside the body, so it'd never
+      // otherwise show up anywhere in this function's logs.
+      const resBody = await res.text();
+      console.log('notify: expo push response', { status: res.status, body: resBody });
       if (res.ok) sent += Math.min(100, messages.length - i);
     }
 
