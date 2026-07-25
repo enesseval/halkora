@@ -147,13 +147,12 @@ Deno.serve(async (req) => {
     let onlyRecipient: string | undefined;
 
     if (table === 'check_ins') {
-      challengeId = record.challenge_id as string;
-      const { data: participant } = await admin
-        .from('participants')
-        .select('user_id')
-        .eq('id', record.participant_id as string)
-        .single();
-      actorUserId = participant?.user_id as string | undefined;
+      // Saha testi bulgusu: check-in bildirimi istenmiyor — grup zaten chate
+      // bakarak/counterlarla kimin check-in yaptığını görüyor, ayrıca push
+      // gürültüsü olmasın. notify-checkin DB Webhook'u silmek daha temizdir
+      // (bkz. docs/db-nudge-and-message-notify.sql) ama webhook duruyor olsa
+      // bile burada no-op — çift güvence.
+      return ok();
     } else if (table === 'messages') {
       challengeId = record.challenge_id as string;
       actorUserId = record.user_id as string;
