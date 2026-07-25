@@ -7,7 +7,8 @@ import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
-import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
+import { QueryClientProvider, focusManager } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { colors } from '@/theme/tokens';
 import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
@@ -16,8 +17,6 @@ import { ErrorState } from '@/components/ErrorState';
 import { BootSplash } from '@/components/BootSplash';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
-
-const queryClient = new QueryClient();
 
 // react-query's polling (refetchInterval) only pauses itself when it thinks
 // the app isn't "focused" — on web that's tab visibility, but on native

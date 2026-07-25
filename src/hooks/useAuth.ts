@@ -5,6 +5,8 @@ import * as Notifications from 'expo-notifications';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { queryClient } from '@/lib/queryClient';
+import { useMockStore } from '@/stores/mockStore';
 import { registerForPushToken } from '@/lib/push';
 import {
   savePushToken,
@@ -44,6 +46,19 @@ const useAuthStore = create<AuthState>(() => ({
   isPro: false,
   messagePreview: true,
 }));
+
+/**
+ * Wipes every piece of per-ACCOUNT client state so the next sign-in on this
+ * device starts clean. Saha testi bulgusu: hesap silinip aynı oturumda yeni
+ * hesap açılınca eski hesabın challenge'ları görünmeye devam etti —
+ * useChallengesQuery'nin birleştirmesi bilerek listeden hiç eleman silmez
+ * ("refetch asla küçültmez" kuralı), o yüzden yeni kullanıcının boş listesi
+ * eski kullanıcının bellekte kalan verisini temizleyemiyordu.
+ */
+function clearPerAccountCaches(): void {
+  queryClient.clear();
+  useMockStore.getState().setChallenges([]);
+}
 
 async function loadProfileName(session: Session | null): Promise<void> {
   if (!session) {
@@ -123,6 +138,10 @@ export function useAuthInit(): void {
       // Only refetch the profile when the user actually changes — TOKEN_REFRESHED
       // and other same-user events must not hammer the DB.
       if (session?.user.id !== prevUid) {
+        // A different signed-in user landing while the previous one's data is
+        // still cached (any account-switch path that skips our own signOut/
+        // deleteAccount actions) must never see the old account's challenges.
+        if (prevUid && session?.user.id) clearPerAccountCaches();
         await loadProfileName(session);
       }
     });
@@ -179,16 +198,20 @@ export function useSyncPushToken(): void {
     const userId = session.user.id;
     let active = true;
 
+    // The dedupe key MUST include the user id, not just the token — the
+    // device's token stays the same across an account switch (saha testi
+    // bulgusu: hesap silinip yenisi açılınca push_tokens'a yeni kullanıcı
+    // için satır hiç yazılmadı, ref "bu token'ı zaten kaydettim" diyordu).
     registerForPushToken().then((token) => {
-      if (!active || !token || token === lastSaved.current) return;
-      lastSaved.current = token;
+      if (!active || !token || `${userId}:${token}` === lastSaved.current) return;
+      lastSaved.current = `${userId}:${token}`;
       savePushToken(userId, token).catch(() => {});
     });
 
     const sub = Notifications.addPushTokenListener((event) => {
       const token = event.data;
-      if (!token || token === lastSaved.current) return;
-      lastSaved.current = token;
+      if (!token || `${userId}:${token}` === lastSaved.current) return;
+      lastSaved.current = `${userId}:${token}`;
       savePushToken(userId, token).catch(() => {});
     });
 
@@ -215,8 +238,12 @@ export function useSyncLocale(): void {
 
   useEffect(() => {
     if (!isSupabaseConfigured || !ready || !session || !name) return;
-    if (locale === lastSaved.current) return;
-    lastSaved.current = locale;
+    // Keyed by user id too — same account-switch trap as useSyncPushToken
+    // above: the locale doesn't change between accounts, so a token-only key
+    // would leave the new account's profiles.locale forever at its default.
+    const key = `${session.user.id}:${locale}`;
+    if (key === lastSaved.current) return;
+    lastSaved.current = key;
     saveLocale(session.user.id, locale).catch(() => {});
   }, [ready, session, name, locale]);
 }
@@ -347,7 +374,8 @@ async function signOut(): Promise<void> {
   const userId = useAuthStore.getState().session?.user.id;
   if (userId) await clearPushToken(userId).catch(() => {});
   await supabase.auth.signOut();
-  useAuthStore.setState({ session: null, name: null, username: null, isPro: false });
+  clearPerAccountCaches();
+  useAuthStore.setState({ session: null, name: null, username: null, isPro: false, messagePreview: true });
 }
 
 /**
@@ -359,7 +387,12 @@ async function signOut(): Promise<void> {
  */
 async function deleteAccount(): Promise<void> {
   await deleteAccountRequest();
-  useAuthStore.setState({ session: null, name: null, username: null, isPro: false });
+  // The server-side user is gone, but supabase-js still holds its JWT locally
+  // — drop it so the next Apple sign-in gets a clean SIGNED_IN under the new
+  // user instead of piggybacking on a dead session.
+  await supabase.auth.signOut().catch(() => {});
+  clearPerAccountCaches();
+  useAuthStore.setState({ session: null, name: null, username: null, isPro: false, messagePreview: true });
 }
 
 /**
