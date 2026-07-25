@@ -54,3 +54,8 @@ yarn-error.*
 
 # local Claude Code settings (machine-specific permission allowlist)
 .claude/settings.local.json
+
+# AI agent skill reference docs (installed via `npx skills add`, tooling only)
+.agents/
+.claude/skills/
+skills-lock.json

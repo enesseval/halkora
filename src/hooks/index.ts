@@ -36,6 +36,7 @@ import {
   getInviteJoiners,
 } from '@/data/mock';
 import { formatLongDate, waitingNames } from '@/lib/day';
+import { syncWidgetSnapshot } from '@/lib/widget';
 import { useAuth } from './useAuth';
 import { firstName } from '@/stores/mockStore';
 import { Challenge, Participant } from '@/data/types';
@@ -118,7 +119,9 @@ export function useChallengesQuery() {
         return fresh ? { ...fresh, messages: c.messages } : c;
       });
       const brandNew = query.data.filter((c) => !currentIds.has(c.id));
-      setChallenges([...refreshed, ...brandNew]);
+      const merged = [...refreshed, ...brandNew];
+      setChallenges(merged);
+      syncWidgetSnapshot(merged);
     }
   }, [query.data, setChallenges]);
 
@@ -316,6 +319,11 @@ export function useCheckIn(id: string) {
     // hides the button, so no stray caller can trigger a write.
     if (!challenge || challenge.status !== 'active' || challenge.currentDay < 1) return;
     checkIn(id); // optimistic: instant ring/animation feedback
+    // Widget-checkin's deep link (app/widget-checkin/[id].tsx) navigates
+    // away immediately after calling this, well before the invalidateQueries
+    // below would've re-synced it — push the optimistic state now so the
+    // widget shows "done" right away instead of on the next poll.
+    syncWidgetSnapshot(useMockStore.getState().challenges);
     if (isSupabaseConfigured && challenge) {
       insertCheckIn(id, 'done')
         .then(({ dayNumber }) => {
@@ -324,6 +332,7 @@ export function useCheckIn(id: string) {
         })
         .catch((e) => {
           undo(id); // roll back the optimistic update
+          syncWidgetSnapshot(useMockStore.getState().challenges);
           Alert.alert(t.errors.checkInFailed, friendlyErrorMessage(e));
         });
     }
@@ -331,6 +340,7 @@ export function useCheckIn(id: string) {
 
   const doUndo = () => {
     undo(id);
+    syncWidgetSnapshot(useMockStore.getState().challenges);
     if (isSupabaseConfigured && challenge) {
       const day = lastServerDay.current ?? challenge.currentDay;
       deleteCheckIn(id, day)

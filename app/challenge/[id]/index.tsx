@@ -171,17 +171,19 @@ export default function DetailScreen() {
   // triggers anything below.
   //
   // If the user's already near the bottom (or it's their OWN send — see the
-  // composer's onPress, which force-scrolls directly), snap down smoothly.
-  // If they've scrolled UP into history, don't yank them back down; show a
-  // WhatsApp-style "jump to latest" pill instead (saha testi bulgusu:
-  // "başkasından mesaj geldiğinde aşağıya doğru ok yanıp sönebilir").
+  // composer's onPress, which marks isNearBottomRef true up front), snap
+  // down — ONE scrollToEnd call, not a burst of retries (saha testi
+  // bulgusu: "2-3 kere denemesin, animasyon kötü" — multiple calls stacked
+  // visibly). If they've scrolled UP into history, don't yank them back
+  // down; show a WhatsApp-style "jump to latest" pill instead (saha testi
+  // bulgusu: "başkasından mesaj geldiğinde aşağıya doğru ok yanıp sönebilir").
   const prevRowsLength = useRef<number | null>(null);
   useEffect(() => {
     const prev = prevRowsLength.current;
     prevRowsLength.current = rows.length;
     if (prev === null || rows.length <= prev) return;
     if (isNearBottomRef.current) {
-      const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+      const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 150);
       return () => clearTimeout(timer);
     }
     setShowJumpToLatest(true);
@@ -718,22 +720,18 @@ export default function DetailScreen() {
                 if (!text) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDraft('');
-                // Force the jump regardless of where the user was scrolled —
-                // sending your own message should always land you on it, the
-                // same as the "jump to latest" pill does for someone else's.
-                // Fired a few times: once now (the optimistic bubble is
-                // already in `rows` synchronously), and again after the
-                // keyboard's close animation settles (Keyboard.dismiss()
-                // below shifts the KeyboardAvoidingView's layout a beat
-                // later, which can leave the first scroll short of the true
-                // bottom — saha testi bulgusu: "hala en alta inmiyor").
+                // Sending your own message should always land you on it,
+                // regardless of where you were scrolled — the rows-length
+                // effect below does the actual (single) scrollToEnd call;
+                // this just makes sure it treats a self-sent message as
+                // "already at the bottom" instead of showing the jump pill.
+                // Repeated scrollToEnd calls here on top of that one looked
+                // janky (saha testi bulgusu: "2-3 kere denemesin, animasyon
+                // kötü") — one call, done.
                 isNearBottomRef.current = true;
                 setShowJumpToLatest(false);
-                listRef.current?.scrollToEnd({ animated: true });
                 const sent = await actions.sendMessage(text);
                 if (sent) Keyboard.dismiss();
-                setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 120);
-                setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 400);
               }}
               style={{
                 width: 44,
