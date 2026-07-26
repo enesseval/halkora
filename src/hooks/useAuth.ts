@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { useMockStore } from '@/stores/mockStore';
 import { registerForPushToken } from '@/lib/push';
+import { syncWidgetSession, reconcileWidgetSession } from '@/lib/widgetAuth';
 import {
   savePushToken,
   clearPushToken,
@@ -128,6 +129,7 @@ export function useAuthInit(): void {
       }
       if (!active) return;
       useAuthStore.setState({ session });
+      syncWidgetSession(session);
       await loadProfileName(session);
       if (active) useAuthStore.setState({ ready: true });
     });
@@ -135,6 +137,10 @@ export function useAuthInit(): void {
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const prevUid = useAuthStore.getState().session?.user.id;
       useAuthStore.setState({ session });
+      // Every event, not just a real user change — this is also how a
+      // TOKEN_REFRESHED lands in the widget's shared storage (targets/widget/
+      // HalkoraWidget.swift's CheckInIntent needs a token that isn't stale).
+      syncWidgetSession(session);
       // Only refetch the profile when the user actually changes — TOKEN_REFRESHED
       // and other same-user events must not hammer the DB.
       if (session?.user.id !== prevUid) {
@@ -169,7 +175,13 @@ export function useAuthInit(): void {
         else supabase.auth.stopAutoRefresh();
       }
       if (state === 'active' && useAuthStore.getState().session) {
-        refreshProfile().catch(() => {});
+        // Adopt any session the widget refreshed while this app wasn't
+        // running BEFORE anything else touches auth — Supabase rotates
+        // refresh tokens, so this app's own stale one would otherwise fail
+        // its next auto-refresh (src/lib/widgetAuth.ts).
+        reconcileWidgetSession()
+          .then(() => refreshProfile())
+          .catch(() => {});
       }
     });
 

@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -5,7 +6,7 @@ import WidgetKit
 // expo-target.config.js (auto-synced from the main app) — must match
 // EXACTLY (case-sensitive) or this reads an empty, unrelated container.
 private let appGroup = "group.com.halkora.app.widget"
-private let snapshotKey = "snapshot"
+private let activeChallengesKey = "activeChallenges"
 
 // Hand-maintained TR/EN copy, same pattern as supabase/functions/notify's
 // COPY dict (docs/AGENTS.md) — this Swift target can't import src/i18n/*.
@@ -34,8 +35,8 @@ private func copyFor(_ locale: String?) -> WidgetCopy {
   locale == "en" ? copyEn : copyTr
 }
 
-// Mirrors the object src/lib/widget.ts writes via ExtensionStorage.set —
-// keep the field names/types in sync with that file.
+// Mirrors one element of the array src/lib/widget.ts writes via
+// ExtensionStorage.set — keep field names/types in sync with that file.
 private struct HalkoraSnapshot: Codable {
   var challengeId: String
   var title: String
@@ -47,12 +48,194 @@ private struct HalkoraSnapshot: Codable {
   var locale: String?
 }
 
-private func loadSnapshot() -> HalkoraSnapshot? {
+private func loadActiveChallenges() -> [HalkoraSnapshot] {
   guard let defaults = UserDefaults(suiteName: appGroup),
-    let data = defaults.data(forKey: snapshotKey)
-  else { return nil }
-  return try? JSONDecoder().decode(HalkoraSnapshot.self, from: data)
+    let data = defaults.data(forKey: activeChallengesKey),
+    let list = try? JSONDecoder().decode([HalkoraSnapshot].self, from: data)
+  else { return [] }
+  return list
 }
+
+// MARK: - Direct network check-in (no app open)
+//
+// Saha testi bulgusu: "widget direk ağdan veri çeksin, uygulamayı açmadan
+// check-in yapabilmeli". The widget process can't run RN/JS or see
+// supabase-js's in-memory session — src/lib/widgetAuth.ts mirrors the
+// signed-in session's access/refresh token (and the public Supabase
+// URL/anon key) into this same shared App Group on every auth change, so
+// this extension can make its own authenticated REST calls.
+//
+// The trickiest part: Supabase ROTATES refresh tokens on use. If this
+// widget refreshes the token while the app isn't running, the app's OWN
+// in-memory refresh token becomes stale — src/hooks/useAuth.ts's
+// reconcileWidgetSession() adopts whatever's newest here on every
+// foreground resume specifically to paper over that.
+private struct SharedAuth {
+  var supabaseUrl: String
+  var supabaseAnonKey: String
+  var accessToken: String
+  var refreshToken: String
+  var expiresAt: Double  // unix seconds
+}
+
+private func loadAuth() -> SharedAuth? {
+  guard let defaults = UserDefaults(suiteName: appGroup),
+    let url = defaults.string(forKey: "supabaseUrl"), !url.isEmpty,
+    let anonKey = defaults.string(forKey: "supabaseAnonKey"), !anonKey.isEmpty,
+    let accessToken = defaults.string(forKey: "accessToken"), !accessToken.isEmpty,
+    let refreshToken = defaults.string(forKey: "refreshToken"), !refreshToken.isEmpty
+  else { return nil }
+  let expiresAt = defaults.double(forKey: "expiresAt")
+  return SharedAuth(
+    supabaseUrl: url, supabaseAnonKey: anonKey, accessToken: accessToken,
+    refreshToken: refreshToken, expiresAt: expiresAt)
+}
+
+private func saveRefreshedTokens(_ accessToken: String, _ refreshToken: String, _ expiresAt: Double) {
+  guard let defaults = UserDefaults(suiteName: appGroup) else { return }
+  defaults.set(accessToken, forKey: "accessToken")
+  defaults.set(refreshToken, forKey: "refreshToken")
+  defaults.set(expiresAt, forKey: "expiresAt")
+}
+
+private struct RefreshTokenResponse: Codable {
+  let access_token: String
+  let refresh_token: String
+  let expires_in: Double
+}
+
+private func refreshAccessToken(_ auth: SharedAuth) async throws -> SharedAuth {
+  var request = URLRequest(url: URL(string: "\(auth.supabaseUrl)/auth/v1/token?grant_type=refresh_token")!)
+  request.httpMethod = "POST"
+  request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  request.setValue(auth.supabaseAnonKey, forHTTPHeaderField: "apikey")
+  request.httpBody = try JSONEncoder().encode(["refresh_token": auth.refreshToken])
+
+  let (data, response) = try await URLSession.shared.data(for: request)
+  guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+    throw URLError(.userAuthenticationRequired)
+  }
+  let decoded = try JSONDecoder().decode(RefreshTokenResponse.self, from: data)
+  let newExpiresAt = Date().timeIntervalSince1970 + decoded.expires_in
+  // Written back immediately so a second CheckInIntent tap (or the app on
+  // its next resume, via reconcileWidgetSession) sees the rotated token —
+  // the OLD refresh token is now invalid at Supabase.
+  saveRefreshedTokens(decoded.access_token, decoded.refresh_token, newExpiresAt)
+  return SharedAuth(
+    supabaseUrl: auth.supabaseUrl, supabaseAnonKey: auth.supabaseAnonKey,
+    accessToken: decoded.access_token, refreshToken: decoded.refresh_token, expiresAt: newExpiresAt)
+}
+
+private func markCheckedInLocally(_ challengeId: String) {
+  guard let defaults = UserDefaults(suiteName: appGroup),
+    let data = defaults.data(forKey: activeChallengesKey),
+    var list = try? JSONDecoder().decode([HalkoraSnapshot].self, from: data)
+  else { return }
+  guard let idx = list.firstIndex(where: { $0.challengeId == challengeId }) else { return }
+  list[idx].checkedInToday = 1
+  guard let newData = try? JSONEncoder().encode(list) else { return }
+  defaults.set(newData, forKey: activeChallengesKey)
+}
+
+/// Calls the SAME `check-in` Edge Function src/data/checkins.ts uses
+/// (day-number math + joker allowance are validated server-side there, not
+/// re-implemented here) — just over a direct authenticated URLRequest
+/// instead of supabase-js, since this process can't run supabase-js.
+private func performCheckIn(challengeId: String) async throws {
+  guard var auth = loadAuth() else { throw URLError(.userAuthenticationRequired) }
+
+  // 60s safety margin before the token's real expiry.
+  if auth.expiresAt < Date().timeIntervalSince1970 + 60 {
+    auth = try await refreshAccessToken(auth)
+  }
+
+  var request = URLRequest(url: URL(string: "\(auth.supabaseUrl)/functions/v1/check-in")!)
+  request.httpMethod = "POST"
+  request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  request.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
+  request.setValue(auth.supabaseAnonKey, forHTTPHeaderField: "apikey")
+  request.httpBody = try JSONEncoder().encode(["challenge_id": challengeId, "type": "done"])
+
+  let (_, response) = try await URLSession.shared.data(for: request)
+  guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+    throw URLError(.badServerResponse)
+  }
+  // Optimistic — the widget may not reopen the app for a while, so reflect
+  // "done" immediately rather than waiting for the app's next real sync.
+  markCheckedInLocally(challengeId)
+}
+
+/// Bound to the not-checked-in card's Button below — runs entirely in this
+/// extension's process, no app launch.
+struct CheckInIntent: AppIntent {
+  static var title: LocalizedStringResource = "Check-in Yap"
+
+  @Parameter(title: "Halka ID")
+  var challengeId: String
+
+  init() {}
+  init(challengeId: String) {
+    self.challengeId = challengeId
+  }
+
+  func perform() async throws -> some IntentResult {
+    // Silent failure by design — a widget button has no surface for an
+    // error message. Worst case the row still reads "check-in yap" and the
+    // next tap (or opening the app) tries again / shows the true state.
+    try? await performCheckIn(challengeId: challengeId)
+    WidgetCenter.shared.reloadTimelines(ofKind: "HalkoraWidget")
+    return .result()
+  }
+}
+
+// MARK: - Per-instance widget configuration (App Intents)
+//
+// A WidgetKit view can't itself respond to a swipe gesture — Apple only
+// allows Button/Toggle taps (iOS 17+). The system-native way to "swipe
+// between halkalar" (saha testi bulgusu) is adding several copies of this
+// SAME widget to the Home Screen and letting iOS stack them (or dragging
+// one on top of another) — each copy independently configured to a
+// specific challenge via long-press -> Edit Widget, exactly like a weather
+// widget lets you pick which city each copy shows. ChallengeEntity +
+// ChallengeQuery below is what powers that picker.
+
+struct ChallengeEntity: AppEntity {
+  static var typeDisplayRepresentation: TypeDisplayRepresentation = "Halka"
+  static var defaultQuery = ChallengeQuery()
+
+  var id: String
+  var title: String
+
+  var displayRepresentation: DisplayRepresentation {
+    DisplayRepresentation(title: "\(title)")
+  }
+}
+
+struct ChallengeQuery: EntityQuery {
+  func entities(for identifiers: [String]) async throws -> [ChallengeEntity] {
+    loadActiveChallenges()
+      .filter { identifiers.contains($0.challengeId) }
+      .map { ChallengeEntity(id: $0.challengeId, title: $0.title) }
+  }
+
+  func suggestedEntities() async throws -> [ChallengeEntity] {
+    loadActiveChallenges().map { ChallengeEntity(id: $0.challengeId, title: $0.title) }
+  }
+
+  func defaultResult() async -> ChallengeEntity? {
+    try? await suggestedEntities().first
+  }
+}
+
+struct SelectChallengeIntent: WidgetConfigurationIntent {
+  static var title: LocalizedStringResource = "Halka Seç"
+  static var description = IntentDescription("Bu widget'ın hangi halkayı göstereceğini seç.")
+
+  @Parameter(title: "Halka")
+  var challenge: ChallengeEntity?
+}
+
+// MARK: - Timeline
 
 struct HalkoraEntry: TimelineEntry {
   let date: Date
@@ -62,7 +245,10 @@ struct HalkoraEntry: TimelineEntry {
   fileprivate let snapshot: HalkoraSnapshot?
 }
 
-struct HalkoraProvider: TimelineProvider {
+struct HalkoraProvider: AppIntentTimelineProvider {
+  typealias Intent = SelectChallengeIntent
+  typealias Entry = HalkoraEntry
+
   func placeholder(in context: Context) -> HalkoraEntry {
     HalkoraEntry(
       date: .now,
@@ -71,19 +257,62 @@ struct HalkoraProvider: TimelineProvider {
         checkedInToday: 0, locale: "tr"))
   }
 
-  func getSnapshot(in context: Context, completion: @escaping (HalkoraEntry) -> Void) {
-    completion(HalkoraEntry(date: .now, snapshot: loadSnapshot()))
+  func snapshot(for configuration: SelectChallengeIntent, in context: Context) async -> HalkoraEntry {
+    HalkoraEntry(date: .now, snapshot: resolve(configuration))
   }
 
-  func getTimeline(in context: Context, completion: @escaping (Timeline<HalkoraEntry>) -> Void) {
-    let entry = HalkoraEntry(date: .now, snapshot: loadSnapshot())
-    // The app calls ExtensionStorage.reloadWidget() after every relevant
-    // change (check-in, challenge list refresh) — .never means this relies
-    // entirely on that in-app push instead of guessing a poll interval and
-    // burning through WidgetKit's limited daily refresh budget.
-    completion(Timeline(entries: [entry], policy: .never))
+  func timeline(for configuration: SelectChallengeIntent, in context: Context) async -> Timeline<HalkoraEntry> {
+    let all = loadActiveChallenges()
+
+    // Explicitly configured (Edit Widget -> picked one specific halka,
+    // meant for stacking several copies) -> pin to just that one, no
+    // auto-rotation.
+    if let pickedId = configuration.challenge?.id,
+      let picked = all.first(where: { $0.challengeId == pickedId })
+    {
+      return Timeline(entries: [HalkoraEntry(date: .now, snapshot: picked)], policy: .never)
+    }
+
+    // Unconfigured (the common case: just dragged onto the Home Screen) and
+    // more than one active challenge -> auto-rotate through ALL of them
+    // over time instead of always showing the same one forever (saha testi
+    // bulgusu: "swipe desteklemiyorsa otomatik dönsün kendi içinde"). A
+    // Timeline can carry several future-dated entries in one go — WidgetKit
+    // switches between them locally as each date arrives, no extra reload
+    // or network call spent per switch, only the one `timeline(for:)` call
+    // that generated all of them counts against the daily refresh budget.
+    if all.count > 1 {
+      let rotationInterval: TimeInterval = 15 * 60  // 15 dk / halka
+      let entries = all.enumerated().map { index, snapshot in
+        HalkoraEntry(
+          date: Date().addingTimeInterval(Double(index) * rotationInterval),
+          snapshot: snapshot)
+      }
+      // Ask for a fresh timeline once the loop finishes a full pass — picks
+      // up any challenge added/removed/checked-in since this was generated.
+      let nextFullReload = Date().addingTimeInterval(Double(all.count) * rotationInterval)
+      return Timeline(entries: entries, policy: .after(nextFullReload))
+    }
+
+    // Zero or exactly one active challenge -> nothing to rotate through.
+    let single = all.first(where: { $0.checkedInToday == 0 }) ?? all.first
+    return Timeline(entries: [HalkoraEntry(date: .now, snapshot: single)], policy: .never)
+  }
+
+  /// Used only for the instantaneous "Add Widget" gallery preview — not the
+  /// real rotating timeline above, so a single best-guess pick is enough.
+  private func resolve(_ configuration: SelectChallengeIntent) -> HalkoraSnapshot? {
+    let all = loadActiveChallenges()
+    if let pickedId = configuration.challenge?.id,
+      let picked = all.first(where: { $0.challengeId == pickedId })
+    {
+      return picked
+    }
+    return all.first(where: { $0.checkedInToday == 0 }) ?? all.first
   }
 }
+
+// MARK: - View
 
 // Named to avoid colliding with SwiftUI's own `View.accentColor(_:)`
 // modifier — a top-level constant with that exact name gets shadowed by
@@ -99,7 +328,7 @@ struct HalkoraWidgetView: View {
       if let snapshot = entry.snapshot {
         let c = copyFor(snapshot.locale)
         let checkedIn = snapshot.checkedInToday != 0
-        VStack(alignment: .leading, spacing: 6) {
+        let content = VStack(alignment: .leading, spacing: 6) {
           Text(snapshot.title)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
@@ -118,16 +347,19 @@ struct HalkoraWidgetView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        // A single tap target for the whole small widget: if today's
-        // already done, just open the ring; otherwise route through the
-        // auto-check-in screen (app/widget-checkin/[id].tsx) — true
-        // no-app-open check-in needs an iOS 17 AppIntent + native network
-        // call, saved for a later round (docs/ROADMAP.md).
-        .widgetURL(
-          checkedIn
-            ? URL(string: "halkora://challenge/\(snapshot.challengeId)")
-            : URL(string: "halkora://widget-checkin/\(snapshot.challengeId)")
-        )
+
+        if checkedIn {
+          // Nothing left to DO — tapping just opens the ring to look at it.
+          content.widgetURL(URL(string: "halkora://challenge/\(snapshot.challengeId)"))
+        } else {
+          // The whole card IS the check-in action (iOS 17+ Button+AppIntent
+          // -> runs in this extension's process, no app launch) — exactly
+          // "uygulamayı açmadan check-in yapabilmeli" (saha testi bulgusu).
+          Button(intent: CheckInIntent(challengeId: snapshot.challengeId)) {
+            content
+          }
+          .buttonStyle(.plain)
+        }
       } else {
         VStack(spacing: 6) {
           Image(systemName: "plus.circle")
@@ -149,12 +381,12 @@ struct HalkoraWidget: Widget {
   let kind = "HalkoraWidget"
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: HalkoraProvider()) { entry in
+    AppIntentConfiguration(kind: kind, intent: SelectChallengeIntent.self, provider: HalkoraProvider()) { entry in
       HalkoraWidgetView(entry: entry)
     }
     .configurationDisplayName("Halkora")
-    .description("Bugünkü halkanın durumu ve tek dokunuşla check-in.")
-    .supportedFamilies([.systemSmall])
+    .description("Bugünkü halkanın durumu ve tek dokunuşla check-in. Birden fazla kopya ekleyip her birini farklı bir halkaya ayarlayarak aralarında kaydırabilirsin.")
+    .supportedFamilies([.systemSmall, .systemMedium])
   }
 }
 
