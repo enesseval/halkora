@@ -56,6 +56,138 @@ private func loadActiveChallenges() -> [HalkoraSnapshot] {
   return list
 }
 
+// MARK: - Direct network check-in (no app open)
+//
+// Saha testi bulgusu: "widget direk ağdan veri çeksin, uygulamayı açmadan
+// check-in yapabilmeli". The widget process can't run RN/JS or see
+// supabase-js's in-memory session — src/lib/widgetAuth.ts mirrors the
+// signed-in session's access/refresh token (and the public Supabase
+// URL/anon key) into this same shared App Group on every auth change, so
+// this extension can make its own authenticated REST calls.
+//
+// The trickiest part: Supabase ROTATES refresh tokens on use. If this
+// widget refreshes the token while the app isn't running, the app's OWN
+// in-memory refresh token becomes stale — src/hooks/useAuth.ts's
+// reconcileWidgetSession() adopts whatever's newest here on every
+// foreground resume specifically to paper over that.
+private struct SharedAuth {
+  var supabaseUrl: String
+  var supabaseAnonKey: String
+  var accessToken: String
+  var refreshToken: String
+  var expiresAt: Double  // unix seconds
+}
+
+private func loadAuth() -> SharedAuth? {
+  guard let defaults = UserDefaults(suiteName: appGroup),
+    let url = defaults.string(forKey: "supabaseUrl"), !url.isEmpty,
+    let anonKey = defaults.string(forKey: "supabaseAnonKey"), !anonKey.isEmpty,
+    let accessToken = defaults.string(forKey: "accessToken"), !accessToken.isEmpty,
+    let refreshToken = defaults.string(forKey: "refreshToken"), !refreshToken.isEmpty
+  else { return nil }
+  let expiresAt = defaults.double(forKey: "expiresAt")
+  return SharedAuth(
+    supabaseUrl: url, supabaseAnonKey: anonKey, accessToken: accessToken,
+    refreshToken: refreshToken, expiresAt: expiresAt)
+}
+
+private func saveRefreshedTokens(_ accessToken: String, _ refreshToken: String, _ expiresAt: Double) {
+  guard let defaults = UserDefaults(suiteName: appGroup) else { return }
+  defaults.set(accessToken, forKey: "accessToken")
+  defaults.set(refreshToken, forKey: "refreshToken")
+  defaults.set(expiresAt, forKey: "expiresAt")
+}
+
+private struct RefreshTokenResponse: Codable {
+  let access_token: String
+  let refresh_token: String
+  let expires_in: Double
+}
+
+private func refreshAccessToken(_ auth: SharedAuth) async throws -> SharedAuth {
+  var request = URLRequest(url: URL(string: "\(auth.supabaseUrl)/auth/v1/token?grant_type=refresh_token")!)
+  request.httpMethod = "POST"
+  request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  request.setValue(auth.supabaseAnonKey, forHTTPHeaderField: "apikey")
+  request.httpBody = try JSONEncoder().encode(["refresh_token": auth.refreshToken])
+
+  let (data, response) = try await URLSession.shared.data(for: request)
+  guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+    throw URLError(.userAuthenticationRequired)
+  }
+  let decoded = try JSONDecoder().decode(RefreshTokenResponse.self, from: data)
+  let newExpiresAt = Date().timeIntervalSince1970 + decoded.expires_in
+  // Written back immediately so a second CheckInIntent tap (or the app on
+  // its next resume, via reconcileWidgetSession) sees the rotated token —
+  // the OLD refresh token is now invalid at Supabase.
+  saveRefreshedTokens(decoded.access_token, decoded.refresh_token, newExpiresAt)
+  return SharedAuth(
+    supabaseUrl: auth.supabaseUrl, supabaseAnonKey: auth.supabaseAnonKey,
+    accessToken: decoded.access_token, refreshToken: decoded.refresh_token, expiresAt: newExpiresAt)
+}
+
+private func markCheckedInLocally(_ challengeId: String) {
+  guard let defaults = UserDefaults(suiteName: appGroup),
+    let data = defaults.data(forKey: activeChallengesKey),
+    var list = try? JSONDecoder().decode([HalkoraSnapshot].self, from: data)
+  else { return }
+  guard let idx = list.firstIndex(where: { $0.challengeId == challengeId }) else { return }
+  list[idx].checkedInToday = 1
+  guard let newData = try? JSONEncoder().encode(list) else { return }
+  defaults.set(newData, forKey: activeChallengesKey)
+}
+
+/// Calls the SAME `check-in` Edge Function src/data/checkins.ts uses
+/// (day-number math + joker allowance are validated server-side there, not
+/// re-implemented here) — just over a direct authenticated URLRequest
+/// instead of supabase-js, since this process can't run supabase-js.
+private func performCheckIn(challengeId: String) async throws {
+  guard var auth = loadAuth() else { throw URLError(.userAuthenticationRequired) }
+
+  // 60s safety margin before the token's real expiry.
+  if auth.expiresAt < Date().timeIntervalSince1970 + 60 {
+    auth = try await refreshAccessToken(auth)
+  }
+
+  var request = URLRequest(url: URL(string: "\(auth.supabaseUrl)/functions/v1/check-in")!)
+  request.httpMethod = "POST"
+  request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  request.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
+  request.setValue(auth.supabaseAnonKey, forHTTPHeaderField: "apikey")
+  request.httpBody = try JSONEncoder().encode(["challenge_id": challengeId, "type": "done"])
+
+  let (_, response) = try await URLSession.shared.data(for: request)
+  guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+    throw URLError(.badServerResponse)
+  }
+  // Optimistic — the widget may not reopen the app for a while, so reflect
+  // "done" immediately rather than waiting for the app's next real sync.
+  markCheckedInLocally(challengeId)
+}
+
+/// Bound to the not-checked-in card's Button below — runs entirely in this
+/// extension's process, no app launch.
+struct CheckInIntent: AppIntent {
+  static var title: LocalizedStringResource = "Check-in Yap"
+
+  @Parameter(title: "Halka ID")
+  var challengeId: String
+
+  init() {}
+  init(challengeId: String) {
+    self.challengeId = challengeId
+  }
+
+  func perform() async throws -> some IntentResult {
+    // Silent failure by design — a widget button has no surface for an
+    // error message. Worst case the row still reads "check-in yap" and the
+    // next tap (or opening the app) tries again / shows the true state.
+    try? await performCheckIn(challengeId: challengeId)
+    WidgetCenter.shared.reloadTimelines(ofKind: "HalkoraWidget")
+    return .result()
+  }
+}
+
 // MARK: - Per-instance widget configuration (App Intents)
 //
 // A WidgetKit view can't itself respond to a swipe gesture — Apple only
@@ -196,7 +328,7 @@ struct HalkoraWidgetView: View {
       if let snapshot = entry.snapshot {
         let c = copyFor(snapshot.locale)
         let checkedIn = snapshot.checkedInToday != 0
-        VStack(alignment: .leading, spacing: 6) {
+        let content = VStack(alignment: .leading, spacing: 6) {
           Text(snapshot.title)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
@@ -215,17 +347,19 @@ struct HalkoraWidgetView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        // A single tap target for the whole widget: if today's already
-        // done, just open the ring; otherwise route through the
-        // auto-check-in screen (app/widget-checkin/[id].tsx) — true
-        // no-app-open check-in needs a separate AppIntent making its own
-        // authenticated Supabase call from the widget process, saved for a
-        // later round (docs/ROADMAP.md).
-        .widgetURL(
-          checkedIn
-            ? URL(string: "halkora://challenge/\(snapshot.challengeId)")
-            : URL(string: "halkora://widget-checkin/\(snapshot.challengeId)")
-        )
+
+        if checkedIn {
+          // Nothing left to DO — tapping just opens the ring to look at it.
+          content.widgetURL(URL(string: "halkora://challenge/\(snapshot.challengeId)"))
+        } else {
+          // The whole card IS the check-in action (iOS 17+ Button+AppIntent
+          // -> runs in this extension's process, no app launch) — exactly
+          // "uygulamayı açmadan check-in yapabilmeli" (saha testi bulgusu).
+          Button(intent: CheckInIntent(challengeId: snapshot.challengeId)) {
+            content
+          }
+          .buttonStyle(.plain)
+        }
       } else {
         VStack(spacing: 6) {
           Image(systemName: "plus.circle")

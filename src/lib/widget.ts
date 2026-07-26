@@ -23,9 +23,13 @@ const storage = Platform.OS === 'ios' ? new ExtensionStorage(APP_GROUP) : null;
 
 /**
  * Pushes every active challenge into the shared App Group so the home-screen
- * widget (targets/widget) can render one without its own network access — a
- * WidgetKit extension can't run RN/JS or call Supabase itself. Call this
- * whenever the challenge list changes (fetch, check-in, undo).
+ * widget (targets/widget) can render one without waiting for this app to be
+ * open. Call this whenever the challenge list changes (fetch, check-in,
+ * undo) — the widget's own tap-to-check-in (CheckInIntent) also calls the
+ * check-in Edge Function directly over the network and writes the result
+ * back into this same storage, so its view stays fresh even when this
+ * function never runs (src/lib/widgetAuth.ts is what makes that call
+ * authenticated).
  *
  * Best-effort and silent: this is a side-channel for a nice-to-have Home
  * Screen widget, never allowed to throw into a real user-facing flow.

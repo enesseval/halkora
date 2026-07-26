@@ -214,7 +214,6 @@ function RootNavigator() {
       />
       <Stack.Screen name="join/[code]" options={{ animation: 'fade' }} />
       <Stack.Screen name="j/[code]" options={{ animation: 'none' }} />
-      <Stack.Screen name="widget-checkin/[id]" options={{ animation: 'none' }} />
       <Stack.Screen
         name="paywall"
         options={{ presentation: 'transparentModal', animation: 'none' }}
