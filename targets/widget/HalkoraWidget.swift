@@ -130,20 +130,45 @@ struct HalkoraProvider: AppIntentTimelineProvider {
   }
 
   func timeline(for configuration: SelectChallengeIntent, in context: Context) async -> Timeline<HalkoraEntry> {
-    let entry = HalkoraEntry(date: .now, snapshot: resolve(configuration))
-    // The app calls ExtensionStorage.reloadWidget() after every relevant
-    // change (check-in, challenge list refresh) — .never means this relies
-    // entirely on that in-app push instead of guessing a poll interval and
-    // burning through WidgetKit's limited daily refresh budget.
-    return Timeline(entries: [entry], policy: .never)
+    let all = loadActiveChallenges()
+
+    // Explicitly configured (Edit Widget -> picked one specific halka,
+    // meant for stacking several copies) -> pin to just that one, no
+    // auto-rotation.
+    if let pickedId = configuration.challenge?.id,
+      let picked = all.first(where: { $0.challengeId == pickedId })
+    {
+      return Timeline(entries: [HalkoraEntry(date: .now, snapshot: picked)], policy: .never)
+    }
+
+    // Unconfigured (the common case: just dragged onto the Home Screen) and
+    // more than one active challenge -> auto-rotate through ALL of them
+    // over time instead of always showing the same one forever (saha testi
+    // bulgusu: "swipe desteklemiyorsa otomatik dönsün kendi içinde"). A
+    // Timeline can carry several future-dated entries in one go — WidgetKit
+    // switches between them locally as each date arrives, no extra reload
+    // or network call spent per switch, only the one `timeline(for:)` call
+    // that generated all of them counts against the daily refresh budget.
+    if all.count > 1 {
+      let rotationInterval: TimeInterval = 15 * 60  // 15 dk / halka
+      let entries = all.enumerated().map { index, snapshot in
+        HalkoraEntry(
+          date: Date().addingTimeInterval(Double(index) * rotationInterval),
+          snapshot: snapshot)
+      }
+      // Ask for a fresh timeline once the loop finishes a full pass — picks
+      // up any challenge added/removed/checked-in since this was generated.
+      let nextFullReload = Date().addingTimeInterval(Double(all.count) * rotationInterval)
+      return Timeline(entries: entries, policy: .after(nextFullReload))
+    }
+
+    // Zero or exactly one active challenge -> nothing to rotate through.
+    let single = all.first(where: { $0.checkedInToday == 0 }) ?? all.first
+    return Timeline(entries: [HalkoraEntry(date: .now, snapshot: single)], policy: .never)
   }
 
-  /// The user explicitly configured this widget copy (Edit Widget -> pick a
-  /// halka) -> show exactly that one, even if it's since been checked into.
-  /// Otherwise (freshly dragged onto the Home Screen, never configured, or
-  /// the configured challenge no longer exists) fall back to the single
-  /// most actionable one: whichever's still waiting on today's check-in, or
-  /// the first active one if everyone's done.
+  /// Used only for the instantaneous "Add Widget" gallery preview — not the
+  /// real rotating timeline above, so a single best-guess pick is enough.
   private func resolve(_ configuration: SelectChallengeIntent) -> HalkoraSnapshot? {
     let all = loadActiveChallenges()
     if let pickedId = configuration.challenge?.id,
