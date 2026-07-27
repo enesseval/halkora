@@ -37,15 +37,93 @@ private func copyFor(_ locale: String?) -> WidgetCopy {
 
 // Mirrors one element of the array src/lib/widget.ts writes via
 // ExtensionStorage.set — keep field names/types in sync with that file.
+//
+// Deliberately carries the RAW day-math inputs (timezone/startDate/
+// createdAt) instead of a precomputed currentDay + checkedInToday boolean:
+// the app can't push an update at midnight while it isn't running, so a
+// precomputed snapshot silently claimed the old day and "Yapıldı ✓" well
+// into the next one (saha testi bulgusu: "tekrar uygulamaya girene kadar
+// yeni güne widget geçmiyor"). currentDay/checkedIn are derived below.
 private struct HalkoraSnapshot: Codable {
   var challengeId: String
   var title: String
-  var currentDay: Int
   var totalDays: Int
+  var timezone: String
+  var startDate: String  // "YYYY-MM-DD" ("" only for a lobby challenge)
+  var createdAt: String  // ISO — FAST_DAYS anchors its 1-minute days here
   // ExtensionStorage.set only allows string/number values inside an
   // object (no booleans) — 0/1 on the JS side.
-  var checkedInToday: Int
+  var fastDays: Int
+  /// Which day the check-in belongs to (see dayKeyFor in src/lib/widget.ts),
+  /// empty when not checked in. Compared against todayKey() below.
+  var checkedInDayKey: String
   var locale: String?
+}
+
+private let isoFormatter: ISO8601DateFormatter = {
+  let f = ISO8601DateFormatter()
+  f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+  return f
+}()
+
+private func parseISO(_ s: String) -> Date? {
+  isoFormatter.date(from: s) ?? ISO8601DateFormatter().date(from: s)
+}
+
+/// "YYYY-MM-DD" as seen in `timezone` — the same value
+/// Intl.DateTimeFormat('en-CA', { timeZone }) produces on the JS side.
+private func dateString(_ date: Date, in timezone: String) -> String {
+  let f = DateFormatter()
+  f.locale = Locale(identifier: "en_US_POSIX")
+  f.timeZone = TimeZone(identifier: timezone) ?? .current
+  f.dateFormat = "yyyy-MM-dd"
+  return f.string(from: date)
+}
+
+extension HalkoraSnapshot {
+  /// Mirrors dayKeyFor() in src/lib/widget.ts — keep both in sync.
+  var todayKey: String {
+    if fastDays != 0 { return String(currentDay) }
+    return dateString(Date(), in: timezone)
+  }
+
+  /// Mirrors daysSinceStart() + `rawDay` in src/data/challenges.ts.
+  var currentDay: Int {
+    if fastDays != 0 {
+      guard let created = parseISO(createdAt) else { return 1 }
+      return Int(Date().timeIntervalSince(created) / 60) + 1
+    }
+    guard !startDate.isEmpty else { return 0 }
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = TimeZone(identifier: "UTC")
+    f.dateFormat = "yyyy-MM-dd"
+    guard let start = f.date(from: startDate),
+      let today = f.date(from: dateString(Date(), in: timezone))
+    else { return 0 }
+    let diff = (today.timeIntervalSince(start) / 86_400).rounded()
+    return min(Int(diff) + 1, totalDays)
+  }
+
+  var checkedInToday: Bool {
+    !checkedInDayKey.isEmpty && checkedInDayKey == todayKey
+  }
+
+  /// When this snapshot's derived state can next change on its own, so the
+  /// timeline can ask WidgetKit to reload exactly then instead of going
+  /// stale until the app happens to run again.
+  var nextRolloverDate: Date {
+    if fastDays != 0 { return Date().addingTimeInterval(60) }
+    let tz = TimeZone(identifier: timezone) ?? .current
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    // A minute past midnight, not exactly midnight — WidgetKit fires
+    // "around" the requested date, and firing a hair early would recompute
+    // the SAME day and then sit stale for another 24h.
+    let tomorrow = cal.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86_400)
+    let midnight = cal.startOfDay(for: tomorrow)
+    return midnight.addingTimeInterval(60)
+  }
 }
 
 private func loadActiveChallenges() -> [HalkoraSnapshot] {
@@ -132,7 +210,9 @@ private func markCheckedInLocally(_ challengeId: String) {
     var list = try? JSONDecoder().decode([HalkoraSnapshot].self, from: data)
   else { return }
   guard let idx = list.firstIndex(where: { $0.challengeId == challengeId }) else { return }
-  list[idx].checkedInToday = 1
+  // Stamped with the day it belongs to (not a bare `true`) so it expires by
+  // itself at the next rollover, exactly like the app-written value.
+  list[idx].checkedInDayKey = list[idx].todayKey
   guard let newData = try? JSONEncoder().encode(list) else { return }
   defaults.set(newData, forKey: activeChallengesKey)
 }
@@ -253,8 +333,10 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     HalkoraEntry(
       date: .now,
       snapshot: HalkoraSnapshot(
-        challengeId: "", title: "Halkora", currentDay: 4, totalDays: 30,
-        checkedInToday: 0, locale: "tr"))
+        challengeId: "", title: "Halkora", totalDays: 30,
+        timezone: TimeZone.current.identifier,
+        startDate: dateString(Date().addingTimeInterval(-3 * 86_400), in: TimeZone.current.identifier),
+        createdAt: "", fastDays: 0, checkedInDayKey: "", locale: "tr"))
   }
 
   func snapshot(for configuration: SelectChallengeIntent, in context: Context) async -> HalkoraEntry {
@@ -266,11 +348,14 @@ struct HalkoraProvider: AppIntentTimelineProvider {
 
     // Explicitly configured (Edit Widget -> picked one specific halka,
     // meant for stacking several copies) -> pin to just that one, no
-    // auto-rotation.
+    // auto-rotation. Still reloads at the day boundary so the derived
+    // day/checked-in state doesn't sit stale until the app next runs.
     if let pickedId = configuration.challenge?.id,
       let picked = all.first(where: { $0.challengeId == pickedId })
     {
-      return Timeline(entries: [HalkoraEntry(date: .now, snapshot: picked)], policy: .never)
+      return Timeline(
+        entries: [HalkoraEntry(date: .now, snapshot: picked)],
+        policy: .after(picked.nextRolloverDate))
     }
 
     // Unconfigured (the common case: just dragged onto the Home Screen) and
@@ -288,15 +373,24 @@ struct HalkoraProvider: AppIntentTimelineProvider {
           date: Date().addingTimeInterval(Double(index) * rotationInterval),
           snapshot: snapshot)
       }
-      // Ask for a fresh timeline once the loop finishes a full pass — picks
-      // up any challenge added/removed/checked-in since this was generated.
-      let nextFullReload = Date().addingTimeInterval(Double(all.count) * rotationInterval)
-      return Timeline(entries: entries, policy: .after(nextFullReload))
+      // Reload once the rotation finishes a full pass — or at the day
+      // boundary if that lands sooner, so a rollover is never waiting on a
+      // long rotation to wrap around first.
+      let afterFullPass = Date().addingTimeInterval(Double(all.count) * rotationInterval)
+      let earliestRollover = all.map(\.nextRolloverDate).min() ?? afterFullPass
+      return Timeline(entries: entries, policy: .after(min(afterFullPass, earliestRollover)))
     }
 
     // Zero or exactly one active challenge -> nothing to rotate through.
-    let single = all.first(where: { $0.checkedInToday == 0 }) ?? all.first
-    return Timeline(entries: [HalkoraEntry(date: .now, snapshot: single)], policy: .never)
+    guard let single = all.first(where: { !$0.checkedInToday }) ?? all.first else {
+      // No active challenge at all — nothing to derive, so nothing to
+      // schedule; the app's own reloadWidget() call is the only thing that
+      // can meaningfully change this state.
+      return Timeline(entries: [HalkoraEntry(date: .now, snapshot: nil)], policy: .never)
+    }
+    return Timeline(
+      entries: [HalkoraEntry(date: .now, snapshot: single)],
+      policy: .after(single.nextRolloverDate))
   }
 
   /// Used only for the instantaneous "Add Widget" gallery preview — not the
@@ -308,7 +402,7 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     {
       return picked
     }
-    return all.first(where: { $0.checkedInToday == 0 }) ?? all.first
+    return all.first(where: { !$0.checkedInToday }) ?? all.first
   }
 }
 
@@ -327,7 +421,7 @@ struct HalkoraWidgetView: View {
     Group {
       if let snapshot = entry.snapshot {
         let c = copyFor(snapshot.locale)
-        let checkedIn = snapshot.checkedInToday != 0
+        let checkedIn = snapshot.checkedInToday
         let content = VStack(alignment: .leading, spacing: 6) {
           Text(snapshot.title)
             .font(.system(size: 13, weight: .semibold))

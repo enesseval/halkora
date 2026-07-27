@@ -72,6 +72,17 @@ export interface Challenge {
   /** The challenge's total joker allowance (owner's choice at creation) —
    * jokerRemaining alone can't show "2 of 3 left" without this. */
   jokerAllowance: number;
+  /** Everything below is the raw day-math input the home-screen widget needs
+   * to recompute "which day is it / did I check in TODAY" entirely on its
+   * own (targets/widget/HalkoraWidget.swift). currentDay/meCheckedInToday
+   * above are snapshots taken whenever the app last fetched — a widget
+   * holding only those goes stale at midnight and can't tell, since a
+   * WidgetKit extension can't re-run this mapping (saha testi bulgusu:
+   * "tekrar uygulamaya girene kadar yeni güne widget geçmiyor").
+   * `startDate` is null while status === 'lobby' (not started yet). */
+  timezone: string;
+  startDate: string | null; // "YYYY-MM-DD"
+  createdAt: string; // ISO — FAST_DAYS test mode anchors its 1-minute days here
   hasMissedYesterday: boolean;
   missedAcknowledged?: boolean;
   inviteCode: string;

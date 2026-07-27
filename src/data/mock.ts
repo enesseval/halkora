@@ -18,6 +18,13 @@ function p(
 
 type MockDict = ReturnType<typeof getDict>['mock'];
 
+/* Demo-only stand-ins for the day-math fields the widget needs
+   (src/data/types.ts) — mock challenges never go through mapRow, but the
+   Challenge type requires them. */
+const DEMO_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const DEMO_START = new Date().toISOString().slice(0, 10);
+const DEMO_CREATED_AT = new Date().toISOString();
+
 /* ------------------------------------------------------------------ */
 /* Challenge 1 — "30 Gün Kitap Okuma" (main E6/E7 flow + E8 + E10)      */
 /* Day 7 of 14. I have NOT checked in. 4 others done → I become the 5th. */
@@ -40,6 +47,9 @@ function buildC1(m: MockDict): Challenge {
     meCheckedInToday: false,
     jokerRemaining: 1,
     jokerAllowance: 2,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: true,
     missedAcknowledged: false,
     inviteCode: 'kitap-14',
@@ -106,6 +116,9 @@ function buildC2(m: MockDict): Challenge {
     meCheckedInToday: false,
     jokerRemaining: 1,
     jokerAllowance: 1,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'seker-14',
     scheduleSummary: m.c2.scheduleSummary,
@@ -145,6 +158,9 @@ function buildC3(m: MockDict): Challenge {
     myOrder: 3,
     jokerRemaining: 2,
     jokerAllowance: 2,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'sabah-21',
     scheduleSummary: m.c3.scheduleSummary,
@@ -182,6 +198,9 @@ function buildC4(m: MockDict): Challenge {
     meCheckedInToday: false,
     jokerRemaining: 1,
     jokerAllowance: 1,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'adim-7',
     scheduleSummary: m.c4.scheduleSummary,
@@ -217,6 +236,9 @@ function buildArchive1(m: MockDict): Challenge {
     meCheckedInToday: true,
     jokerRemaining: 0,
     jokerAllowance: 1,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'kitap-v1',
     scheduleSummary: m.archive1.scheduleSummary,

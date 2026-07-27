@@ -254,6 +254,13 @@ export const useMockStore = create<MockState>((set, get) => ({
       meCheckedInToday: false,
       jokerRemaining: input.joker ?? 1,
       jokerAllowance: input.joker ?? 1,
+      // Day-math inputs the widget recomputes from (src/data/types.ts). Mock
+      // mode has no server row, so these mirror what insertChallenge would
+      // have written: the creating device's timezone, and today as the start
+      // unless it's a lobby/tomorrow challenge.
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      startDate: input.lobby ? null : (input.startDateISO ?? new Date().toISOString().slice(0, 10)),
+      createdAt: new Date().toISOString(),
       hasMissedYesterday: false,
       inviteCode: override?.inviteCode ?? id.slice(-6),
       scheduleSummary: t.common.scheduleSummary(input.dailyAction || t.common.dailyGoalFallback, input.totalDays),
