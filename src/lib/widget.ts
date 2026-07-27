@@ -57,10 +57,20 @@ export function widgetDiagnostics(challenges: Challenge[]): string {
   const counts = Object.entries(byStatus)
     .map(([k, v]) => `${k}:${v}`)
     .join(' ');
+  // Distinguishes the two ways a write can vanish, which need completely
+  // different fixes. ExtensionStorage's JS side falls back to no-op stubs
+  // when its native module isn't in the binary (see the package's
+  // build/ExtensionStorage.js) — that's a pod install/rebuild problem. If
+  // the module IS there but the write still doesn't read back, it's the App
+  // Group entitlement instead.
+  const nativeModule = (globalThis as { expo?: { modules?: Record<string, unknown> } }).expo?.modules
+    ?.ExtensionStorage;
+  if (!nativeModule) return `NATIVE MODÜL YOK (pod install/rebuild) · ${counts || 'halka yok'}`;
+
   try {
     storage.set('probe', Date.now());
     const probe = storage.get('probe');
-    if (probe == null) return `YAZILAMIYOR (app group/native modül) · ${counts || 'halka yok'}`;
+    if (probe == null) return `APP GROUP YAZMIYOR (entitlement) · ${counts || 'halka yok'}`;
     const stored = storage.get(ACTIVE_CHALLENGES_KEY);
     const storedCount = stored ? (JSON.parse(stored) as unknown[]).length : null;
     return `probe OK · paylaşılan:${storedCount ?? 'yok'} · ${counts || 'halka yok'}`;
