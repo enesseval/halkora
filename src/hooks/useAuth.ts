@@ -9,6 +9,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useMockStore } from '@/stores/mockStore';
 import { registerForPushToken } from '@/lib/push';
 import { syncWidgetSession, reconcileWidgetSession } from '@/lib/widgetAuth';
+import { syncWidgetSnapshot } from '@/lib/widget';
 import {
   savePushToken,
   clearPushToken,
@@ -173,6 +174,14 @@ export function useAuthInit(): void {
       if (Platform.OS !== 'web') {
         if (state === 'active') supabase.auth.startAutoRefresh();
         else supabase.auth.stopAutoRefresh();
+      }
+      if (state !== 'active') {
+        // Last write before this app goes quiet: react-query's polling stops
+        // while backgrounded (focusManager in app/_layout.tsx), so this is
+        // the final chance to hand the widget fresh data — and the widget
+        // can't refresh itself often either (WidgetKit reload budget), so
+        // whatever lands here is what it shows for a while.
+        syncWidgetSnapshot(useMockStore.getState().challenges);
       }
       if (state === 'active' && useAuthStore.getState().session) {
         // Adopt any session the widget refreshed while this app wasn't
