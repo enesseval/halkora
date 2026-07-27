@@ -4,7 +4,7 @@
 > **kökte** duruyor ve repoya dahil — her cihazda `git pull` ile güncel gelir.
 >
 > **Nasıl kullanılır:** her turda ilgili bölümü baştan sona geç, kutucukları
-> işaretle. Bulduğun her hatayı §12'deki şablonla kaydet. Bir bölüm tamamen
+> işaretle. Bulduğun her hatayı §13'teki şablonla kaydet. Bir bölüm tamamen
 > temiz geçmeden bir sonrakine güvenme — özellikle §1 (kurulum) doğru
 > değilse aşağıdaki her şey yanıltıcı sonuç verir.
 >
@@ -203,7 +203,59 @@ Bunlar yanlışsa aşağıdaki tüm sonuçlar şüphelidir.
 
 ---
 
-## 10. Ayarlar ve hesap
+## 10. Bahis v2 ve rövanş
+
+> Sıra bozulursa hiçbir şey yüklenmez: **SQL → notify deploy → build.**
+> Build önce gittiyse challenge listesi hiç gelmez (yeni istemci eski DB'de
+> `kind` kolonunu arıyor) — SQL'i çalıştırıp uygulamayı yeniden aç.
+
+### Kurulum
+- [ ] 🔴 `docs/db-stake-v2.sql` çalıştırıldı.
+- [ ] 🔴 `supabase functions deploy notify --no-verify-jwt` yapıldı.
+- [ ] Ana ekran normal yükleniyor (yüklenmiyorsa yukarıdaki sıra bozulmuş).
+
+### Oluşturma
+- [ ] Bahis adımında **Bireysel / Kolektif** seçimi görünüyor.
+- [ ] Bireysel: eşik seçenekleri süreye göre değişiyor — 14 günde 3 önerili,
+      **30 günde 6 seçeneği listede VAR** (sabit 0-1-2-3 değil).
+- [ ] Süreyi değiştir → öneri güncelleniyor. Eşiği elle seçtikten sonra süreyi
+      değiştir → **senin seçimin korunuyor**.
+- [ ] Kolektif: %80 / %90 / %100 ve kendi placeholder metni.
+- [ ] Bahis metni boş bırakılırsa halka bahissiz kuruluyor, hata yok.
+
+### Sonuç hesabı ⏱️
+- [ ] 🔴 Eşiği aşan kişi(ler) doğru listeleniyor.
+- [ ] 🔴 Herkes eşiği geçtiyse kutlama metni çıkıyor ve **"Ödendi" butonu YOK**.
+- [ ] Jokerle günü kurtaran kişi kaybeden sayılmıyor.
+- [ ] 🔴 **Erken bitirme:** uzun bir halkayı 2-3. günde bitir → kalan günler
+      kaçırılmış SAYILMIYOR, herkes borçlu çıkmıyor.
+- [ ] 🔴 📱 **Sonradan katılan:** halka başladıktan sonra katılan biri,
+      katılmadan önceki günlerden sorumlu değil.
+- [ ] Kolektif: hedef fiili katılımcı sayısıyla hesaplanıyor (lobiden başlamış,
+      kişi sayısı sonradan belli olmuş halkada da doğru).
+- [ ] v2 ÖNCESİ bahisli tamamlanmış halka → eski davranış (sadece metin),
+      buton yok, hiçbir yerde hata yok.
+
+### Ödendi / kutlandı
+- [ ] 🔴 Butona bas → kart "✓ Bahis kapandı" haline dönüyor.
+- [ ] 🔴 Sohbete sistem mesajı düşüyor ve 📱 gruba push gidiyor.
+- [ ] Mesaj içeriği sunucudan geliyor. *Bilinen sınırlama:* metnin dili,
+      butona basan kişinin diline göre — herkes kendi dilinde görmüyor.
+- [ ] İkinci kez basılamıyor.
+- [ ] 📱 İki cihaz aynı anda basarsa ikincisi sessizce geçiyor, hata vermiyor.
+
+### Rövanş
+- [ ] 🔴 Bitiş ekranı → "Rövanş" → create ekranı **lobi açık** geliyor.
+- [ ] Başlık, günlük hedef, süre ve bahis (tür + eşik/yüzde dahil) dolu geliyor.
+- [ ] 🔴 📱 Eski halkadaki herkese **"Rövanş! 🔁"** bildirimi gidiyor —
+      normal davet metni değil.
+- [ ] Bildirime dokun → katılma ekranı → katılınca lobide görünüyor.
+- [ ] Kurucu lobiden "Şimdi başlat" ile başlatabiliyor.
+- [ ] Aynı kişiye ikinci kez rövanş daveti gönderilirse akış kırılmıyor.
+
+---
+
+## 11. Ayarlar ve hesap
 
 - [ ] İsim değiştirilebiliyor; baş harfler güncelleniyor.
 - [ ] Kullanıcı adı değiştirilebiliyor; rezerve isim (`admin`) ve alınmış
@@ -222,7 +274,7 @@ Bunlar yanlışsa aşağıdaki tüm sonuçlar şüphelidir.
 
 ---
 
-## 11. Genel sağlamlık
+## 12. Genel sağlamlık
 
 - [ ] Uçak modunda her ekran: anlamlı hata + tekrar dene (beyaz ekran yok).
 - [ ] Uygulamayı 1+ saat arka planda bırakıp aç → ilk işlem (mesaj/check-in)
@@ -237,7 +289,7 @@ Bunlar yanlışsa aşağıdaki tüm sonuçlar şüphelidir.
 
 ---
 
-## 12. Bulunan hataların kaydı
+## 13. Bulunan hataların kaydı
 
 Her hata için:
 
