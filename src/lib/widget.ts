@@ -34,6 +34,41 @@ const storage = Platform.OS === 'ios' ? new ExtensionStorage(APP_GROUP) : null;
  * Best-effort and silent: this is a side-channel for a nice-to-have Home
  * Screen widget, never allowed to throw into a real user-facing flow.
  */
+/**
+ * DEV-only readback so "widget boş görünüyor" is self-diagnosable on a real
+ * TestFlight device instead of guessed at. Every failure mode in this chain
+ * is SILENT by design (the ExtensionStorage JS shim no-ops when the native
+ * module isn't linked; UserDefaults(suiteName:) returns nil when the App
+ * Group entitlement is missing; syncWidgetSnapshot swallows everything), so
+ * this writes a probe, reads it straight back, and reports what actually
+ * landed:
+ *  - "native module yok" -> pod install/rebuild missing
+ *  - "app group yazmıyor" -> App Group entitlement not provisioned
+ *  - probe OK but 0 active -> nothing wrong with the plumbing at all, there
+ *    just isn't an ACTIVE challenge (a 'lobby'/'upcoming' one doesn't count)
+ */
+export function widgetDiagnostics(challenges: Challenge[]): string {
+  if (Platform.OS !== 'ios') return 'iOS değil';
+  if (!storage) return 'storage yok';
+  const byStatus = challenges.reduce<Record<string, number>>((acc, c) => {
+    acc[c.status] = (acc[c.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  const counts = Object.entries(byStatus)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(' ');
+  try {
+    storage.set('probe', Date.now());
+    const probe = storage.get('probe');
+    if (probe == null) return `YAZILAMIYOR (app group/native modül) · ${counts || 'halka yok'}`;
+    const stored = storage.get(ACTIVE_CHALLENGES_KEY);
+    const storedCount = stored ? (JSON.parse(stored) as unknown[]).length : null;
+    return `probe OK · paylaşılan:${storedCount ?? 'yok'} · ${counts || 'halka yok'}`;
+  } catch (e) {
+    return `hata: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
 export function syncWidgetSnapshot(challenges: Challenge[]): void {
   if (!storage) return;
   try {
