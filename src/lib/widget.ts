@@ -1,7 +1,23 @@
 import { Platform } from 'react-native';
 import { ExtensionStorage } from '@bacons/apple-targets';
 import type { Challenge } from '@/data/types';
+import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
 import { getLocale } from '@/i18n';
+
+/**
+ * Identifies WHICH day a check-in belongs to, so the widget can tell "done
+ * today" from "done yesterday, still showing" without the app running.
+ * Mirrors HalkoraWidget.swift's todayKey() — keep both in sync.
+ */
+function dayKeyFor(c: Challenge): string {
+  if (FAST_DAYS) return String(fastDaysSince(c.createdAt) + 1);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: c.timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
 
 // Same App Group id as app.json's ios.entitlements + targets/widget's
 // expo-target.config.js (auto-synced from the main app) — must match
@@ -79,21 +95,71 @@ export function widgetDiagnostics(challenges: Challenge[]): string {
   }
 }
 
+/**
+ * Per-day ring state, one character per day, as the widget's segmented ring
+ * needs it. Only three cases actually render differently: a completed day, a
+ * joker-covered day, and everything else — "missed" and "upcoming" are
+ * deliberately identical in this product (never red, never punishing), so
+ * they collapse to the same '-'. `today` isn't encoded: the widget knows
+ * which day is today from its own math and paints that segment itself.
+ */
+function segmentsOf(c: Challenge): string {
+  return c.days
+    .map((d) => (d === 'done' ? 'd' : d === 'joker' ? 'j' : '-'))
+    .join('');
+}
+
 export function syncWidgetSnapshot(challenges: Challenge[]): void {
   if (!storage) return;
   try {
-    const active = challenges.filter((c) => c.status === 'active');
+    // Upcoming/lobby halkalar are included too — the widget has a real
+    // "not started yet" state for them (widget spec 04). Completed ones are
+    // dropped: nothing to act on, and they'd crowd out a live halka.
+    const relevant = challenges.filter(
+      (c) => c.status === 'active' || c.status === 'upcoming' || c.status === 'lobby',
+    );
     const locale = getLocale();
     storage.set(
       ACTIVE_CHALLENGES_KEY,
-      active.map((c) => ({
+      relevant.map((c) => ({
         challengeId: c.id,
         title: c.title,
-        currentDay: c.currentDay,
+        // Raw, un-prefixed action ("20 sayfa oku") — `dailyAction` carries a
+        // "Bugün: " prefix that would just repeat inside the widget.
+        dailyAction: c.dailyActionRaw ?? '',
         totalDays: c.totalDays,
-        // ExtensionStorage.set only allows string/number values inside an
-        // object (no booleans) — HalkoraWidget.swift reads this as 0/1.
-        checkedInToday: c.meCheckedInToday ? 1 : 0,
+        // Raw day-math inputs rather than a precomputed currentDay/
+        // checkedInToday: the widget re-derives both itself so it rolls over
+        // at midnight on its own (saha testi bulgusu: "tekrar uygulamaya
+        // girene kadar yeni güne widget geçmiyor"). HalkoraWidget.swift
+        // mirrors daysSinceStart() from src/data/challenges.ts exactly —
+        // change one, change the other.
+        timezone: c.timezone,
+        startDate: c.startDate ?? '',
+        createdAt: c.createdAt,
+        fastDays: FAST_DAYS ? 1 : 0,
+        // The day this check-in belongs to, not a boolean — a stale `true`
+        // is exactly what made the widget claim "Yapıldı ✓" into the next
+        // day. Empty when not checked in. Key format matches the widget's
+        // own todayKey(): the challenge-timezone date, or the fast-day
+        // number under FAST_DAYS.
+        checkedInDayKey: c.meCheckedInToday ? dayKeyFor(c) : '',
+        segments: segmentsOf(c),
+        // Group progress ("4/8 tamamladı"). Only meaningful for the day it
+        // was counted on, so it's stamped — the widget hides the line rather
+        // than showing yesterday's count after a rollover.
+        syncedDayKey: dayKeyFor(c),
+        participantsTotal: c.participants.length,
+        participantsDoneToday: c.participants.filter((p) => p.checkedInToday).length,
+        jokerRemaining: c.jokerRemaining,
+        // 'active' | 'upcoming' | 'lobby' — drives which layout the widget
+        // renders; the widget never re-derives this itself because a lobby
+        // has no start date to compute from.
+        state: c.status,
+        // Already-localized by the app ("Pazartesi başlıyor" / "Kurucu
+        // başlatacak") — the widget's own COPY dict can't produce these
+        // without duplicating the whole date-formatting layer.
+        startsLabel: c.startsLabel ?? c.startsWhen ?? '',
         locale,
       })),
     );
