@@ -14,6 +14,7 @@
         "applinks:halkora.app"
       ],
       "bundleIdentifier": "com.halkora.app",
+      "appleTeamId": "82S9ART43D",
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
         "CFBundleLocalizations": ["tr", "en"],
