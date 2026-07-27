@@ -95,16 +95,38 @@ export function widgetDiagnostics(challenges: Challenge[]): string {
   }
 }
 
+/**
+ * Per-day ring state, one character per day, as the widget's segmented ring
+ * needs it. Only three cases actually render differently: a completed day, a
+ * joker-covered day, and everything else — "missed" and "upcoming" are
+ * deliberately identical in this product (never red, never punishing), so
+ * they collapse to the same '-'. `today` isn't encoded: the widget knows
+ * which day is today from its own math and paints that segment itself.
+ */
+function segmentsOf(c: Challenge): string {
+  return c.days
+    .map((d) => (d === 'done' ? 'd' : d === 'joker' ? 'j' : '-'))
+    .join('');
+}
+
 export function syncWidgetSnapshot(challenges: Challenge[]): void {
   if (!storage) return;
   try {
-    const active = challenges.filter((c) => c.status === 'active');
+    // Upcoming/lobby halkalar are included too — the widget has a real
+    // "not started yet" state for them (widget spec 04). Completed ones are
+    // dropped: nothing to act on, and they'd crowd out a live halka.
+    const relevant = challenges.filter(
+      (c) => c.status === 'active' || c.status === 'upcoming' || c.status === 'lobby',
+    );
     const locale = getLocale();
     storage.set(
       ACTIVE_CHALLENGES_KEY,
-      active.map((c) => ({
+      relevant.map((c) => ({
         challengeId: c.id,
         title: c.title,
+        // Raw, un-prefixed action ("20 sayfa oku") — `dailyAction` carries a
+        // "Bugün: " prefix that would just repeat inside the widget.
+        dailyAction: c.dailyActionRaw ?? '',
         totalDays: c.totalDays,
         // Raw day-math inputs rather than a precomputed currentDay/
         // checkedInToday: the widget re-derives both itself so it rolls over
@@ -122,6 +144,22 @@ export function syncWidgetSnapshot(challenges: Challenge[]): void {
         // own todayKey(): the challenge-timezone date, or the fast-day
         // number under FAST_DAYS.
         checkedInDayKey: c.meCheckedInToday ? dayKeyFor(c) : '',
+        segments: segmentsOf(c),
+        // Group progress ("4/8 tamamladı"). Only meaningful for the day it
+        // was counted on, so it's stamped — the widget hides the line rather
+        // than showing yesterday's count after a rollover.
+        syncedDayKey: dayKeyFor(c),
+        participantsTotal: c.participants.length,
+        participantsDoneToday: c.participants.filter((p) => p.checkedInToday).length,
+        jokerRemaining: c.jokerRemaining,
+        // 'active' | 'upcoming' | 'lobby' — drives which layout the widget
+        // renders; the widget never re-derives this itself because a lobby
+        // has no start date to compute from.
+        state: c.status,
+        // Already-localized by the app ("Pazartesi başlıyor" / "Kurucu
+        // başlatacak") — the widget's own COPY dict can't produce these
+        // without duplicating the whole date-formatting layer.
+        startsLabel: c.startsLabel ?? c.startsWhen ?? '',
         locale,
       })),
     );
