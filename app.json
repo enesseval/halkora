@@ -78,6 +78,14 @@
           "backgroundColor": "#0D0E11"
         }
       ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ],
       "@bacons/apple-targets"
     ],
     "extra": {
