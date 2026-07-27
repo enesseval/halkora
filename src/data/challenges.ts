@@ -3,7 +3,8 @@ import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
 import { buildDays, formatShortDate } from '@/lib/day';
 import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
-import { getDict } from '@/i18n';
+import { computeStakeOutcome } from './stakeOutcome';
+import { getDict, getLocale } from '@/i18n';
 
 export interface InsertedChallenge {
   id: string;
@@ -57,6 +58,9 @@ export async function insertChallenge(
       challenge_id: challenge.id,
       mode: input.stake.mode,
       text: input.stake.text,
+      kind: input.stake.kind ?? 'individual',
+      threshold_missed: input.stake.thresholdMissed ?? null,
+      collective_target_pct: input.stake.collectiveTargetPct ?? null,
     });
     if (sErr) throw sErr;
   }
@@ -81,12 +85,17 @@ interface ChallengeRow {
   first_day_join_only: boolean;
   created_at: string;
   owner_id: string | null;
+  // Set only when the challenge was ended EARLY (docs/db-stake-v2.sql §2).
+  ended_on_day: number | null;
 }
 
 interface ParticipantRow {
   id: string; // participants.id — what check_ins.participant_id references
   challenge_id: string;
   user_id: string;
+  // When this person joined — the stake threshold only holds someone
+  // responsible from their own join day onward (src/data/stakeOutcome.ts).
+  created_at: string;
 }
 
 interface CheckInRow {
@@ -101,6 +110,27 @@ interface StakeRow {
   challenge_id: string;
   mode: 'direct' | 'vote';
   text: string | null;
+  // Bahis v2 (docs/db-stake-v2.sql). Nullable across the board so a row
+  // written before that migration still maps cleanly.
+  kind: 'individual' | 'collective' | null;
+  threshold_missed: number | null;
+  collective_target_pct: number | null;
+  settled_at: string | null;
+}
+
+/** Shared by both mapping paths — a pre-v2 row has no `kind`, and is treated
+ * as 'individual' with no threshold, which means no outcome is computed and
+ * the finish screen falls back to showing the raw text. */
+function mapStake(stake: StakeRow | undefined): Challenge['stake'] {
+  if (!stake) return undefined;
+  return {
+    mode: stake.mode,
+    kind: stake.kind ?? 'individual',
+    text: stake.text ?? '',
+    thresholdMissed: stake.threshold_missed ?? undefined,
+    collectiveTargetPct: stake.collective_target_pct ?? undefined,
+    settled: !!stake.settled_at,
+  };
 }
 
 interface NudgeRow {
@@ -223,7 +253,7 @@ function mapLobbyRow(
     firstDayJoinOnly: row.first_day_join_only,
     isOwner: row.owner_id === myUserId,
     joinClosed: false, // lobby'de katılım penceresi kavramı henüz devrede değil
-    stake: stake ? { mode: stake.mode, text: stake.text ?? '' } : undefined,
+    stake: mapStake(stake),
     participants,
     messages: [],
   };
@@ -321,6 +351,29 @@ function mapRow(
     };
   });
 
+  // Bahis v2 outcome — the stake threshold only becomes answerable once the
+  // challenge is over. Uses the shared helper so the mock store computes the
+  // exact same thing (src/data/stakeOutcome.ts), and counts each person from
+  // THEIR join day against the day the challenge actually stopped on.
+  const stakeOutcomeResult =
+    status === 'completed'
+      ? computeStakeOutcome({
+          stake: mapStake(stake),
+          participants,
+          totalDays: row.total_days,
+          endedOnDay: row.ended_on_day ?? undefined,
+          joinDayByParticipant: new Map(
+            parts.map((p) => [
+              p.user_id,
+              row.start_date
+                ? Math.max(daysSinceStart(row.start_date, row.timezone, p.created_at) + 1, 1)
+                : 1,
+            ]),
+          ),
+          totalCheckIns: checkIns.length,
+        })
+      : {};
+
   // E9 finish stats — only meaningful once the challenge is actually over.
   const finishStats =
     status === 'completed' && parts.length > 0
@@ -395,15 +448,16 @@ function mapRow(
     // Client-side mirror of the join_challenge_by_code RPC's check (Ek M) —
     // display only, the RPC is what actually enforces it server-side.
     joinClosed: row.first_day_join_only && currentDay > 1,
-    stake: stake ? { mode: stake.mode, text: stake.text ?? '' } : undefined,
+    stake: mapStake(stake),
     participants,
     messages: [],
     finishStats,
     advancedStats,
-    // No automatic "kim kaybetti" computation from real data (that's a group
-    // decision, not something we can infer) — the stake's own text is shown
-    // instead by the Detail/complete screens when this is absent.
-    stakeResult: undefined,
+    // Both undefined for a pre-v2 stake (no threshold was ever chosen), in
+    // which case the finish screen falls back to the raw stake text.
+    stakeResult: stakeOutcomeResult.text,
+    stakeOutcome: stakeOutcomeResult.outcome,
+    endedOnDay: row.ended_on_day ?? undefined,
   };
 }
 
@@ -438,15 +492,23 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
     supabase
       .from('challenges')
       .select(
-        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at, owner_id',
+        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at, owner_id, ended_on_day',
       )
       .in('id', ids),
-    supabase.from('participants').select('id, challenge_id, user_id').in('challenge_id', ids),
+    supabase
+      .from('participants')
+      .select('id, challenge_id, user_id, created_at')
+      .in('challenge_id', ids),
     supabase
       .from('check_ins')
       .select('participant_id, challenge_id, day_number, type, created_at')
       .in('challenge_id', ids),
-    supabase.from('stakes').select('challenge_id, mode, text').in('challenge_id', ids),
+    supabase
+      .from('stakes')
+      .select(
+        'challenge_id, mode, text, kind, threshold_missed, collective_target_pct, settled_at',
+      )
+      .in('challenge_id', ids),
     // "Have I already nudged this person today, IN THIS CHALLENGE?" — the DB's
     // uniqueness window is now (from_user, to_user, challenge_id, day)
     // (docs/db-nudge-and-message-notify.sql §5): nudging someone in one
@@ -521,6 +583,22 @@ export async function restartChallenge(challengeId: string): Promise<void> {
 /** E10 "Erken bitir" — marks the challenge completed. */
 export async function endChallengeEarly(challengeId: string): Promise<void> {
   const { error } = await supabase.rpc('end_challenge_early', { p_challenge_id: challengeId });
+  if (error) throw error;
+}
+
+/**
+ * Closes the stake ("ödendi/kutlandı") — docs/db-stake-v2.sql. The RPC
+ * computes the result text ITSELF and posts the chat system message; we only
+ * pass the locale so it picks a language. Deliberately NOT sending the
+ * client's own computed string: a system message renders with more
+ * authority than a normal one and also goes out as a push, so letting any
+ * member supply that text would be an injection vector.
+ */
+export async function settleStake(challengeId: string): Promise<void> {
+  const { error } = await supabase.rpc('settle_stake', {
+    p_challenge_id: challengeId,
+    p_locale: getLocale(),
+  });
   if (error) throw error;
 }
 

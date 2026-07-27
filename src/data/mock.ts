@@ -55,7 +55,7 @@ function buildC1(m: MockDict): Challenge {
     inviteCode: 'kitap-14',
     scheduleSummary: m.c1.scheduleSummary,
     startsWhen: m.c1.startsWhen,
-    stake: { mode: 'direct', text: m.c1.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c1.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, false, { isMe: true }),
       p('enes', 'Enes Kaya', 'EK', true, { checkinTime: '08:20' }),
@@ -123,7 +123,7 @@ function buildC2(m: MockDict): Challenge {
     inviteCode: 'seker-14',
     scheduleSummary: m.c2.scheduleSummary,
     startsWhen: getDict().common.ongoing,
-    stake: { mode: 'direct', text: m.c2.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c2.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, false, { isMe: true }),
       p('kerem', 'Kerem Aydın', 'KA', true, { checkinTime: '07:40' }),
@@ -165,7 +165,7 @@ function buildC3(m: MockDict): Challenge {
     inviteCode: 'sabah-21',
     scheduleSummary: m.c3.scheduleSummary,
     startsWhen: getDict().common.ongoing,
-    stake: { mode: 'direct', text: m.c3.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c3.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, true, { isMe: true, checkinTime: '07:12' }),
       p('mehmet', 'Mehmet Kaya', 'MK', true, { checkinTime: '06:31' }),
@@ -205,7 +205,7 @@ function buildC4(m: MockDict): Challenge {
     inviteCode: 'adim-7',
     scheduleSummary: m.c4.scheduleSummary,
     startsWhen: startsTomorrow,
-    stake: { mode: 'direct', text: m.c4.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c4.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, false, { isMe: true }),
       p('cem', 'Cem Ay', 'CA', false),
@@ -243,7 +243,7 @@ function buildArchive1(m: MockDict): Challenge {
     inviteCode: 'kitap-v1',
     scheduleSummary: m.archive1.scheduleSummary,
     startsWhen: getDict().common.completed,
-    stake: { mode: 'direct', text: m.archive1.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.archive1.stake },
     finishStats: { people: 8, checkins: 96, completionPct: 86 },
     stakeResult: m.archive1.stakeResult,
     participants: [

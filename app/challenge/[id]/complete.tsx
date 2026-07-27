@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { useChallenge, useChallengesQuery, useCreateGate } from '@/hooks';
+import { useChallenge, useChallengeActions, useChallengesQuery, useCreateGate } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Avatar, Button, Card, Screen, SectionLabel } from '@/components/ui';
@@ -44,6 +45,31 @@ export default function CompleteScreen() {
   const { isPro } = useAuth();
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const canCreate = useCreateGate();
+  const actions = useChallengeActions(id ?? '');
+  const [settling, setSettling] = useState(false);
+
+  // Derived here (not inside the JSX) so the settle button's visibility rule
+  // stays readable: there's nothing to "mark as paid" when the stake was
+  // already closed, when nobody fell short, or when this is a pre-v2 stake
+  // whose outcome was never computed at all.
+  const settled = !!challenge?.stake?.settled;
+  const stakeLine = challenge?.stakeResult ?? (challenge?.stake ? t.complete.stakeResult(challenge.stake.text) : '');
+  const outcome = challenge?.stakeOutcome;
+  const someoneOwes =
+    outcome?.kind === 'collective' ? outcome.collectiveHit === false : (outcome?.losers.length ?? 0) > 0;
+  const canSettle = !!outcome && !settled && someoneOwes;
+
+  const doSettle = async () => {
+    if (settling) return;
+    setSettling(true);
+    try {
+      await actions.settleStake();
+    } catch (e) {
+      Alert.alert(t.complete.settleFailed, friendlyErrorMessage(e));
+    } finally {
+      setSettling(false);
+    }
+  };
 
   if (!challenge) {
     return (
@@ -246,22 +272,46 @@ export default function CompleteScreen() {
           </View>
         ) : null}
 
-        {/* stake — a computed "who lost" result when we have one (mock demo),
-            otherwise just the stake's own text so real challenges aren't blank */}
+        {/* Stake. Three states (docs/BAHIS-V2-VE-ROVANS.md §6):
+             - settled -> muted, closed
+             - computed result -> the outcome + a "mark as paid" action, but
+               only when somebody actually owes something
+             - pre-v2 stake with no threshold -> just its own text, as before */}
         {challenge.stakeResult || challenge.stake?.text ? (
-          <View
-            style={{
-              marginTop: 24,
-              backgroundColor: colors.emberSoft,
-              borderRadius: radius.badge,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              alignItems: 'center',
-            }}
-          >
-            <AppText variant="bodyMedium" color={colors.ember}>
-              {challenge.stakeResult ?? t.complete.stakeResult(challenge.stake!.text)}
-            </AppText>
+          <View style={{ marginTop: 24, gap: 10 }}>
+            <View
+              style={{
+                backgroundColor: settled ? 'transparent' : colors.emberSoft,
+                borderRadius: radius.badge,
+                borderWidth: settled ? hairline : 0,
+                borderColor: colors.strokeSubtle,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                alignItems: 'center',
+              }}
+            >
+              <AppText
+                variant="bodyMedium"
+                color={settled ? colors.textTertiary : colors.ember}
+                style={{ textAlign: 'center' }}
+              >
+                {settled ? `${t.complete.settledLabel} · ${stakeLine}` : stakeLine}
+              </AppText>
+            </View>
+            {canSettle ? (
+              <Button
+                label={
+                  settling
+                    ? t.common.continue
+                    : challenge.stakeOutcome?.kind === 'collective'
+                      ? t.complete.settleCtaCollective
+                      : t.complete.settleCta
+                }
+                variant="secondary"
+                onPress={doSettle}
+                disabled={settling}
+              />
+            ) : null}
           </View>
         ) : null}
 
@@ -274,6 +324,12 @@ export default function CompleteScreen() {
             }}
           />
           <Button label={t.complete.shareResult} variant="secondary" onPress={share} />
+          {/* Rematch now opens as a lobby rather than starting on a date, so
+              say so up front — otherwise "neden hemen başlamadı" is the
+              first question (docs/BAHIS-V2-VE-ROVANS.md §7). */}
+          <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
+            {t.complete.rematchLobbyHint}
+          </AppText>
         </View>
       </ScrollView>
     </Screen>
