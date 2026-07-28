@@ -304,12 +304,25 @@ function mapRow(
   // days[] reflects MY personal progress on this challenge's ring.
   const explicit: SegmentState[] = [];
   if (status !== 'upcoming') {
-    for (let i = 1; i < currentDay; i++) {
+    // How far the ring actually got. Ending early freezes it there: the days
+    // after that never arrived, so they stay empty instead of turning into
+    // missed days as the calendar keeps moving. Same number stakeOutcome
+    // counts against.
+    const elapsed =
+      status === 'completed'
+        ? Math.min(row.ended_on_day ?? currentDay, row.total_days)
+        : currentDay;
+    // A finished ring has no "today" — its last day is history like every
+    // other. Leaving it as 'today' left that segment breathing forever.
+    const lastSettled = status === 'completed' ? elapsed : currentDay - 1;
+    for (let i = 1; i <= lastSettled; i++) {
       const c = myByDay.get(i);
       explicit.push(c ? (c.type === 'joker' ? 'joker' : 'done') : 'missed');
     }
-    const todayCheckIn = myByDay.get(currentDay);
-    explicit.push(todayCheckIn ? (todayCheckIn.type === 'joker' ? 'joker' : 'done') : 'today');
+    if (status !== 'completed') {
+      const todayCheckIn = myByDay.get(currentDay);
+      explicit.push(todayCheckIn ? (todayCheckIn.type === 'joker' ? 'joker' : 'done') : 'today');
+    }
   }
 
   const meCheckedInToday = myByDay.has(currentDay);

@@ -366,7 +366,16 @@ export const useMockStore = create<MockState>((set, get) => ({
   endEarly: (id) =>
     set((s) => ({
       challenges: s.challenges.map((c) =>
-        c.id === id ? { ...c, status: 'completed' } : c,
+        c.id === id
+          ? {
+              ...c,
+              status: 'completed',
+              // A finished ring has no "today", and that state is the one
+              // that breathes — left alone it blinks forever on the finish
+              // screen. mapRow does the same for real challenges.
+              days: c.days.map((d) => (d === 'today' ? 'missed' : d)),
+            }
+          : c,
       ),
       momentumDemoId: null,
     })),
