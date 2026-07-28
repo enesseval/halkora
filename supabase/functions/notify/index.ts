@@ -49,26 +49,28 @@ function truncate(text: string): string {
 // Only the copy actually composed server-side needs an entry here: a chat
 // message's body is the user's own text (never translated), and titles that
 // are just names/challenge titles need no dictionary lookup either.
+//
+// Three-tier layout (saha testi bulgusu, referencing a WhatsApp screenshot:
+// "fotoğraf eklenirse fotoğraf yoksa isim altında challange adı onunda
+// altında bildirim içeriği olsa") — title=sender name, subtitle=challenge
+// name, body=content. `subtitle` is iOS-only (Expo silently drops it on
+// Android); no real photo/avatar — that needs a profile-photo feature this
+// app doesn't have yet PLUS a native Notification Service Extension, well
+// beyond an Edge Function change.
 const COPY = {
   tr: {
-    checkedIn: (name: string) => `${name} check-in yaptı ✓`,
-    nudgeTitle: 'El salla 👋',
     nudgeBody: 'Sana el salladı — sıra sende.',
-    messageBody: (name: string, text: string) => `${name}: ${text}`,
-    messageBodyHidden: (name: string) => `${name} bir mesaj gönderdi`,
-    inviteTitle: 'Halka daveti 💌',
-    inviteBody: (name: string, challengeTitle: string) => `${name} seni "${challengeTitle}" halkasına davet etti.`,
+    messageBodyHidden: 'Yeni bir mesaj gönderdi',
+    inviteBody: 'Seni halkasına davet etti 💌',
+    rematchBody: (challengeTitle: string) => `"${challengeTitle}" için rövanş başlattı. Var mısın? 🔁`,
     someone: 'Biri',
     challengeFallback: 'Halkan',
   },
   en: {
-    checkedIn: (name: string) => `${name} checked in ✓`,
-    nudgeTitle: 'Nudge 👋',
     nudgeBody: "Someone nudged you — you're up.",
-    messageBody: (name: string, text: string) => `${name}: ${text}`,
-    messageBodyHidden: (name: string) => `${name} sent a message`,
-    inviteTitle: 'Ring invite 💌',
-    inviteBody: (name: string, challengeTitle: string) => `${name} invited you to "${challengeTitle}".`,
+    messageBodyHidden: 'Sent a new message',
+    inviteBody: 'Invited you to their ring 💌',
+    rematchBody: (challengeTitle: string) => `Started a rematch of "${challengeTitle}". You in? 🔁`,
     someone: 'Someone',
     challengeFallback: 'Your ring',
   },
@@ -119,15 +121,6 @@ Deno.serve(async (req) => {
     );
 
     const { table, record } = payload;
-    // TEMP diagnostic (saha testi: mesaj bildirimi gitmiyor, check-in/nudge
-    // gidiyor) — kaldırılacak, bkz. docs/db-nudge-and-message-notify.sql notu.
-    console.log('notify: payload', {
-      table,
-      kind: record.kind,
-      notify_others: record.notify_others,
-      challenge_id: record.challenge_id,
-      user_id: record.user_id,
-    });
 
     // messages.notify_others (docs/db-nudge-and-message-notify.sql) is the
     // one real gate here — a nudge's own system message sets it false since
@@ -135,10 +128,7 @@ Deno.serve(async (req) => {
     // (this would otherwise double-notify the recipient for one nudge), but
     // a challenge-details-change system message leaves it true (default) so
     // it's worth pushing to the group, same as a real chat message.
-    if (table === 'messages' && record.notify_others === false) {
-      console.log('notify: blocked by notify_others === false');
-      return ok();
-    }
+    if (table === 'messages' && record.notify_others === false) return ok();
 
     let challengeId: string | undefined;
     let actorUserId: string | undefined;
@@ -192,7 +182,6 @@ Deno.serve(async (req) => {
         .neq('user_id', actorUserId);
       recipientIds = (participants ?? []).map((p) => p.user_id as string);
     }
-    console.log('notify: recipients resolved', { count: recipientIds.length, recipientIds });
     if (recipientIds.length === 0) return ok();
 
     const [{ data: tokenRows }, profilesResult] = await Promise.all([
@@ -228,34 +217,32 @@ Deno.serve(async (req) => {
       .filter((r) => r.token)
       .map((r) => {
         const c = copyFor(localeByUser.get(r.user_id as string));
-        let title: string;
+        const title = actorName ?? c.someone;
+        const subtitle = challengeTitle ?? c.challengeFallback;
         let body: string;
-        if (table === 'check_ins') {
-          title = challengeTitle ?? c.challengeFallback;
-          body = c.checkedIn(actorName ?? c.someone);
-        } else if (table === 'messages') {
-          title = challengeTitle ?? c.challengeFallback;
+        if (table === 'messages') {
           if (record.kind === 'message') {
             const showPreview = previewByUser.get(r.user_id as string) ?? true;
-            body = showPreview
-              ? c.messageBody(actorName ?? c.someone, truncate((record.text as string) ?? ''))
-              : c.messageBodyHidden(actorName ?? c.someone);
+            body = showPreview ? truncate((record.text as string) ?? '') : c.messageBodyHidden;
           } else {
             // A system announcement (e.g. a challenge-details change) is
-            // already a complete, safe-to-show line — no name prefix, no
-            // content-hiding (there's no private content here to hide).
+            // already a complete, safe-to-show sentence — no content-hiding
+            // (there's no private content here to hide).
             body = truncate((record.text as string) ?? '');
           }
         } else if (table === 'nudges') {
-          title = c.nudgeTitle;
           body = (record.message as string | null) || c.nudgeBody;
         } else {
-          title = c.inviteTitle;
-          body = c.inviteBody(actorName ?? c.someone, challengeTitle ?? c.challengeFallback);
+          // A rematch invite reads differently from a first-time one — the
+          // recipient already knows the group (invites.kind, see
+          // docs/db-stake-v2.sql).
+          body =
+            record.kind === 'rematch'
+              ? c.rematchBody(challengeTitle ?? c.challengeFallback)
+              : c.inviteBody;
         }
-        return { to: r.token as string, title, body, data: { challengeId, inviteCode } };
+        return { to: r.token as string, title, subtitle, body, data: { challengeId, inviteCode } };
       });
-    console.log('notify: tokenRows', { tokenRowCount: (tokenRows ?? []).length, composedCount: messages.length });
     if (messages.length === 0) return ok();
 
     // Expo's push endpoint accepts at most 100 messages per request — group

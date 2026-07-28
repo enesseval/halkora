@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Hand-written rather than plugin-generated: @bacons/apple-targets only
+		writes this file when it doesn't already exist (build/with-widget.js),
+		so this is the supported way to add keys. Everything under NSExtension
+		matches what the plugin would have generated for a `widget` target —
+		don't drop it.
+
+		UIAppFonts is the reason this file exists at all: a widget extension
+		is its own bundle and does NOT inherit the fonts the main app
+		registers, so General Sans / Satoshi have to be declared (and the
+		.ttf files shipped) here too, or every .custom() font in
+		HalkoraWidget.swift silently falls back to the system face.
+	-->
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>GeneralSans-Semibold.ttf</string>
+		<string>Satoshi-Medium.ttf</string>
+		<string>Satoshi-Bold.ttf</string>
+	</array>
+</dict>
+</plist>

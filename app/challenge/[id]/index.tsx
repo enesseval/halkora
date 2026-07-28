@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Keyboard, Pressable, RefreshControl, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Keyboard,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  RefreshControl,
+  TextInput,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -23,6 +32,7 @@ import {
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { setActiveChallengeId } from '@/lib/push';
 import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
@@ -108,6 +118,25 @@ export default function DetailScreen() {
   const [starting, setStarting] = useState(false);
   const [showLobbyDatePicker, setShowLobbyDatePicker] = useState(false);
   const [lobbyDate, setLobbyDate] = useState<Date | null>(null);
+  const listRef = useRef<FlashListRef<Row>>(null);
+  // Tracks scroll position without re-rendering on every scroll tick — read
+  // inside the rows-length effect below instead of depending on state there
+  // (which would re-run that effect, and re-trigger the scroll, on every
+  // single scroll event).
+  const isNearBottomRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+
+  // Saha testi bulgusu: "bu challange içindeyken onunla ilgili bildirim
+  // üstte gözükmesin, zaten bakıyorum" — src/lib/push.ts's notification
+  // handler reads this to suppress just THIS challenge's foreground banner;
+  // every other challenge's push is unaffected. Cleared on unmount/id change
+  // so leaving the screen (or switching to a different challenge) doesn't
+  // leave a stale id silently suppressing that ring's real notifications.
+  useEffect(() => {
+    if (!id) return;
+    setActiveChallengeId(id);
+    return () => setActiveChallengeId(null);
+  }, [id]);
 
   const rows = useMemo<Row[]>(() => {
     if (!challenge) return [];
@@ -132,6 +161,49 @@ export default function DetailScreen() {
     }
     return out;
   }, [challenge, chatError, t]);
+
+  // Auto-scroll to the newest row whenever chat grows — sending your own
+  // message (saha testi bulgusu: "mesaj attığım zaman aşağıda kalıyor, ben
+  // manuel kaydırmak zorunda kalıyorum") or a new one arriving via realtime.
+  // `null` on the very first render so the initial load (participants +
+  // full history) doesn't yank the screen down to the end before the user's
+  // even looked at it — only a length INCREASE from a previous real count
+  // triggers anything below.
+  //
+  // If the user's already near the bottom (or it's their OWN send — see the
+  // composer's onPress, which marks isNearBottomRef true up front), snap
+  // down — ONE scrollToEnd call, not a burst of retries (saha testi
+  // bulgusu: "2-3 kere denemesin, animasyon kötü" — multiple calls stacked
+  // visibly). If they've scrolled UP into history, don't yank them back
+  // down; show a WhatsApp-style "jump to latest" pill instead (saha testi
+  // bulgusu: "başkasından mesaj geldiğinde aşağıya doğru ok yanıp sönebilir").
+  const prevRowsLength = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevRowsLength.current;
+    prevRowsLength.current = rows.length;
+    if (prev === null || rows.length <= prev) return;
+    if (isNearBottomRef.current) {
+      const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 150);
+      return () => clearTimeout(timer);
+    }
+    setShowJumpToLatest(true);
+  }, [rows.length]);
+
+  const NEAR_BOTTOM_THRESHOLD = 120;
+  const handleListScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+    const nearBottom = distanceFromBottom < NEAR_BOTTOM_THRESHOLD;
+    isNearBottomRef.current = nearBottom;
+    if (nearBottom && showJumpToLatest) setShowJumpToLatest(false);
+  };
+
+  const jumpToLatest = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    isNearBottomRef.current = true;
+    setShowJumpToLatest(false);
+    listRef.current?.scrollToEnd({ animated: true });
+  };
 
   // Auto-finish: once everyone's checked in on the LAST day, there's no
   // reason to sit around waiting for the calendar date to roll over —
@@ -566,6 +638,7 @@ export default function DetailScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <FlashList
+            ref={listRef}
             data={rows}
             renderItem={renderItem}
             keyExtractor={(item, i) =>
@@ -578,10 +651,36 @@ export default function DetailScreen() {
             ListHeaderComponent={header}
             contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
+            onScroll={handleListScroll}
+            scrollEventThrottle={100}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
             }
           />
+
+          {showJumpToLatest ? (
+            <Pressable
+              onPress={jumpToLatest}
+              style={{
+                position: 'absolute',
+                right: spacing.screenX,
+                bottom: 76,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.ember,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOpacity: 0.25,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 4,
+              }}
+            >
+              <Feather name="arrow-down" size={20} color={colors.bgBase} />
+            </Pressable>
+          ) : null}
 
           {/* note / chat input */}
           <View
@@ -621,6 +720,16 @@ export default function DetailScreen() {
                 if (!text) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDraft('');
+                // Sending your own message should always land you on it,
+                // regardless of where you were scrolled — the rows-length
+                // effect below does the actual (single) scrollToEnd call;
+                // this just makes sure it treats a self-sent message as
+                // "already at the bottom" instead of showing the jump pill.
+                // Repeated scrollToEnd calls here on top of that one looked
+                // janky (saha testi bulgusu: "2-3 kere denemesin, animasyon
+                // kötü") — one call, done.
+                isNearBottomRef.current = true;
+                setShowJumpToLatest(false);
                 const sent = await actions.sendMessage(text);
                 if (sent) Keyboard.dismiss();
               }}

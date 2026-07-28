@@ -2,14 +2,31 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+// The challenge Detail screen currently on screen, set by
+// app/challenge/[id]/index.tsx on focus/blur — module-level rather than
+// store/context state because this needs to be readable from
+// setNotificationHandler's callback below, which runs outside React
+// entirely. A push for the SAME challenge the user is already looking at is
+// redundant (saha testi bulgusu: "challenge içindeyken o challange ile
+// ilgili bildirim üstte gözükmesin, saçma çünkü zaten bakıyorum") — every
+// other challenge's push still shows normally.
+let activeChallengeId: string | null = null;
+export function setActiveChallengeId(id: string | null): void {
+  activeChallengeId = id;
+}
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    const challengeId = notification.request.content.data?.challengeId as string | undefined;
+    const suppress = !!challengeId && challengeId === activeChallengeId;
+    return {
+      shouldShowAlert: !suppress,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: !suppress,
+      shouldShowList: !suppress,
+    };
+  },
 });
 
 async function ensureAndroidChannel(): Promise<void> {

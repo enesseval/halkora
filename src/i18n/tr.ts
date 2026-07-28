@@ -92,6 +92,9 @@ export const tr = {
       CHALLENGE_LIMIT_REACHED: 'Ücretsiz planda aynı anda en fazla 2 halka kurabilirsin.',
       OWNER_CANNOT_LEAVE: 'Kurucu halkadan ayrılamaz — bunun yerine halkayı silebilirsin.',
       NOT_IN_LOBBY: 'Bu halka zaten başlamış.',
+      NOT_COMPLETED: 'Bu halka henüz tamamlanmadı.',
+      NO_STAKE: 'Bu halkada bahis yok.',
+      ALREADY_SETTLED: 'Bahis zaten kapatılmış.',
     },
   },
 
@@ -197,6 +200,13 @@ export const tr = {
     joinUnlimited: 'Sınırsız',
     joinFirstDayOnly: 'Sadece ilk gün',
     joinUnlimitedHint: 'Herkes istediği zaman katılabilir.',
+    stakeKindIndividual: 'Bireysel',
+    stakeKindCollective: 'Kolektif',
+    stakeKindHint: 'Bireysel: eşiği geçemeyen öder. Kolektif: grup hedefi tutturamazsa hep birlikte.',
+    stakeThresholdLabel: 'En fazla kaç gün kaçırılabilir?',
+    stakeThresholdDay: (n: number) => (n === 0 ? 'Hiç' : `${n} gün`),
+    stakeCollectiveTargetLabel: 'Grup hedefi',
+    stakeCollectivePlaceholder: 'Tutturursak hep beraber kahvaltı',
     lobbyOption: 'Grup dolunca başlat',
     lobbyOptionHint: 'Tarih vermeden kur — istediğin an ya da ileri bir tarih seçerek halka içinden başlatırsın.',
     lobbyOptionHintOff: 'Yerine tarih vermeden kurup daha sonra başlatmak istersen seç.',
@@ -222,6 +232,7 @@ export const tr = {
     notifyMessagePreview: 'Bildirimde mesaj içeriği',
     notifyMessagePreviewOn: 'Görünür',
     notifyMessagePreviewOff: 'Gizli',
+    widgetDebug: 'Widget teşhis',
     account: 'Hesap',
     accountLinking: 'Bağlanıyor…',
     accountUnsecured: 'Güvence yok',
@@ -351,6 +362,18 @@ export const tr = {
     advancedStreak: 'en uzun seri',
     advancedDaysFmt: (done: number, total: number) => `${done}/${total} gün`,
     stakeResult: (text: string) => `Bahis: ${text}`,
+    // Bahis v2 sonuç metinleri (docs/db-stake-v2.sql). Aynı hesap sunucuda
+    // settle_stake içinde de var — biri değişirse ikisi birden değişmeli.
+    stakeAllPassed: 'Herkes eşiği geçti — bahis yok, tebrikler 🎉',
+    stakeLosers: (names: string, stakeText: string) => `🎲 ${stakeText} — ${names}`,
+    stakeCollectiveWin: (total: number, target: number) => `🎯 ${total}/${target} — hedef tuttu!`,
+    stakeCollectiveFail: (total: number, target: number, text: string) =>
+      `${total}/${target} — hedef tutmadı. ${text}`,
+    settleCta: 'Ödendi olarak işaretle',
+    settleCtaCollective: 'Kutlandı olarak işaretle',
+    settledLabel: '✓ Bahis kapandı',
+    settleFailed: 'İşaretlenemedi',
+    rematchLobbyHint: 'Rövanş lobide açılır — eski halkana davet gider, kim gelirse onunla başlarsın.',
     // Aynı grupla tekrar: create formu bu challenge'ın verileriyle önceden
     // dolu açılır, oluşunca eski katılımcılara otomatik davet gider
     // (app/(main)/create.tsx `rematchOf` parametresi).

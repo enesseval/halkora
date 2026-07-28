@@ -18,6 +18,13 @@ function p(
 
 type MockDict = ReturnType<typeof getDict>['mock'];
 
+/* Demo-only stand-ins for the day-math fields the widget needs
+   (src/data/types.ts) — mock challenges never go through mapRow, but the
+   Challenge type requires them. */
+const DEMO_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const DEMO_START = new Date().toISOString().slice(0, 10);
+const DEMO_CREATED_AT = new Date().toISOString();
+
 /* ------------------------------------------------------------------ */
 /* Challenge 1 — "30 Gün Kitap Okuma" (main E6/E7 flow + E8 + E10)      */
 /* Day 7 of 14. I have NOT checked in. 4 others done → I become the 5th. */
@@ -40,12 +47,15 @@ function buildC1(m: MockDict): Challenge {
     meCheckedInToday: false,
     jokerRemaining: 1,
     jokerAllowance: 2,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: true,
     missedAcknowledged: false,
     inviteCode: 'kitap-14',
     scheduleSummary: m.c1.scheduleSummary,
     startsWhen: m.c1.startsWhen,
-    stake: { mode: 'direct', text: m.c1.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c1.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, false, { isMe: true }),
       p('enes', 'Enes Kaya', 'EK', true, { checkinTime: '08:20' }),
@@ -106,11 +116,14 @@ function buildC2(m: MockDict): Challenge {
     meCheckedInToday: false,
     jokerRemaining: 1,
     jokerAllowance: 1,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'seker-14',
     scheduleSummary: m.c2.scheduleSummary,
     startsWhen: getDict().common.ongoing,
-    stake: { mode: 'direct', text: m.c2.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c2.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, false, { isMe: true }),
       p('kerem', 'Kerem Aydın', 'KA', true, { checkinTime: '07:40' }),
@@ -145,11 +158,14 @@ function buildC3(m: MockDict): Challenge {
     myOrder: 3,
     jokerRemaining: 2,
     jokerAllowance: 2,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'sabah-21',
     scheduleSummary: m.c3.scheduleSummary,
     startsWhen: getDict().common.ongoing,
-    stake: { mode: 'direct', text: m.c3.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c3.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, true, { isMe: true, checkinTime: '07:12' }),
       p('mehmet', 'Mehmet Kaya', 'MK', true, { checkinTime: '06:31' }),
@@ -182,11 +198,14 @@ function buildC4(m: MockDict): Challenge {
     meCheckedInToday: false,
     jokerRemaining: 1,
     jokerAllowance: 1,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'adim-7',
     scheduleSummary: m.c4.scheduleSummary,
     startsWhen: startsTomorrow,
-    stake: { mode: 'direct', text: m.c4.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.c4.stake },
     participants: [
       p(ME_ID, ME_NAME, ME_INITIALS, false, { isMe: true }),
       p('cem', 'Cem Ay', 'CA', false),
@@ -217,11 +236,14 @@ function buildArchive1(m: MockDict): Challenge {
     meCheckedInToday: true,
     jokerRemaining: 0,
     jokerAllowance: 1,
+    timezone: DEMO_TZ,
+    startDate: DEMO_START,
+    createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: false,
     inviteCode: 'kitap-v1',
     scheduleSummary: m.archive1.scheduleSummary,
     startsWhen: getDict().common.completed,
-    stake: { mode: 'direct', text: m.archive1.stake },
+    stake: { mode: 'direct', kind: 'individual', text: m.archive1.stake },
     finishStats: { people: 8, checkins: 96, completionPct: 86 },
     stakeResult: m.archive1.stakeResult,
     participants: [

@@ -44,10 +44,34 @@ export interface StakeOption {
   votes: number;
 }
 
+/** 'individual' — whoever exceeds the missed-day threshold pays.
+ *  'collective' — the group either hits a shared check-in target or doesn't. */
+export type StakeKind = 'individual' | 'collective';
+
 export interface Stake {
   mode: StakeMode;
+  kind: StakeKind;
   text: string; // headline shown in StakeBadge
+  /** individual: max missed days allowed. `undefined` = pre-v2 record, no
+   * outcome is computed and only `text` is shown (docs/db-stake-v2.sql). */
+  thresholdMissed?: number;
+  /** collective: group check-in target as a percentage. */
+  collectiveTargetPct?: number;
+  /** The "ödendi/kutlandı" ritual already happened. */
+  settled?: boolean;
   options?: StakeOption[];
+}
+
+/** Structured result so the finish screen never has to parse the display
+ * string. Computed client-side in src/data/stakeOutcome.ts — the same shape
+ * `settle_stake` derives server-side when it writes the chat message. */
+export interface StakeOutcome {
+  kind: StakeKind;
+  /** individual: everyone past the threshold. Empty = nobody pays. */
+  losers: Participant[];
+  collectiveHit?: boolean;
+  collectiveTotal?: number;
+  collectiveTarget?: number;
 }
 
 export interface Momentum {
@@ -72,6 +96,23 @@ export interface Challenge {
   /** The challenge's total joker allowance (owner's choice at creation) —
    * jokerRemaining alone can't show "2 of 3 left" without this. */
   jokerAllowance: number;
+  /** Everything below is the raw day-math input the home-screen widget needs
+   * to recompute "which day is it / did I check in TODAY" entirely on its
+   * own (targets/widget/HalkoraWidget.swift). currentDay/meCheckedInToday
+   * above are snapshots taken whenever the app last fetched — a widget
+   * holding only those goes stale at midnight and can't tell, since a
+   * WidgetKit extension can't re-run this mapping (saha testi bulgusu:
+   * "tekrar uygulamaya girene kadar yeni güne widget geçmiyor").
+   * `startDate` is null while status === 'lobby' (not started yet). */
+  timezone: string;
+  startDate: string | null; // "YYYY-MM-DD"
+  createdAt: string; // ISO — FAST_DAYS test mode anchors its 1-minute days here
+  /** Set when the challenge was ended EARLY — the day it actually stopped on.
+   * The stake threshold counts against this, not `totalDays`, or every
+   * unelapsed day would read as "missed" and the whole group would lose
+   * (docs/db-stake-v2.sql §2). `undefined` for a challenge that ran its
+   * natural course. */
+  endedOnDay?: number;
   hasMissedYesterday: boolean;
   missedAcknowledged?: boolean;
   inviteCode: string;
@@ -107,5 +148,11 @@ export interface Challenge {
       longestStreak: number;
     }[];
   };
+  /** Display string for the finish screen. Computed from the stake's
+   * threshold/target once the challenge is completed; `undefined` for a
+   * pre-v2 stake (then the raw `stake.text` is shown instead). */
   stakeResult?: string; // "☕ Kahveler Mehmet'ten"
+  /** The same result, structured — lets complete.tsx decide whether to offer
+   * the "ödendi" button without parsing `stakeResult`. */
+  stakeOutcome?: StakeOutcome;
 }

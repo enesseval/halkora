@@ -61,6 +61,10 @@ interface MockState {
    * status/day-1 fields directly instead of round-tripping through a
    * start_date, matching how `startTomorrow: false` create already works). */
   startChallenge: (id: string) => void;
+  /** Bahis v2 — "ödendi/kutlandı" ritüeli. Mock karşılığı: stake'i settled
+   * işaretle + sohbete sistem mesajı düşür (gerçek modda bunu settle_stake
+   * RPC'si yapıyor). */
+  settleStake: (id: string) => void;
   /** Faz 3C madde 3 — owner-only edit of title/daily action/stake text. */
   updateDetails: (id: string, title: string, dailyAction: string, stakeText: string) => void;
   openMomentumDemo: (id: string) => void;
@@ -254,6 +258,13 @@ export const useMockStore = create<MockState>((set, get) => ({
       meCheckedInToday: false,
       jokerRemaining: input.joker ?? 1,
       jokerAllowance: input.joker ?? 1,
+      // Day-math inputs the widget recomputes from (src/data/types.ts). Mock
+      // mode has no server row, so these mirror what insertChallenge would
+      // have written: the creating device's timezone, and today as the start
+      // unless it's a lobby/tomorrow challenge.
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      startDate: input.lobby ? null : (input.startDateISO ?? new Date().toISOString().slice(0, 10)),
+      createdAt: new Date().toISOString(),
       hasMissedYesterday: false,
       inviteCode: override?.inviteCode ?? id.slice(-6),
       scheduleSummary: t.common.scheduleSummary(input.dailyAction || t.common.dailyGoalFallback, input.totalDays),
@@ -375,6 +386,29 @@ export const useMockStore = create<MockState>((set, get) => ({
       };
     }),
 
+  settleStake: (id) =>
+    set((s) => ({
+      challenges: s.challenges.map((c) => {
+        if (c.id !== id || !c.stake || c.stake.settled) return c;
+        const t = getDict();
+        const line = c.stakeResult ?? c.stake.text;
+        return {
+          ...c,
+          stake: { ...c.stake, settled: true },
+          messages: [
+            ...c.messages,
+            {
+              id: `settle-${Date.now()}`,
+              kind: 'system' as const,
+              text: `🎲 ${t.complete.settledLabel.replace('✓ ', '')} — ${line}`,
+              dayNumber: c.currentDay,
+              reactions: [],
+            },
+          ],
+        };
+      }),
+    })),
+
   openMomentumDemo: (id) => set({ momentumDemoId: id }),
   closeMomentumDemo: () => set({ momentumDemoId: null }),
 
@@ -390,7 +424,12 @@ export const useMockStore = create<MockState>((set, get) => ({
           dailyAction: `${t.common.today}: ${dailyAction}`,
           dailyActionRaw: dailyAction,
           scheduleSummary: t.common.scheduleSummary(dailyAction, c.totalDays),
-          stake: clean ? { mode: c.stake?.mode ?? 'direct', text: clean } : undefined,
+          stake: clean
+            ? {
+                ...(c.stake ?? { mode: 'direct' as const, kind: 'individual' as const }),
+                text: clean,
+              }
+            : undefined,
         };
       }),
     }));

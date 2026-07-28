@@ -8,6 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
 import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
+import { useMockStore } from '@/stores/mockStore';
+import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { NameSheet, UsernameSheet } from '@/components/Sheets';
@@ -115,6 +117,8 @@ export default function SettingsScreen() {
     setMessagePreview,
   } = useAuth();
   const debugUserId = session?.user.id.slice(0, 8);
+  const challenges = useMockStore((s) => s.challenges);
+  const [widgetDebug, setWidgetDebug] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
@@ -362,11 +366,29 @@ export default function SettingsScreen() {
                     void setProDev(!isPro);
                   }}
                 />
+                <Divider />
+                {/* Every failure mode in the widget's shared-storage chain is
+                    silent (see widgetDiagnostics) — this forces a write and
+                    reads it straight back so a blank widget is diagnosable
+                    on-device instead of guessed at. */}
+                <Row
+                  icon="grid"
+                  label={t.settings.widgetDebug}
+                  onPress={() => {
+                    syncWidgetSnapshot(challenges);
+                    setWidgetDebug(widgetDiagnostics(challenges));
+                  }}
+                />
               </Group>
             </View>
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }} tabular>
               uid: {debugUserId ?? '—'} · is_pro: {String(isPro)}
             </AppText>
+            {widgetDebug ? (
+              <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
+                widget: {widgetDebug}
+              </AppText>
+            ) : null}
           </View>
         ) : null}
 
