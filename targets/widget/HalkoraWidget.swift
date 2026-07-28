@@ -52,6 +52,13 @@ private struct WidgetCopy {
   let joinedCount: (Int) -> String  // "5 kişi katıldı"
   let brand: String  // inline lock-screen prefix
   let dayLong: (Int, Int) -> String  // "Gün 7/14"
+  // "Bugün" ve "Seri" widget'ları
+  let todayTitle: String  // "Bugün"
+  let ringsClosed: (Int, Int) -> String  // "2/3 halka kapandı"
+  let allClosed: String  // "Bugün tamam"
+  let noneActive: String  // "Aktif halka yok"
+  let streakUnit: (Int) -> String  // "7 gün seri"
+  let streakWord: String  // "SERİ"
 }
 
 private let copyTr = WidgetCopy(
@@ -67,7 +74,13 @@ private let copyTr = WidgetCopy(
   jokerLeft: { n in "\(n) joker kaldı" },
   joinedCount: { n in "\(n) kişi katıldı" },
   brand: "Halka",
-  dayLong: { c, t in "Gün \(c)/\(t)" }
+  dayLong: { c, t in "Gün \(c)/\(t)" },
+  todayTitle: "Bugün",
+  ringsClosed: { done, total in "\(done)/\(total) halka kapandı" },
+  allClosed: "Bugün tamam",
+  noneActive: "Aktif halka yok",
+  streakUnit: { n in "\(n) gün seri" },
+  streakWord: "SERİ"
 )
 
 private let copyEn = WidgetCopy(
@@ -83,7 +96,13 @@ private let copyEn = WidgetCopy(
   jokerLeft: { n in "\(n) joker left" },
   joinedCount: { n in "\(n) joined" },
   brand: "Halkora",
-  dayLong: { c, t in "Day \(c)/\(t)" }
+  dayLong: { c, t in "Day \(c)/\(t)" },
+  todayTitle: "Today",
+  ringsClosed: { done, total in "\(done)/\(total) rings closed" },
+  allClosed: "Today is done",
+  noneActive: "No active rings",
+  streakUnit: { n in "\(n) day streak" },
+  streakWord: "STREAK"
 )
 
 private func copyFor(_ locale: String?) -> WidgetCopy {
@@ -142,6 +161,11 @@ private struct HalkoraSnapshot: Codable {
   var syncedDayKey: String
   var participantsTotal: Int
   var participantsDoneToday: Int
+  /// "AB:1,CD:0" — initials and whether that person covered today. Packed
+  /// into one string for the same reason `segments` is (ExtensionStorage
+  /// takes only strings/numbers inside an object). Optional so a snapshot
+  /// written by an older build still decodes.
+  var roster: String?
   var jokerRemaining: Int
   var state: String  // "active" | "upcoming" | "lobby"
   var startsLabel: String  // already localized by the app
@@ -206,11 +230,16 @@ extension HalkoraSnapshot {
     return dateString(now, in: timezone)
   }
 
-  /// Mirrors daysSinceStart() + `rawDay` in src/data/challenges.ts.
-  func currentDay(at now: Date) -> Int {
+  /// Mirrors `rawDay` in src/data/challenges.ts — UNCLAMPED, so it keeps
+  /// climbing past the last day. That overshoot is the only way the widget
+  /// can tell "the final day, still open" from "this ring is over": the app
+  /// drops finished halkalar from the sync, but it can only do that while
+  /// it's running, and a ring that ends while the app is closed would
+  /// otherwise keep offering a check-in forever.
+  func rawDay(at now: Date) -> Int {
     if fastDays != 0 {
       guard let created = parseISO(createdAt) else { return 1 }
-      return min(max(Int(now.timeIntervalSince(created) / 60) + 1, 1), totalDays)
+      return max(Int(now.timeIntervalSince(created) / 60) + 1, 1)
     }
     guard !startDate.isEmpty else { return 0 }
     let f = DateFormatter()
@@ -221,28 +250,58 @@ extension HalkoraSnapshot {
       let today = f.date(from: dateString(now, in: timezone))
     else { return 0 }
     let diff = (today.timeIntervalSince(start) / 86_400).rounded()
-    return min(Int(diff) + 1, totalDays)
+    return Int(diff) + 1
   }
+
+  /// Mirrors daysSinceStart() + `currentDay` in src/data/challenges.ts.
+  func currentDay(at now: Date) -> Int {
+    let raw = rawDay(at: now)
+    return raw <= 0 ? raw : min(raw, totalDays)
+  }
+
+  /// The calendar has moved past the last day — nothing left to check in for.
+  func isOver(at now: Date) -> Bool { rawDay(at: now) > totalDays }
 
   func checkedInToday(at now: Date) -> Bool {
     !checkedInDayKey.isEmpty && checkedInDayKey == todayKey(at: now)
   }
 
-  /// True once the last day is behind us — drives the "Tamamlandı" frame.
+  /// Drives the "Tamamlandı" frame: either the ring has run out of days, or
+  /// it's the final day and that day is already covered. The first half used
+  /// to be missing — with currentDay clamped, a finished ring looked exactly
+  /// like an open final day and sat on "Check-in yap" indefinitely (saha
+  /// testi bulgusu: "Gün 14/14 · Check-in yap").
   func isCompleted(at now: Date) -> Bool {
-    isActive && currentDay(at: now) >= totalDays && checkedInToday(at: now)
+    guard isActive else { return false }
+    if isOver(at: now) { return true }
+    return currentDay(at: now) >= totalDays && checkedInToday(at: now)
   }
 
   /// Group counts only make sense for the day they were counted on.
   func groupCountsFresh(at now: Date) -> Bool { syncedDayKey == todayKey(at: now) }
+
+  /// The roster as (initials, doneToday) pairs. Malformed or missing entries
+  /// are skipped rather than rendered as blanks — an older build's snapshot
+  /// simply has no roster, and the large widget hides that row.
+  var rosterEntries: [(initials: String, done: Bool)] {
+    guard let roster, !roster.isEmpty else { return [] }
+    return roster.split(separator: ",").compactMap { field in
+      let parts = field.split(separator: ":")
+      guard parts.count == 2, !parts[0].isEmpty else { return nil }
+      return (String(parts[0]), parts[1] == "1")
+    }
+  }
 
   /// Per-day ring state, with today's segment resolved for `now` rather than
   /// trusting whatever the app last stored.
   func ringSegments(at now: Date) -> [SegmentKind] {
     let chars = Array(segments)
     let day = currentDay(at: now)
+    let over = isOver(at: now)
     return (1...max(totalDays, 1)).map { n in
-      if n == day && isActive {
+      // Once the ring is over there is no "today" segment to breathe — the
+      // last day falls back to whatever the app last recorded for it.
+      if n == day && isActive && !over {
         return checkedInToday(at: now) ? .done : .today
       }
       guard n - 1 < chars.count else { return .waiting }
@@ -252,6 +311,26 @@ extension HalkoraSnapshot {
       default: return .waiting
       }
     }
+  }
+
+  /// Consecutive covered days, counting back from the last settled day.
+  ///
+  /// Today is added only when it's actually covered — an open day does NOT
+  /// break the streak, because the day isn't lost until it ends. Jokers
+  /// count, matching how the rest of the app treats them.
+  func streak(at now: Date) -> Int {
+    let chars = Array(segments)
+    var total = 0
+    let over = isOver(at: now)
+    if isActive && !over && checkedInToday(at: now) { total += 1 }
+    var n = over ? totalDays : currentDay(at: now) - 1
+    while n >= 1, n - 1 < chars.count {
+      let ch = chars[n - 1]
+      guard ch == "d" || ch == "j" else { break }
+      total += 1
+      n -= 1
+    }
+    return total
   }
 
   /// The next `count` moments at which this snapshot's derived state changes
@@ -489,8 +568,19 @@ struct HalkoraProvider: AppIntentTimelineProvider {
       date: .now, snapshot: resolve(configuration), rotationCount: 1, rotationIndex: 0)
   }
 
+  /// Stored halkalar minus the ones whose last day is already behind us —
+  /// a finished ring shouldn't take a rotation slot from a live one. If
+  /// every ring is finished the full list is kept, so the widget shows a
+  /// "Tamamlandı" frame instead of pretending there is nothing there.
+  private func liveChallenges() -> [HalkoraSnapshot] {
+    let stored = loadActiveChallenges()
+    let now = Date()
+    let live = stored.filter { !($0.isActive && $0.isOver(at: now)) }
+    return live.isEmpty ? stored : live
+  }
+
   func timeline(for configuration: SelectChallengeIntent, in context: Context) async -> Timeline<HalkoraEntry> {
-    let all = loadActiveChallenges()
+    let all = liveChallenges()
 
     // Explicitly configured (Edit Widget -> picked one specific halka, meant
     // for stacking several copies) -> pin to just that one, no rotation.
@@ -506,17 +596,7 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     // timeline(for:) call counts against the refresh budget, not each
     // switch. Capped at 3 (matching the spec's "max 3 dots").
     if all.count > 1 {
-      let now = Date()
-      let rotationInterval: TimeInterval = 15 * 60
-      let shown = Array(all.prefix(3))
-      // One pass of rotation slots, each already carrying the state correct
-      // for the moment it will be shown.
-      let entries = shown.enumerated().map { index, snapshot in
-        HalkoraEntry(
-          date: now.addingTimeInterval(Double(index) * rotationInterval),
-          snapshot: snapshot, rotationCount: shown.count, rotationIndex: index)
-      }
-      return Timeline(entries: entries, policy: .atEnd)
+      return rotatingTimeline(for: Array(all.prefix(3)))
     }
 
     guard let single = all.first(where: { !$0.checkedInToday(at: Date()) }) ?? all.first else {
@@ -527,6 +607,43 @@ struct HalkoraProvider: AppIntentTimelineProvider {
         policy: .never)
     }
     return dayBoundaryTimeline(for: single)
+  }
+
+  /// Rotate between halkalar (spec 03).
+  ///
+  /// One minute per halka, not the spec's 15. The whole point of the widget
+  /// is closing a day without opening the app, and nobody waits a quarter of
+  /// an hour for their second ring to come around. A minute is also the
+  /// floor: WidgetKit renders pre-built entries at their dates, but it does
+  /// not honour sub-minute granularity, so asking for 30s would just drop
+  /// entries unpredictably.
+  ///
+  /// The slots are pinned to the wall clock rather than started from "now".
+  /// Building the timeline from `now` looked right and was not: the timeline
+  /// is rebuilt constantly — every widget check-in and every trip through the
+  /// app reloads it — and each rebuild restarted the cycle at slot 0, so the
+  /// first halka in the list was the only one anyone ever saw. Anchored to
+  /// the clock, a rebuild lands mid-cycle exactly where the old timeline was.
+  ///
+  /// One timeline carries two hours of slots so rotation continues on entries
+  /// WidgetKit already holds, instead of depending on reloads the budget may
+  /// refuse.
+  private func rotatingTimeline(for shown: [HalkoraSnapshot]) -> Timeline<HalkoraEntry> {
+    let interval: TimeInterval = 60
+    let currentSlot = Int(Date().timeIntervalSince1970 / interval)
+    let entries = (0..<120).map { offset -> HalkoraEntry in
+      let slot = currentSlot + offset
+      let index = slot % shown.count
+      // The first date is the start of the CURRENT slot, i.e. in the past.
+      // That's deliberate — WidgetKit shows the newest entry not in the
+      // future, so the right halka appears immediately instead of after a
+      // wait. Every entry derives its state from its own date, so a day
+      // boundary inside the window is handled without a reload.
+      return HalkoraEntry(
+        date: Date(timeIntervalSince1970: Double(slot) * interval),
+        snapshot: shown[index], rotationCount: shown.count, rotationIndex: index)
+    }
+    return Timeline(entries: entries, policy: .atEnd)
   }
 
   /// One entry now plus one per upcoming day boundary, so the day counter
@@ -546,7 +663,7 @@ struct HalkoraProvider: AppIntentTimelineProvider {
   }
 
   private func resolve(_ configuration: SelectChallengeIntent) -> HalkoraSnapshot? {
-    let all = loadActiveChallenges()
+    let all = liveChallenges()
     if let pickedId = configuration.challenge?.id,
       let picked = all.first(where: { $0.challengeId == pickedId })
     {
@@ -563,7 +680,9 @@ private let samplePreview = HalkoraSnapshot(
   startDate: dateString(Date().addingTimeInterval(-6 * 86_400), in: TimeZone.current.identifier),
   createdAt: "", fastDays: 0, checkedInDayKey: "",
   segments: "dddddd--------", syncedDayKey: "", participantsTotal: 8,
-  participantsDoneToday: 4, jokerRemaining: 1, state: "active", startsLabel: "",
+  participantsDoneToday: 4,
+  roster: "EK:1,SA:1,MY:1,DT:1,BÖ:0,CN:0,AR:0,ZG:0",
+  jokerRemaining: 1, state: "active", startsLabel: "",
   locale: "tr")
 
 // MARK: - Ring
@@ -664,17 +783,31 @@ private struct Pill: View {
   }
 }
 
-/// Near-invisible rotation dots (spec 03). Never more than three.
+/// Which halka of how many (spec 03). The spec asked for these to be
+/// near-invisible, which held while rotation took a quarter of an hour and
+/// read as a background detail. At a minute per halka the card visibly
+/// changes under you, and an indicator you can't see makes that look like a
+/// glitch rather than a rotation — so the active dot is ember and sized to
+/// be legible at arm's length. Never more than three.
 private struct RotationDots: View {
   let count: Int
   let index: Int
+  /// Lock Screen accessories are drawn monochrome; ember would come out as
+  /// plain white there, so those callers ask for the opacity treatment.
+  var monochrome: Bool = false
 
   var body: some View {
-    HStack(spacing: 3) {
+    HStack(spacing: 4) {
       ForEach(0..<count, id: \.self) { i in
-        Circle()
-          .fill(Color.white.opacity(i == index ? 0.35 : 0.12))
-          .frame(width: 3, height: 3)
+        Capsule()
+          .fill(
+            i == index
+              ? (monochrome ? Color.white.opacity(0.9) : halkoraEmber)
+              : Color.white.opacity(monochrome ? 0.3 : 0.18)
+          )
+          // The active one stretches instead of only brightening, so its
+          // position is readable even in a glance too short to compare tones.
+          .frame(width: i == index ? 12 : 5, height: 5)
       }
     }
   }
@@ -980,6 +1113,203 @@ struct HalkoraMediumWidget: Widget {
   }
 }
 
+// MARK: - Large (4×4)
+//
+// The size the spec left for a next pass. It earns the space by showing the
+// group person by person instead of as a "4/8" count — at 2×2 and 4×2 there
+// is no room for that, so the large widget answers a question the others
+// can't: who is the ring still waiting on.
+
+/// One person in the group grid. Ember-filled once they've covered today,
+/// hollow while the ring is still waiting on them.
+private struct RosterChip: View {
+  let initials: String
+  let done: Bool
+
+  var body: some View {
+    Text(initials)
+      .font(wMeta(11))
+      .foregroundStyle(done ? halkoraBg : halkoraTextSecondary)
+      .frame(width: 30, height: 30)
+      .background(
+        Circle()
+          .fill(done ? halkoraEmber : Color.clear)
+          .overlay(
+            Circle().stroke(done ? Color.clear : halkoraWaiting, lineWidth: 1.5)
+          )
+      )
+  }
+}
+
+struct HalkoraLargeView: View {
+  var entry: HalkoraEntry
+
+  var body: some View {
+    let c = copyFor(entry.snapshot?.locale)
+    Group {
+      if let s = entry.snapshot {
+        content(s, c)
+      } else {
+        emptyState(c)
+      }
+    }
+    .containerBackground(halkoraBg, for: .widget)
+  }
+
+  @ViewBuilder
+  private func content(_ s: HalkoraSnapshot, _ c: WidgetCopy) -> some View {
+    let at = entry.date
+    let roster = s.rosterEntries
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top) {
+        VStack(alignment: .leading, spacing: 3) {
+          Text(s.title)
+            .font(wTitle(17))
+            .kerning(-0.34)
+            .foregroundStyle(halkoraTextPrimary)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+          if !s.dailyAction.isEmpty {
+            Text(s.dailyAction)
+              .font(wAction(13))
+              .foregroundStyle(halkoraTextSecondary)
+              .lineLimit(1)
+          }
+        }
+        Spacer(minLength: 8)
+        if entry.rotationCount > 1 {
+          RotationDots(count: entry.rotationCount, index: entry.rotationIndex)
+            .padding(.top, 4)
+        }
+      }
+
+      Spacer(minLength: 12)
+
+      HStack(alignment: .center, spacing: 18) {
+        ZStack {
+          RingView(segments: s.ringSegments(at: at), lineWidth: 9, maxSegments: 31)
+            .frame(width: 126, height: 126)
+          VStack(spacing: 1) {
+            if s.isActive {
+              Text(c.dayWord)
+                .font(wMeta(10))
+                .kerning(1.4)
+                .foregroundStyle(halkoraTextTertiary)
+              Text(c.dayShort(s.currentDay(at: at), s.totalDays))
+                .font(wCounter(24))
+                .monospacedDigit()
+                .foregroundStyle(halkoraTextPrimary)
+            } else {
+              Text(c.daysCount(s.totalDays))
+                .font(wMeta(12))
+                .foregroundStyle(halkoraTextSecondary)
+            }
+          }
+        }
+
+        VStack(alignment: .leading, spacing: 10) {
+          if s.isActive {
+            if s.groupCountsFresh(at: at) {
+              Text(c.doneToday(s.participantsDoneToday, s.participantsTotal))
+                .font(wMeta(12))
+                .monospacedDigit()
+                .foregroundStyle(halkoraTextSecondary)
+            }
+            if s.jokerRemaining > 0 {
+              HStack(spacing: 5) {
+                Circle().fill(halkoraJoker).frame(width: 6, height: 6)
+                Text(c.jokerLeft(s.jokerRemaining))
+                  .font(wMeta(12))
+                  .monospacedDigit()
+                  .foregroundStyle(halkoraTextSecondary)
+              }
+            }
+            if s.isCompleted(at: at) {
+              Pill(label: c.completedLabel, settled: true).fixedSize()
+            } else if s.checkedInToday(at: at) {
+              Pill(label: c.doneLabel, settled: true).fixedSize()
+            } else {
+              Button(intent: CheckInIntent(challengeId: s.challengeId)) {
+                Pill(label: c.checkInCta).fixedSize().frame(minHeight: 44)
+              }
+              .buttonStyle(.plain)
+            }
+          } else {
+            if !s.startsLabel.isEmpty {
+              Text(s.startsLabel).font(wMeta(12)).foregroundStyle(halkoraTextSecondary)
+            }
+            Text(c.joinedCount(s.participantsTotal))
+              .font(wMeta(12))
+              .monospacedDigit()
+              .foregroundStyle(halkoraTextTertiary)
+          }
+        }
+
+        Spacer(minLength: 0)
+      }
+
+      Spacer(minLength: 12)
+
+      // The group, person by person. Only when today's counts are still the
+      // ones we synced — an out-of-date roster would mark people done for a
+      // day that has already turned over, which is worse than showing none.
+      if !roster.isEmpty && s.groupCountsFresh(at: at) {
+        // Wrapping by hand: WidgetKit has no Grid that flows on iOS 17, and a
+        // fixed column count would clip a larger group.
+        let rows = stride(from: 0, to: roster.count, by: 6).map {
+          Array(roster[$0..<min($0 + 6, roster.count)])
+        }
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(rows.indices, id: \.self) { r in
+            HStack(spacing: 6) {
+              ForEach(rows[r].indices, id: \.self) { i in
+                RosterChip(initials: rows[r][i].initials, done: rows[r][i].done)
+              }
+              Spacer(minLength: 0)
+            }
+          }
+        }
+      }
+    }
+    .padding(18)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .widgetURL(URL(string: "halkora://challenge/\(s.challengeId)"))
+  }
+
+  private func emptyState(_ c: WidgetCopy) -> some View {
+    VStack(spacing: 14) {
+      ZStack {
+        RingView(segments: Array(repeating: .waiting, count: 12), lineWidth: 9, maxSegments: 31)
+          .frame(width: 126, height: 126)
+        Image(systemName: "plus").font(.system(size: 28, weight: .semibold))
+          .foregroundStyle(halkoraEmber)
+      }
+      Text(c.emptyTitle)
+        .font(wTitle(17))
+        .kerning(-0.34)
+        .foregroundStyle(halkoraTextPrimary)
+        .multilineTextAlignment(.center)
+      Pill(label: c.emptyCta).fixedSize()
+    }
+    .padding(18)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .widgetURL(URL(string: "halkora://"))
+  }
+}
+
+struct HalkoraLargeWidget: Widget {
+  var body: some WidgetConfiguration {
+    AppIntentConfiguration(
+      kind: "HalkoraWidgetLarge", intent: SelectChallengeIntent.self, provider: HalkoraProvider()
+    ) { entry in
+      HalkoraLargeView(entry: entry)
+    }
+    .configurationDisplayName("Halka · grup")
+    .description("Halkanın günü, joker durumu ve kimin bugünü kapattığı.")
+    .supportedFamilies([.systemLarge])
+  }
+}
+
 // MARK: - Lock Screen accessories
 //
 // The system renders these monochrome (white on transparent) — color is
@@ -1116,6 +1446,364 @@ struct HalkoraLockWidget: Widget {
   }
 }
 
+// MARK: - "Bugün" — every active halka at once
+//
+// Rotation answers "which halka" by taking turns; this answers it by showing
+// them together. For anyone running more than one ring that is the shorter
+// path to the thing the widget exists for — closing the day without opening
+// the app — because nothing has to come around first.
+
+struct HalkoraListEntry: TimelineEntry {
+  let date: Date
+  fileprivate let snapshots: [HalkoraSnapshot]
+}
+
+/// No AppIntent configuration: there is nothing to pick, the widget is the
+/// whole list by definition.
+struct HalkoraListProvider: TimelineProvider {
+  func placeholder(in context: Context) -> HalkoraListEntry {
+    HalkoraListEntry(date: .now, snapshots: [samplePreview])
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (HalkoraListEntry) -> Void) {
+    if context.isPreview {
+      completion(HalkoraListEntry(date: .now, snapshots: [samplePreview]))
+      return
+    }
+    completion(HalkoraListEntry(date: .now, snapshots: loadActiveChallenges()))
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<HalkoraListEntry>) -> Void) {
+    let all = loadActiveChallenges()
+    let now = Date()
+    // Halkalar can sit in different timezones, so the boundaries that matter
+    // are the union of theirs — merged, sorted, deduped. Same reasoning as
+    // the single-halka timeline: pre-built entries cost no reload budget.
+    var moments = Set<Date>()
+    for s in all {
+      for d in s.upcomingRollovers(after: now, count: s.fastDays != 0 ? 30 : 4) {
+        moments.insert(d)
+      }
+    }
+    let dates = [now] + moments.sorted().prefix(24)
+    let entries = dates.map { HalkoraListEntry(date: $0, snapshots: all) }
+    completion(Timeline(entries: entries, policy: all.isEmpty ? .never : .atEnd))
+  }
+}
+
+/// One halka as a row: where it stands, and the button that closes it.
+private struct TodayRow: View {
+  let snapshot: HalkoraSnapshot
+  let at: Date
+  let copy: WidgetCopy
+
+  var body: some View {
+    let s = snapshot
+    HStack(spacing: 10) {
+      RingView(segments: s.ringSegments(at: at), lineWidth: 3.5, maxSegments: 31)
+        .frame(width: 30, height: 30)
+
+      VStack(alignment: .leading, spacing: 1) {
+        Text(s.title)
+          .font(wTitle(13))
+          .kerning(-0.26)
+          .foregroundStyle(halkoraTextPrimary)
+          .lineLimit(1)
+        if s.isActive {
+          Text(copy.dayLong(s.currentDay(at: at), s.totalDays))
+            .font(wMeta(10))
+            .monospacedDigit()
+            .foregroundStyle(halkoraTextTertiary)
+        } else if !s.startsLabel.isEmpty {
+          Text(s.startsLabel).font(wMeta(10)).foregroundStyle(halkoraTextTertiary)
+        }
+      }
+
+      Spacer(minLength: 6)
+
+      if s.isActive {
+        if s.isCompleted(at: at) {
+          Pill(label: copy.completedLabel, settled: true).fixedSize()
+        } else if s.checkedInToday(at: at) {
+          Pill(label: copy.doneLabel, settled: true).fixedSize()
+        } else {
+          Button(intent: CheckInIntent(challengeId: s.challengeId)) {
+            Pill(label: copy.checkInCta).fixedSize().frame(minHeight: 40)
+          }
+          .buttonStyle(.plain)
+        }
+      }
+    }
+  }
+}
+
+struct HalkoraListView: View {
+  @Environment(\.widgetFamily) var family
+  var entry: HalkoraListEntry
+
+  private var rowLimit: Int { family == .systemLarge ? 6 : 3 }
+
+  var body: some View {
+    let at = entry.date
+    // Anything already over is dropped rather than listed as a dead row —
+    // the app can't prune the stored list while it isn't running.
+    let live = entry.snapshots.filter { !($0.isActive && $0.isOver(at: at)) }
+    let c = copyFor(live.first?.locale ?? entry.snapshots.first?.locale)
+    let openCount = live.filter { $0.isActive && !$0.checkedInToday(at: at) }.count
+    let activeCount = live.filter { $0.isActive }.count
+
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .firstTextBaseline) {
+        Text(c.todayTitle)
+          .font(wTitle(15))
+          .kerning(-0.3)
+          .foregroundStyle(halkoraTextPrimary)
+        Spacer(minLength: 6)
+        if activeCount > 0 {
+          Text(
+            openCount == 0
+              ? c.allClosed
+              : c.ringsClosed(activeCount - openCount, activeCount)
+          )
+          .font(wMeta(10))
+          .monospacedDigit()
+          .foregroundStyle(openCount == 0 ? halkoraEmber : halkoraTextTertiary)
+        }
+      }
+      .padding(.bottom, 10)
+
+      if live.isEmpty {
+        Spacer(minLength: 0)
+        HStack {
+          Spacer()
+          VStack(spacing: 8) {
+            Text(c.emptyTitle)
+              .font(wTitle(13))
+              .foregroundStyle(halkoraTextSecondary)
+            Pill(label: c.emptyCta).fixedSize()
+          }
+          Spacer()
+        }
+        Spacer(minLength: 0)
+      } else {
+        VStack(spacing: 8) {
+          ForEach(live.prefix(rowLimit), id: \.challengeId) { s in
+            TodayRow(snapshot: s, at: at, copy: c)
+          }
+        }
+        Spacer(minLength: 0)
+      }
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .widgetURL(URL(string: "halkora://"))
+    .containerBackground(halkoraBg, for: .widget)
+  }
+}
+
+struct HalkoraListWidget: Widget {
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: "HalkoraWidgetToday", provider: HalkoraListProvider()) { entry in
+      HalkoraListView(entry: entry)
+    }
+    .configurationDisplayName("Bugün · tüm halkalar")
+    .description("Aktif halkalarının hepsi tek kartta, her biri için check-in.")
+    .supportedFamilies([.systemMedium, .systemLarge])
+  }
+}
+
+// MARK: - "Seri" — the streak
+
+struct HalkoraStreakView: View {
+  var entry: HalkoraEntry
+
+  var body: some View {
+    let c = copyFor(entry.snapshot?.locale)
+    Group {
+      if let s = entry.snapshot {
+        content(s, c)
+      } else {
+        VStack(spacing: 8) {
+          Text(c.emptyTitle)
+            .font(wTitle(13))
+            .foregroundStyle(halkoraTextSecondary)
+            .multilineTextAlignment(.center)
+          Pill(label: c.emptyCta).fixedSize()
+        }
+        .padding(14)
+        .widgetURL(URL(string: "halkora://"))
+      }
+    }
+    .containerBackground(halkoraBg, for: .widget)
+  }
+
+  @ViewBuilder
+  private func content(_ s: HalkoraSnapshot, _ c: WidgetCopy) -> some View {
+    let at = entry.date
+    let streak = s.streak(at: at)
+    VStack(spacing: 0) {
+      HStack {
+        Text(c.streakWord)
+          .font(wMeta(9))
+          .kerning(1.4)
+          .foregroundStyle(halkoraTextTertiary)
+        Spacer(minLength: 4)
+        if entry.rotationCount > 1 {
+          RotationDots(count: entry.rotationCount, index: entry.rotationIndex)
+        }
+      }
+
+      Spacer(minLength: 6)
+
+      ZStack {
+        RingView(segments: s.ringSegments(at: at), lineWidth: 6, maxSegments: 16)
+          .frame(width: 96, height: 96)
+        Text("\(streak)")
+          .font(wCounter(34))
+          .monospacedDigit()
+          .foregroundStyle(streak > 0 ? halkoraEmber : halkoraTextSecondary)
+      }
+
+      Spacer(minLength: 6)
+
+      Text(s.title)
+        .font(wMeta(11))
+        .foregroundStyle(halkoraTextSecondary)
+        .lineLimit(1)
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .widgetURL(URL(string: "halkora://challenge/\(s.challengeId)"))
+  }
+}
+
+struct HalkoraStreakWidget: Widget {
+  var body: some WidgetConfiguration {
+    AppIntentConfiguration(
+      kind: "HalkoraWidgetStreak", intent: SelectChallengeIntent.self, provider: HalkoraProvider()
+    ) { entry in
+      HalkoraStreakView(entry: entry)
+    }
+    .configurationDisplayName("Halka · seri")
+    .description("Üst üste kaç gün kapattığın.")
+    .supportedFamilies([.systemSmall])
+  }
+}
+
+// MARK: - Lock Screen: "Bugün" summary and streak
+//
+// Same monochrome constraint as the per-halka accessories: the system strips
+// color, so these lean on shape, weight and opacity.
+
+struct HalkoraLockTodayView: View {
+  @Environment(\.widgetFamily) var family
+  var entry: HalkoraListEntry
+
+  var body: some View {
+    let at = entry.date
+    let live = entry.snapshots.filter { $0.isActive && !$0.isOver(at: at) }
+    let c = copyFor(live.first?.locale ?? entry.snapshots.first?.locale)
+    let total = live.count
+    let done = live.filter { $0.checkedInToday(at: at) }.count
+
+    switch family {
+    case .accessoryInline:
+      Text(total == 0 ? c.noneActive : "\(c.brand) · \(c.ringsClosed(done, total))")
+    case .accessoryRectangular:
+      VStack(alignment: .leading, spacing: 3) {
+        Text(c.todayTitle).font(.system(size: 13, weight: .semibold))
+        if total == 0 {
+          Text(c.noneActive).font(.system(size: 12)).opacity(0.75)
+        } else {
+          Text(done == total ? c.allClosed : c.ringsClosed(done, total))
+            .font(.system(size: 12))
+            .opacity(0.75)
+            .monospacedDigit()
+          // One tick per halka — the shortest honest summary of the day.
+          HStack(spacing: 3) {
+            ForEach(live.indices, id: \.self) { i in
+              Capsule()
+                .fill(Color.white.opacity(live[i].checkedInToday(at: at) ? 1 : 0.28))
+                .frame(height: 3)
+            }
+          }
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    default:
+      // Circular: rings closed today, as a gauge.
+      ZStack {
+        RingView(
+          segments: (0..<max(total, 1)).map { i in
+            total == 0 ? .waiting : (live[i].checkedInToday(at: at) ? .done : .waiting)
+          },
+          lineWidth: 5, maxSegments: 14, monochrome: true
+        )
+        Text(total == 0 ? "—" : "\(done)")
+          .font(.system(size: 17, weight: .semibold, design: .rounded))
+          .monospacedDigit()
+      }
+    }
+  }
+}
+
+struct HalkoraLockTodayWidget: Widget {
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: "HalkoraWidgetLockToday", provider: HalkoraListProvider()) { entry in
+      HalkoraLockTodayView(entry: entry)
+    }
+    .configurationDisplayName("Bugün · özet")
+    .description("Bugün kaç halkanı kapattığın.")
+    .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
+  }
+}
+
+struct HalkoraLockStreakView: View {
+  @Environment(\.widgetFamily) var family
+  var entry: HalkoraEntry
+
+  var body: some View {
+    let c = copyFor(entry.snapshot?.locale)
+    let at = entry.date
+    let streak = entry.snapshot?.streak(at: at) ?? 0
+
+    switch family {
+    case .accessoryInline:
+      Text("\(c.brand) · \(c.streakUnit(streak))")
+    default:
+      ZStack {
+        if let s = entry.snapshot {
+          RingView(
+            segments: s.ringSegments(at: at), lineWidth: 5, maxSegments: 14, monochrome: true)
+        }
+        VStack(spacing: -2) {
+          Text("\(streak)")
+            .font(.system(size: 18, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+          Text(c.streakWord)
+            .font(.system(size: 7, weight: .medium))
+            .kerning(0.6)
+            .opacity(0.7)
+        }
+      }
+    }
+  }
+}
+
+struct HalkoraLockStreakWidget: Widget {
+  var body: some WidgetConfiguration {
+    AppIntentConfiguration(
+      kind: "HalkoraWidgetLockStreak", intent: SelectChallengeIntent.self,
+      provider: HalkoraProvider()
+    ) { entry in
+      HalkoraLockStreakView(entry: entry)
+    }
+    .configurationDisplayName("Halka · seri (kilit ekranı)")
+    .description("Üst üste kaç gün kapattığın.")
+    .supportedFamilies([.accessoryCircular, .accessoryInline])
+  }
+}
+
 // MARK: - Bundle
 
 @main
@@ -1123,6 +1811,11 @@ struct HalkoraWidgetBundle: WidgetBundle {
   var body: some Widget {
     HalkoraSmallWidget()
     HalkoraMediumWidget()
+    HalkoraLargeWidget()
+    HalkoraListWidget()
+    HalkoraStreakWidget()
     HalkoraLockWidget()
+    HalkoraLockTodayWidget()
+    HalkoraLockStreakWidget()
   }
 }

@@ -151,6 +151,16 @@ export function syncWidgetSnapshot(challenges: Challenge[]): void {
         syncedDayKey: dayKeyFor(c),
         participantsTotal: c.participants.length,
         participantsDoneToday: c.participants.filter((p) => p.checkedInToday).length,
+        // Who's in, and who's still owed today — the large widget shows the
+        // group person by person rather than as a count. Packed into one
+        // string because ExtensionStorage only takes strings/numbers inside
+        // an object, same reason `segments` is a string. Separators are
+        // stripped from initials so a stray one can't split a field, and the
+        // list is capped because a widget can't show more anyway.
+        roster: c.participants
+          .slice(0, 12)
+          .map((p) => `${p.initials.replace(/[,:]/g, '')}:${p.checkedInToday ? 1 : 0}`)
+          .join(','),
         jokerRemaining: c.jokerRemaining,
         // 'active' | 'upcoming' | 'lobby' — drives which layout the widget
         // renders; the widget never re-derives this itself because a lobby
