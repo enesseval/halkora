@@ -95,7 +95,8 @@ interface ParticipantRow {
   user_id: string;
   // When this person joined — the stake threshold only holds someone
   // responsible from their own join day onward (src/data/stakeOutcome.ts).
-  created_at: string;
+  // Nullable in the schema, so treat a missing value as "was here from day 1".
+  joined_at: string | null;
 }
 
 interface CheckInRow {
@@ -365,8 +366,8 @@ function mapRow(
           joinDayByParticipant: new Map(
             parts.map((p) => [
               p.user_id,
-              row.start_date
-                ? Math.max(daysSinceStart(row.start_date, row.timezone, p.created_at) + 1, 1)
+              row.start_date && p.joined_at
+                ? Math.max(daysSinceStart(row.start_date, row.timezone, p.joined_at) + 1, 1)
                 : 1,
             ]),
           ),
@@ -497,7 +498,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
       .in('id', ids),
     supabase
       .from('participants')
-      .select('id, challenge_id, user_id, created_at')
+      .select('id, challenge_id, user_id, joined_at')
       .in('challenge_id', ids),
     supabase
       .from('check_ins')
