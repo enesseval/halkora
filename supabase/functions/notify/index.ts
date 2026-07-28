@@ -62,6 +62,7 @@ const COPY = {
     nudgeBody: 'Sana el salladı — sıra sende.',
     messageBodyHidden: 'Yeni bir mesaj gönderdi',
     inviteBody: 'Seni halkasına davet etti 💌',
+    rematchBody: (challengeTitle: string) => `"${challengeTitle}" için rövanş başlattı. Var mısın? 🔁`,
     someone: 'Biri',
     challengeFallback: 'Halkan',
   },
@@ -69,6 +70,7 @@ const COPY = {
     nudgeBody: "Someone nudged you — you're up.",
     messageBodyHidden: 'Sent a new message',
     inviteBody: 'Invited you to their ring 💌',
+    rematchBody: (challengeTitle: string) => `Started a rematch of "${challengeTitle}". You in? 🔁`,
     someone: 'Someone',
     challengeFallback: 'Your ring',
   },
@@ -231,7 +233,13 @@ Deno.serve(async (req) => {
         } else if (table === 'nudges') {
           body = (record.message as string | null) || c.nudgeBody;
         } else {
-          body = c.inviteBody;
+          // A rematch invite reads differently from a first-time one — the
+          // recipient already knows the group (invites.kind, see
+          // docs/db-stake-v2.sql).
+          body =
+            record.kind === 'rematch'
+              ? c.rematchBody(challengeTitle ?? c.challengeFallback)
+              : c.inviteBody;
         }
         return { to: r.token as string, title, subtitle, body, data: { challengeId, inviteCode } };
       });

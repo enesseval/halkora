@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -19,8 +19,15 @@ import {
 import { sendInvite, isDuplicateInviteError } from '@/data/invites';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { addDays, formatLongDate, formatShortDate, isSameDay } from '@/lib/day';
+import type { StakeKind } from '@/data/types';
 import { AppText, Button, Chip, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
+
+/** ~20% of the ring's length, so a 14-day ring suggests 3 and a 7-day one
+ * suggests 1 — a starting point the owner can override. */
+function suggestedThreshold(totalDays: number): number {
+  return Math.max(Math.round(totalDays * 0.2), 0);
+}
 
 /** One start-date choice pill (Bugün / Yarın / custom calendar date). */
 function DatePill({
@@ -320,13 +327,37 @@ export default function CreateScreen() {
   // Kurucu-tetiklemeli başlangıç (saha testi bulgusu) — true iken start
   // seçimindeki 3 pill (Bugün/Yarın/Tarih seç) yok sayılır, challenge
   // status='lobby' ile kurulur (startChallenge sonradan gerçek başlangıcı verir).
-  const [lobby, setLobby] = useState(false);
+  // A rematch defaults to a lobby: the old group has to opt in again, and
+  // starting on a date would kick off with whoever happened to be around
+  // (docs/BAHIS-V2-VE-ROVANS.md §7). Still switchable.
+  const [lobby, setLobby] = useState(!!rematchOf);
 
   const isToday = isSameDay(startDate, today);
   const isTomorrow = isSameDay(startDate, tomorrow);
   const isCustom = !isToday && !isTomorrow;
   const [stakeMode, setStakeMode] = useState<'direct' | 'vote'>(rematchSource?.stake?.mode ?? 'direct');
   const [stakeText, setStakeText] = useState(() => rematchSource?.stake?.text ?? '');
+  // Bahis v2 (docs/db-stake-v2.sql): individual = whoever misses more than
+  // the threshold pays; collective = the group hits a shared target or
+  // nobody does.
+  const [stakeKind, setStakeKind] = useState<StakeKind>(rematchSource?.stake?.kind ?? 'individual');
+  const [collectivePct, setCollectivePct] = useState(
+    () => rematchSource?.stake?.collectiveTargetPct ?? 80,
+  );
+  // Suggested from the length (a 14-day ring tolerates ~3), but the moment
+  // the user picks one themselves we stop moving it under them.
+  const [thresholdTouched, setThresholdTouched] = useState(false);
+  const [thresholdMissed, setThresholdMissed] = useState(
+    () => rematchSource?.stake?.thresholdMissed ?? suggestedThreshold(rematchSource?.totalDays ?? 14),
+  );
+  useEffect(() => {
+    if (!thresholdTouched) setThresholdMissed(suggestedThreshold(totalDays));
+  }, [totalDays, thresholdTouched]);
+  // The suggestion has to be reachable: a fixed 0/1/2/3 row can't offer the
+  // 6 a 30-day ring suggests.
+  const thresholdOptions = Array.from(
+    new Set([0, 1, 2, 3, suggestedThreshold(totalDays)]),
+  ).sort((a, b) => a - b);
   const [creating, setCreating] = useState(false);
   const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(() => rematchSource?.firstDayJoinOnly ?? false);
 
@@ -351,7 +382,15 @@ export default function CreateScreen() {
       startDateISO,
       joker,
       startsLabel: isToday ? undefined : startsLabel,
-      stake: stakeText ? { mode: stakeMode, text: stakeText } : undefined,
+      stake: stakeText
+        ? {
+            mode: stakeMode,
+            kind: stakeKind,
+            text: stakeText,
+            thresholdMissed: stakeKind === 'individual' ? thresholdMissed : undefined,
+            collectiveTargetPct: stakeKind === 'collective' ? collectivePct : undefined,
+          }
+        : undefined,
       firstDayJoinOnly,
       lobby,
     });
@@ -369,7 +408,7 @@ export default function CreateScreen() {
       const others = rematchSource.participants.filter((p) => !p.isMe);
       await Promise.all(
         others.map((p) =>
-          sendInvite(id, p.id).catch((e) => {
+          sendInvite(id, p.id, 'rematch').catch((e) => {
             if (!isDuplicateInviteError(e)) console.error('rematch auto-invite failed', e);
           }),
         ),
@@ -600,27 +639,81 @@ export default function CreateScreen() {
             </AppText>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
               <View style={{ flex: 1 }}>
-                <Chip label={t.create.stakeDirect} selected={stakeMode === 'direct'} onPress={() => setStakeMode('direct')} />
+                <Chip
+                  label={t.create.stakeKindIndividual}
+                  selected={stakeKind === 'individual'}
+                  onPress={() => setStakeKind('individual')}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Chip label={t.create.stakeVote} selected={stakeMode === 'vote'} onPress={() => setStakeMode('vote')} />
+                <Chip
+                  label={t.create.stakeKindCollective}
+                  selected={stakeKind === 'collective'}
+                  onPress={() => setStakeKind('collective')}
+                />
               </View>
             </View>
-            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 24, marginBottom: 10 }}>
-              {t.create.stakeSuggestions}
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }}>
+              {t.create.stakeKindHint}
             </AppText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {STAKE_PRESETS().map((s) => (
-                <Chip
-                  key={s.id}
-                  label={s.label}
-                  emoji={s.emoji}
-                  selected={stakeText === s.label}
-                  onPress={() => setStakeText(s.label)}
+
+            {stakeKind === 'individual' ? (
+              <>
+                <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 24, marginBottom: 10 }}>
+                  {t.create.stakeThresholdLabel}
+                </AppText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {thresholdOptions.map((n) => (
+                    <Chip
+                      key={n}
+                      label={t.create.stakeThresholdDay(n)}
+                      selected={thresholdMissed === n}
+                      onPress={() => {
+                        setThresholdTouched(true);
+                        setThresholdMissed(n);
+                      }}
+                    />
+                  ))}
+                </View>
+                <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 24, marginBottom: 10 }}>
+                  {t.create.stakeSuggestions}
+                </AppText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {STAKE_PRESETS().map((s) => (
+                    <Chip
+                      key={s.id}
+                      label={s.label}
+                      emoji={s.emoji}
+                      selected={stakeText === s.label}
+                      onPress={() => setStakeText(s.label)}
+                    />
+                  ))}
+                </View>
+                <Field label={t.create.stakeCustomLabel} value={stakeText} onChangeText={setStakeText} placeholder={t.create.stakeCustomPlaceholder} />
+              </>
+            ) : (
+              <>
+                <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 24, marginBottom: 10 }}>
+                  {t.create.stakeCollectiveTargetLabel}
+                </AppText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[80, 90, 100].map((pct) => (
+                    <Chip
+                      key={pct}
+                      label={t.common.percent(pct)}
+                      selected={collectivePct === pct}
+                      onPress={() => setCollectivePct(pct)}
+                    />
+                  ))}
+                </View>
+                <Field
+                  label={t.create.stakeCustomLabel}
+                  value={stakeText}
+                  onChangeText={setStakeText}
+                  placeholder={t.create.stakeCollectivePlaceholder}
                 />
-              ))}
-            </View>
-            <Field label={t.create.stakeCustomLabel} value={stakeText} onChangeText={setStakeText} placeholder={t.create.stakeCustomPlaceholder} />
+              </>
+            )}
           </>
         ) : null}
       </ScrollView>

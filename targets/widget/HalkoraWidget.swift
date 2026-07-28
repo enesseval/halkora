@@ -184,21 +184,33 @@ private enum SegmentKind {
   case waiting
 }
 
+// Everything derived below takes the date it should be evaluated AT, rather
+// than reading Date() internally. That's what lets one timeline carry
+// several future-dated entries whose state is already correct when WidgetKit
+// displays them — the system flips between pre-built entries locally, for
+// free, instead of us asking it to reload at every day boundary.
+//
+// ⚠️ Asking for frequent reloads does NOT work: WidgetKit grants a widget
+// only a few dozen refreshes a day, so a "reload me in 60 seconds" policy is
+// silently throttled and the widget just freezes (saha testi bulgusu:
+// "widgetlar uygulama arka planda açık dahi olsa güncellenmiyor ... 5dkdır").
+// The app can't cover the gap either: its polling deliberately stops while
+// backgrounded (focusManager in app/_layout.tsx), so nothing pushes updates.
 extension HalkoraSnapshot {
   var isActive: Bool { state == "active" }
   var isLobby: Bool { state == "lobby" }
 
   /// Mirrors dayKeyFor() in src/lib/widget.ts — keep both in sync.
-  var todayKey: String {
-    if fastDays != 0 { return String(currentDay) }
-    return dateString(Date(), in: timezone)
+  func todayKey(at now: Date) -> String {
+    if fastDays != 0 { return String(currentDay(at: now)) }
+    return dateString(now, in: timezone)
   }
 
   /// Mirrors daysSinceStart() + `rawDay` in src/data/challenges.ts.
-  var currentDay: Int {
+  func currentDay(at now: Date) -> Int {
     if fastDays != 0 {
       guard let created = parseISO(createdAt) else { return 1 }
-      return min(Int(Date().timeIntervalSince(created) / 60) + 1, totalDays)
+      return min(max(Int(now.timeIntervalSince(created) / 60) + 1, 1), totalDays)
     }
     guard !startDate.isEmpty else { return 0 }
     let f = DateFormatter()
@@ -206,30 +218,32 @@ extension HalkoraSnapshot {
     f.timeZone = TimeZone(identifier: "UTC")
     f.dateFormat = "yyyy-MM-dd"
     guard let start = f.date(from: startDate),
-      let today = f.date(from: dateString(Date(), in: timezone))
+      let today = f.date(from: dateString(now, in: timezone))
     else { return 0 }
     let diff = (today.timeIntervalSince(start) / 86_400).rounded()
     return min(Int(diff) + 1, totalDays)
   }
 
-  var checkedInToday: Bool {
-    !checkedInDayKey.isEmpty && checkedInDayKey == todayKey
+  func checkedInToday(at now: Date) -> Bool {
+    !checkedInDayKey.isEmpty && checkedInDayKey == todayKey(at: now)
   }
 
   /// True once the last day is behind us — drives the "Tamamlandı" frame.
-  var isCompleted: Bool { isActive && currentDay >= totalDays && checkedInToday }
+  func isCompleted(at now: Date) -> Bool {
+    isActive && currentDay(at: now) >= totalDays && checkedInToday(at: now)
+  }
 
   /// Group counts only make sense for the day they were counted on.
-  var groupCountsFresh: Bool { syncedDayKey == todayKey }
+  func groupCountsFresh(at now: Date) -> Bool { syncedDayKey == todayKey(at: now) }
 
-  /// Per-day ring state, with today's segment resolved live rather than
+  /// Per-day ring state, with today's segment resolved for `now` rather than
   /// trusting whatever the app last stored.
-  var ringSegments: [SegmentKind] {
+  func ringSegments(at now: Date) -> [SegmentKind] {
     let chars = Array(segments)
-    let day = currentDay
+    let day = currentDay(at: now)
     return (1...max(totalDays, 1)).map { n in
       if n == day && isActive {
-        return checkedInToday ? .done : .today
+        return checkedInToday(at: now) ? .done : .today
       }
       guard n - 1 < chars.count else { return .waiting }
       switch chars[n - 1] {
@@ -240,18 +254,28 @@ extension HalkoraSnapshot {
     }
   }
 
-  /// When the derived state can next change on its own, so the timeline can
-  /// reload exactly then instead of going stale until the app runs again.
-  var nextRolloverDate: Date {
-    if fastDays != 0 { return Date().addingTimeInterval(60) }
+  /// The next `count` moments at which this snapshot's derived state changes
+  /// on its own — one per day boundary. Pre-building an entry for each is
+  /// what keeps the widget correct without spending reloads.
+  func upcomingRollovers(after now: Date, count: Int) -> [Date] {
+    if fastDays != 0 {
+      // Test mode: a "day" is 60s, so this is also the only way fast-day
+      // rollover is observable at all — a reload-based approach would be
+      // throttled long before the first flip.
+      guard let created = parseISO(createdAt) else { return [] }
+      let elapsed = now.timeIntervalSince(created)
+      let nextIndex = floor(elapsed / 60) + 1
+      return (0..<count).map { created.addingTimeInterval((nextIndex + Double($0)) * 60) }
+    }
     let tz = TimeZone(identifier: timezone) ?? .current
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
-    // A minute past midnight, not exactly midnight — WidgetKit fires
-    // "around" the requested date, and firing a hair early would recompute
-    // the SAME day and then sit stale for another 24h.
-    let tomorrow = cal.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86_400)
-    return cal.startOfDay(for: tomorrow).addingTimeInterval(60)
+    return (1...count).compactMap { offset in
+      guard let day = cal.date(byAdding: .day, value: offset, to: now) else { return nil }
+      // A minute past midnight, not exactly midnight — rendering a hair
+      // early would recompute the SAME day.
+      return cal.startOfDay(for: day).addingTimeInterval(60)
+    }
   }
 }
 
@@ -332,9 +356,9 @@ private func markCheckedInLocally(_ challengeId: String) {
   guard let idx = list.firstIndex(where: { $0.challengeId == challengeId }) else { return }
   // Stamped with the day it belongs to (not a bare `true`) so it expires by
   // itself at the next rollover, exactly like the app-written value.
-  list[idx].checkedInDayKey = list[idx].todayKey
+  list[idx].checkedInDayKey = list[idx].todayKey(at: Date())
   // Keep the group counter honest about the check-in that just happened.
-  if list[idx].groupCountsFresh {
+  if list[idx].groupCountsFresh(at: Date()) {
     list[idx].participantsDoneToday = min(
       list[idx].participantsDoneToday + 1, list[idx].participantsTotal)
   }
@@ -473,9 +497,7 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     if let pickedId = configuration.challenge?.id,
       let picked = all.first(where: { $0.challengeId == pickedId })
     {
-      return Timeline(
-        entries: [HalkoraEntry(date: .now, snapshot: picked, rotationCount: 1, rotationIndex: 0)],
-        policy: .after(picked.nextRolloverDate))
+      return dayBoundaryTimeline(for: picked)
     }
 
     // Unconfigured + more than one halka -> auto-rotate. A Timeline can
@@ -484,30 +506,43 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     // timeline(for:) call counts against the refresh budget, not each
     // switch. Capped at 3 (matching the spec's "max 3 dots").
     if all.count > 1 {
+      let now = Date()
       let rotationInterval: TimeInterval = 15 * 60
       let shown = Array(all.prefix(3))
+      // One pass of rotation slots, each already carrying the state correct
+      // for the moment it will be shown.
       let entries = shown.enumerated().map { index, snapshot in
         HalkoraEntry(
-          date: Date().addingTimeInterval(Double(index) * rotationInterval),
+          date: now.addingTimeInterval(Double(index) * rotationInterval),
           snapshot: snapshot, rotationCount: shown.count, rotationIndex: index)
       }
-      // Reload once the rotation finishes a pass — or at the day boundary if
-      // that lands sooner, so a rollover never waits on the rotation to wrap.
-      let afterFullPass = Date().addingTimeInterval(Double(shown.count) * rotationInterval)
-      let earliestRollover = shown.map(\.nextRolloverDate).min() ?? afterFullPass
-      return Timeline(entries: entries, policy: .after(min(afterFullPass, earliestRollover)))
+      return Timeline(entries: entries, policy: .atEnd)
     }
 
-    guard let single = all.first(where: { !$0.checkedInToday }) ?? all.first else {
+    guard let single = all.first(where: { !$0.checkedInToday(at: Date()) }) ?? all.first else {
       // No halka at all — nothing to derive, so nothing to schedule; the
       // app's own reloadWidget() is the only thing that can change this.
       return Timeline(
         entries: [HalkoraEntry(date: .now, snapshot: nil, rotationCount: 1, rotationIndex: 0)],
         policy: .never)
     }
-    return Timeline(
-      entries: [HalkoraEntry(date: .now, snapshot: single, rotationCount: 1, rotationIndex: 0)],
-      policy: .after(single.nextRolloverDate))
+    return dayBoundaryTimeline(for: single)
+  }
+
+  /// One entry now plus one per upcoming day boundary, so the day counter
+  /// and the "checked in today" state flip on schedule using entries
+  /// WidgetKit already holds — no reload budget spent, which is the only
+  /// thing that actually works here (see the note above the derivation).
+  private func dayBoundaryTimeline(for snapshot: HalkoraSnapshot) -> Timeline<HalkoraEntry> {
+    let now = Date()
+    // Fast mode burns a "day" every 60s, so it needs many more points to
+    // cover a useful test window; real days only need a few.
+    let count = snapshot.fastDays != 0 ? 30 : 4
+    let dates = [now] + snapshot.upcomingRollovers(after: now, count: count)
+    let entries = dates.map {
+      HalkoraEntry(date: $0, snapshot: snapshot, rotationCount: 1, rotationIndex: 0)
+    }
+    return Timeline(entries: entries, policy: .atEnd)
   }
 
   private func resolve(_ configuration: SelectChallengeIntent) -> HalkoraSnapshot? {
@@ -517,7 +552,7 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     {
       return picked
     }
-    return all.first(where: { !$0.checkedInToday }) ?? all.first
+    return all.first(where: { !$0.checkedInToday(at: Date()) }) ?? all.first
   }
 }
 
@@ -673,13 +708,17 @@ struct HalkoraSmallView: View {
 
   @ViewBuilder
   private func content(_ s: HalkoraSnapshot, _ c: WidgetCopy) -> some View {
+    // Derive against the entry's own date, not Date(): WidgetKit builds
+    // future-dated entries ahead of time, so reading the wall clock here
+    // would bake "now" into a frame meant for tomorrow.
+    let at = entry.date
     let card = VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .top) {
         ZStack {
-          RingView(segments: s.ringSegments, lineWidth: 5, maxSegments: 16)
+          RingView(segments: s.ringSegments(at: at), lineWidth: 5, maxSegments: 16)
             .frame(width: 56, height: 56)
           if s.isActive {
-            Text(c.dayShort(s.currentDay, s.totalDays))
+            Text(c.dayShort(s.currentDay(at: at), s.totalDays))
               .font(wCounter(13))
               .monospacedDigit()
               .foregroundStyle(halkoraTextPrimary)
@@ -711,9 +750,9 @@ struct HalkoraSmallView: View {
       Spacer(minLength: 6)
 
       if s.isActive {
-        if s.isCompleted {
+        if s.isCompleted(at: at) {
           Pill(label: c.completedLabel, settled: true)
-        } else if s.checkedInToday {
+        } else if s.checkedInToday(at: at) {
           Pill(label: c.doneLabel, settled: true)
         } else {
           Pill(label: c.checkInCta)
@@ -737,7 +776,7 @@ struct HalkoraSmallView: View {
 
     // Spec: on small, the WHOLE card is the check-in target; the pill exists
     // as affordance only. Anything not actionable just opens the halka.
-    if s.isActive && !s.checkedInToday && !s.isCompleted {
+    if s.isActive && !s.checkedInToday(at: at) && !s.isCompleted(at: at) {
       Button(intent: CheckInIntent(challengeId: s.challengeId)) { card }
         .buttonStyle(.plain)
     } else {
@@ -801,9 +840,10 @@ struct HalkoraMediumView: View {
 
   @ViewBuilder
   private func content(_ s: HalkoraSnapshot, _ c: WidgetCopy) -> some View {
+    let at = entry.date
     HStack(alignment: .center, spacing: 16) {
       ZStack {
-        RingView(segments: s.ringSegments, lineWidth: 7, maxSegments: 31)
+        RingView(segments: s.ringSegments(at: at), lineWidth: 7, maxSegments: 31)
           .frame(width: 88, height: 88)
         VStack(spacing: 0) {
           if s.isActive {
@@ -811,7 +851,7 @@ struct HalkoraMediumView: View {
               .font(wMeta(9))
               .kerning(1.2)
               .foregroundStyle(halkoraTextTertiary)
-            Text(c.dayShort(s.currentDay, s.totalDays))
+            Text(c.dayShort(s.currentDay(at: at), s.totalDays))
               .font(wCounter(16))
               .monospacedDigit()
               .foregroundStyle(halkoraTextPrimary)
@@ -851,7 +891,7 @@ struct HalkoraMediumView: View {
         HStack(alignment: .bottom) {
           VStack(alignment: .leading, spacing: 2) {
             if s.isActive {
-              if s.groupCountsFresh {
+              if s.groupCountsFresh(at: at) {
                 Text(c.doneToday(s.participantsDoneToday, s.participantsTotal))
                   .font(wMeta())
                   .monospacedDigit()
@@ -882,9 +922,9 @@ struct HalkoraMediumView: View {
           // Spec: two targets on medium — the pill is check-in (44pt hit
           // area around a 32pt pill), the rest of the card opens the halka.
           if s.isActive {
-            if s.isCompleted {
+            if s.isCompleted(at: at) {
               Pill(label: c.completedLabel, settled: true).fixedSize()
-            } else if s.checkedInToday {
+            } else if s.checkedInToday(at: at) {
               Pill(label: c.doneLabel, settled: true).fixedSize()
             } else {
               Button(intent: CheckInIntent(challengeId: s.challengeId)) {
@@ -967,15 +1007,16 @@ struct HalkoraLockView: View {
 
   @ViewBuilder
   private var circular: some View {
+    let at = entry.date
     if let s = entry.snapshot {
       ZStack {
         AccessoryWidgetBackground()
-        RingView(segments: s.ringSegments, lineWidth: 4, maxSegments: 14, monochrome: true)
+        RingView(segments: s.ringSegments(at: at), lineWidth: 4, maxSegments: 14, monochrome: true)
         // Day number while pending; a check once done.
-        if s.checkedInToday {
+        if s.checkedInToday(at: at) {
           Image(systemName: "checkmark").font(.system(size: 14, weight: .bold))
         } else if s.isActive {
-          Text("\(s.currentDay)").font(.system(size: 15, weight: .semibold)).monospacedDigit()
+          Text("\(s.currentDay(at: at))").font(.system(size: 15, weight: .semibold)).monospacedDigit()
         } else {
           Text("\(s.totalDays)").font(.system(size: 13, weight: .medium)).monospacedDigit()
         }
@@ -990,17 +1031,18 @@ struct HalkoraLockView: View {
 
   @ViewBuilder
   private var rectangular: some View {
+    let at = entry.date
     if let s = entry.snapshot {
       let c = copyFor(s.locale)
       VStack(alignment: .leading, spacing: 3) {
         Text(s.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
         // The ring flattens to a tick bar — same segments, read left to right.
-        TickBar(segments: s.ringSegments)
+        TickBar(segments: s.ringSegments(at: at))
           .frame(height: 4)
         HStack(spacing: 4) {
-          Text(c.dayLong(s.currentDay, s.totalDays)).monospacedDigit()
+          Text(c.dayLong(s.currentDay(at: at), s.totalDays)).monospacedDigit()
           Text("·")
-          if s.checkedInToday {
+          if s.checkedInToday(at: at) {
             doneLabelWithCheck(c.doneLabel)
           } else {
             Text(c.checkInCta)
@@ -1018,17 +1060,18 @@ struct HalkoraLockView: View {
 
   @ViewBuilder
   private var inline: some View {
+    let at = entry.date
     if let s = entry.snapshot {
       let c = copyFor(s.locale)
       // One line, mini arc as the brand mark.
       Label {
-        if s.checkedInToday {
+        if s.checkedInToday(at: at) {
           Text("\(c.brand) · \(c.doneLabel) ✓")
         } else {
-          Text("\(c.brand) · \(c.dayLong(s.currentDay, s.totalDays))")
+          Text("\(c.brand) · \(c.dayLong(s.currentDay(at: at), s.totalDays))")
         }
       } icon: {
-        Image(systemName: s.checkedInToday ? "circle.righthalf.filled" : "circle.dashed")
+        Image(systemName: s.checkedInToday(at: at) ? "circle.righthalf.filled" : "circle.dashed")
       }
     } else {
       Label(copyFor(nil).brand, systemImage: "circle.dashed")

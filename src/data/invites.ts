@@ -32,7 +32,13 @@ export function isDuplicateInviteError(e: unknown): boolean {
 
 /** Sends an invite to an already-resolved user id. RLS (docs/db-invites.sql)
  * requires the caller to already be a member of `challengeId`. */
-export async function sendInvite(challengeId: string, toUserId: string): Promise<void> {
+export async function sendInvite(
+  challengeId: string,
+  toUserId: string,
+  /** 'rematch' gives the push a different headline — the recipient already
+   * knows this group (docs/db-stake-v2.sql §4, notify's invites branch). */
+  kind: 'invite' | 'rematch' = 'invite',
+): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -40,6 +46,6 @@ export async function sendInvite(challengeId: string, toUserId: string): Promise
   if (!user) throw new Error(getDict().errors.sessionMissing);
   const { error } = await supabase
     .from('invites')
-    .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId });
+    .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId, kind });
   if (error) throw error;
 }

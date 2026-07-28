@@ -19,6 +19,7 @@ import {
   deleteChallenge as deleteChallengeRemote,
   leaveChallenge as leaveChallengeRemote,
   startChallenge as startChallengeRemote,
+  settleStake,
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
@@ -512,6 +513,7 @@ export function useChallengeActions(id: string) {
   const removeChallengeMock = useMockStore((s) => s.removeChallenge);
   const startChallengeMock = useMockStore((s) => s.startChallenge);
   const updateDetailsMock = useMockStore((s) => s.updateDetails);
+  const settleStakeMock = useMockStore((s) => s.settleStake);
   const setChallenges = useMockStore((s) => s.setChallenges);
   const challenge = useChallenge(id);
   const queryClient = useQueryClient();
@@ -598,6 +600,23 @@ export function useChallengeActions(id: string) {
       restartChallenge(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
         .catch((e) => Alert.alert(t.errors.restartFailed, friendlyErrorMessage(e)));
+    }
+  };
+
+  /** Closes the stake. Awaited by the finish screen so it can show the error
+   * inline; ALREADY_SETTLED counts as success — two members tapping at the
+   * same moment is a normal race, not something to complain about. */
+  const doSettleStake = async (): Promise<void> => {
+    if (isSupabaseConfigured) {
+      try {
+        await settleStake(id);
+      } catch (e) {
+        if (!isErrorCode(e, 'ALREADY_SETTLED')) throw e;
+      }
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+      queryClient.invalidateQueries({ queryKey: messagesKey(id) });
+    } else {
+      settleStakeMock(id);
     }
   };
 
@@ -691,6 +710,7 @@ export function useChallengeActions(id: string) {
     restart: doRestart,
     endEarly: doEndEarly,
     updateDetails: doUpdateDetails,
+    settleStake: doSettleStake,
     deleteChallenge: doDelete,
     leaveChallenge: doLeave,
     startChallenge: doStart,
