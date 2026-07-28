@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { GestureResponderEvent, Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
   cancelAnimation,
@@ -27,6 +27,13 @@ interface Props {
   /** override the preset diameter/stroke (e.g. 44px completed-card ring) */
   diameter?: number;
   strokeWidth?: number;
+  /** Day numbers (1-based) a joker could still repair. They get a faint amber
+   * hint so a tappable gap is distinguishable from a day that simply hasn't
+   * arrived yet — without ever marking a missed day red. */
+  repairableDays?: number[];
+  /** Called with the 1-based day number when a repairable segment is tapped.
+   * Taps anywhere else on the ring are ignored. */
+  onRepairDayPress?: (dayNumber: number) => void;
 }
 
 const DIM: Record<RingSize, { px: number; stroke: number }> = {
@@ -74,9 +81,10 @@ interface SegProps {
   state: SegmentState;
   isActive: boolean;
   stroke: number;
+  repairable?: boolean;
 }
 
-function Segment({ d, length, state, isActive, stroke }: SegProps) {
+function Segment({ d, length, state, isActive, stroke, repairable }: SegProps) {
   const filled = state === 'done' || state === 'joker';
   // opacity of the colored overlay; dashoffset controls the "sweep" fill.
   const op = useSharedValue(filled ? 1 : state === 'today' ? 0.4 : 0);
@@ -142,6 +150,18 @@ function Segment({ d, length, state, isActive, stroke }: SegProps) {
         strokeLinecap="butt"
         fill="none"
       />
+      {/* "a joker still fits here" — deliberately faint. It reads as an open
+          slot inviting a tap, not as a red mark against the day. */}
+      {repairable ? (
+        <Path
+          d={d}
+          stroke={colors.joker}
+          strokeWidth={stroke}
+          strokeLinecap="butt"
+          strokeOpacity={0.3}
+          fill="none"
+        />
+      ) : null}
       {/* colored overlay */}
       <AnimatedPath
         d={d}
@@ -164,6 +184,8 @@ export function ProgressRing({
   centerContent,
   diameter,
   strokeWidth,
+  repairableDays,
+  onRepairDayPress,
 }: Props) {
   const base = DIM[size];
   const px = diameter ?? base.px;
@@ -182,10 +204,39 @@ export function ProgressRing({
   const span = step - gapDeg;
   const length = (r * span * Math.PI) / 180;
 
-  return (
-    <View
-      style={{ width: px, height: px, alignItems: 'center', justifyContent: 'center' }}
-    >
+  const repairable = new Set(repairableDays ?? []);
+  const tappable = onRepairDayPress != null && repairable.size > 0;
+
+  /**
+   * Resolve a touch to a day. Per-segment hit targets would be ~18px apart on
+   * a 30-day ring and would have to overlap to be thumb-sized, so instead the
+   * whole ring takes the touch and the segment is derived from its angle —
+   * exact at any day count.
+   */
+  const handlePress = (e: GestureResponderEvent) => {
+    if (!onRepairDayPress) return;
+    // locationX/Y are relative to whichever view took the touch. That is
+    // either this Pressable or the Svg inside it — and the Svg is laid out
+    // exactly on top of the Pressable's box (same size, at 0,0), so both give
+    // the same numbers. Keep them coincident if this layout ever changes.
+    const { locationX, locationY } = e.nativeEvent;
+    const dx = locationX - cx;
+    const dy = locationY - cy;
+    const dist = Math.hypot(dx, dy);
+    // Only the ring band itself, generously padded for fingers. Taps that land
+    // in the middle belong to the check-in button, not to a day.
+    const band = Math.max(stroke * 2.5, 22);
+    if (dist < r - band || dist > r + band) return;
+    // Angle clockwise from 12 o'clock, matching how the arcs are laid out.
+    const deg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+    const norm = ((deg % 360) + 360) % 360;
+    const day = Math.floor(norm / step) + 1;
+    if (!repairable.has(day)) return;
+    onRepairDayPress(day);
+  };
+
+  const body = (
+    <>
       <Svg
         width={px}
         height={px}
@@ -204,12 +255,17 @@ export function ProgressRing({
               state={state}
               isActive={i === activeIndex}
               stroke={stroke}
+              repairable={repairable.has(i + 1)}
             />
           );
         })}
       </Svg>
       {centerContent ? (
+        // box-none: the wrapper covers the whole ring, so it must let ring
+        // taps fall through to the Pressable below while its own children
+        // (the check-in button) still receive theirs.
         <View
+          pointerEvents="box-none"
           style={{
             position: 'absolute',
             top: 0,
@@ -223,6 +279,21 @@ export function ProgressRing({
           {centerContent}
         </View>
       ) : null}
-    </View>
+    </>
+  );
+
+  const boxStyle = {
+    width: px,
+    height: px,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as const;
+
+  if (!tappable) return <View style={boxStyle}>{body}</View>;
+
+  return (
+    <Pressable style={boxStyle} onPress={handlePress}>
+      {body}
+    </Pressable>
   );
 }

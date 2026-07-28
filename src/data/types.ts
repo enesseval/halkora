@@ -140,6 +140,10 @@ export interface Challenge {
   // challenge'larda dolu; mevcut check_ins'ten hesaplanır, ekstra veri yok.
   advancedStats?: {
     perfectDays: number; // herkesin check-in yaptığı gün sayısı
+    /** HANGİ günlerin kusursuz olduğu (1-tabanlı). Sayı tek başına halkayı
+     * çizmeye yetmiyor: halka her yerde "hangi günler" demek, "kaç gün"
+     * değil — ilk N segmenti doldurmak sahte bir takvim gösterirdi. */
+    perfectDayNumbers: number[];
     leaderboard: {
       name: string;
       initials: string;

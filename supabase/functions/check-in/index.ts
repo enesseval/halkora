@@ -3,7 +3,10 @@
 //
 // Deploy: see docs/PHASE2-SUPABASE.md "Ek F".
 //
-// Body: { challenge_id: string, type?: 'done' | 'joker' }
+// Body: { challenge_id: string, type?: 'done' | 'joker', day_number?: number }
+// `day_number` is only read for jokers — it says WHICH past day is being
+// repaired (the ring lets you tap any gap). Omitted means yesterday, which
+// is what every joker meant before this and what older clients still send.
 // Returns: { day_number: number } on success, { error: string } on failure —
 // `error` is a stable UPPER_SNAKE_CASE code (see src/i18n/*.ts `errors.codes`)
 // that the client localizes, not prose — never change these strings without
@@ -33,6 +36,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const challengeId: string | undefined = body?.challenge_id;
     const checkInType: 'done' | 'joker' = body?.type === 'joker' ? 'joker' : 'done';
+    const requestedDay: unknown = body?.day_number;
     if (!challengeId) return fail('CHALLENGE_ID_REQUIRED');
 
     // Bound to the CALLER's own JWT — only used to resolve who is calling.
@@ -103,8 +107,16 @@ Deno.serve(async (req) => {
     let dayNumber = currentDay;
 
     if (checkInType === 'joker') {
-      dayNumber = currentDay - 1;
+      // Which gap is being repaired. The client sends the day the user tapped
+      // on the ring; older builds send nothing and always meant yesterday.
+      dayNumber = requestedDay === undefined ? currentDay - 1 : Number(requestedDay);
+      if (!Number.isInteger(dayNumber)) return fail('INVALID_DAY');
       if (dayNumber < 1) return fail('NOTHING_TO_MAKE_UP');
+      // A joker only repairs the PAST. Today has its own check-in button, and
+      // a future day isn't missed yet — allowing either would let someone bank
+      // days ahead of time. This is enforced here and not just in the UI
+      // because day_number now comes from the client.
+      if (dayNumber >= currentDay) return fail('INVALID_DAY');
 
       const { data: existingForDay } = await admin
         .from('check_ins')

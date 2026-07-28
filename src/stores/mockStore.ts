@@ -38,7 +38,9 @@ interface MockState {
   // actions
   checkIn: (id: string) => void;
   undoCheckIn: (id: string) => void;
-  useJoker: (id: string) => void;
+  /** `dayNumber` omitted = yesterday (the missed-day gate); a number = the
+   * gap the user tapped on the ring. */
+  useJoker: (id: string, dayNumber?: number) => void;
   ackMissed: (id: string) => void;
   /** Returns the generated local message id (used to roll back on send failure). */
   sendMessage: (id: string, text: string) => string;
@@ -145,23 +147,27 @@ export const useMockStore = create<MockState>((set, get) => ({
       }),
     })),
 
-  useJoker: (id) =>
+  useJoker: (id, dayNumber) =>
     set((s) => ({
       challenges: s.challenges.map((c) => {
-        if (c.id !== id || c.jokerRemaining <= 0 || !c.hasMissedYesterday) {
-          return c;
-        }
+        if (c.id !== id || c.jokerRemaining <= 0) return c;
+        // Default day = yesterday, which is what the missed-day gate means.
+        const day = dayNumber ?? c.currentDay - 1;
+        const idx = day - 1;
+        // Only an actual gap can be repaired — anything else and we'd
+        // decrement the allowance for a no-op.
+        if (idx < 0 || idx >= c.days.length || c.days[idx] !== 'missed') return c;
         const days = c.days.slice();
-        const yIdx = c.currentDay - 2; // yesterday
-        if (yIdx >= 0 && yIdx < days.length && days[yIdx] === 'missed') {
-          days[yIdx] = 'joker';
-        }
+        days[idx] = 'joker';
+        // Repairing yesterday is what closes the missed-day gate; repairing an
+        // older gap leaves it standing, because yesterday is still open.
+        const closesGate = day === c.currentDay - 1;
         return {
           ...c,
           days,
           jokerRemaining: c.jokerRemaining - 1,
-          hasMissedYesterday: false,
-          missedAcknowledged: true,
+          hasMissedYesterday: closesGate ? false : c.hasMissedYesterday,
+          missedAcknowledged: closesGate ? true : c.missedAcknowledged,
         };
       }),
     })),

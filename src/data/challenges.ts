@@ -396,10 +396,11 @@ function mapRow(
             if (!coveredByDay.has(c.day_number)) coveredByDay.set(c.day_number, new Set());
             coveredByDay.get(c.day_number)!.add(c.participant_id);
           }
-          let perfectDays = 0;
+          const perfectDayNumbers: number[] = [];
           for (let d = 1; d <= row.total_days; d++) {
-            if ((coveredByDay.get(d)?.size ?? 0) === parts.length) perfectDays += 1;
+            if ((coveredByDay.get(d)?.size ?? 0) === parts.length) perfectDayNumbers.push(d);
           }
+          const perfectDays = perfectDayNumbers.length;
 
           const leaderboard = parts
             .map((p) => {
@@ -418,7 +419,7 @@ function mapRow(
             })
             .sort((a, b) => b.completedDays - a.completedDays || b.longestStreak - a.longestStreak);
 
-          return { perfectDays, leaderboard };
+          return { perfectDays, perfectDayNumbers, leaderboard };
         })()
       : undefined;
 

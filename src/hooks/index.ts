@@ -519,10 +519,12 @@ export function useChallengeActions(id: string) {
   const queryClient = useQueryClient();
   const { name: myName } = useAuth();
 
-  const doUseJoker = () => {
-    useJoker(id); // optimistic: yesterday's segment flips to amber immediately
+  /** `dayNumber` omitted = yesterday (the missed-day gate); a number comes
+   * from tapping that gap on the ring. */
+  const doUseJoker = (dayNumber?: number) => {
+    useJoker(id, dayNumber); // optimistic: that segment flips to amber immediately
     if (isSupabaseConfigured && challenge) {
-      insertCheckIn(id, 'joker') // day_number (yesterday) + allowance validated server-side
+      insertCheckIn(id, 'joker', dayNumber) // day + allowance validated server-side
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
         .catch(async (e) => {
           // The optimistic amber flip didn't actually happen server-side (no

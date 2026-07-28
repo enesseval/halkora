@@ -40,7 +40,13 @@ import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
 import { ParticipantRow } from '@/components/ParticipantRow';
 import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
-import { MissedDaySheet, MomentumSheet, OwnerSettingsSheet, NudgeMessageSheet } from '@/components/Sheets';
+import {
+  JokerDaySheet,
+  MissedDaySheet,
+  MomentumSheet,
+  OwnerSettingsSheet,
+  NudgeMessageSheet,
+} from '@/components/Sheets';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
@@ -125,6 +131,8 @@ export default function DetailScreen() {
   // single scroll event).
   const isNearBottomRef = useRef(true);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  /** Day whose gap the user tapped on the ring — null when no sheet is open. */
+  const [jokerDay, setJokerDay] = useState<number | null>(null);
 
   // Saha testi bulgusu: "bu challange içindeyken onunla ilgili bildirim
   // üstte gözükmesin, zaten bakıyorum" — src/lib/push.ts's notification
@@ -292,6 +300,16 @@ export default function DetailScreen() {
   // once today is done.
   const showMissed = challenge.hasMissedYesterday && !challenge.missedAcknowledged && !meCheckedInToday;
   const showMomentum = momentumDemoId === challenge.id;
+
+  // Gaps a joker could still fill. Only while the ring is running and only if
+  // there's an allowance left — otherwise the ring shows no invitation to tap
+  // something that would just fail server-side.
+  const repairableDays =
+    challenge.status === 'active' && challenge.jokerRemaining > 0
+      ? challenge.days
+          .map((state, i) => (state === 'missed' ? i + 1 : 0))
+          .filter((day) => day > 0)
+      : [];
 
   const goHomeAfterExit = () => {
     if (router.canGoBack()) router.back();
@@ -499,6 +517,8 @@ export default function DetailScreen() {
           days={challenge.days}
           size="L"
           activeIndex={challenge.currentDay - 1}
+          repairableDays={repairableDays}
+          onRepairDayPress={setJokerDay}
           centerContent={
             isUpcoming ? (
               <View style={{ alignItems: 'center' }}>
@@ -548,6 +568,18 @@ export default function DetailScreen() {
         <InfoChip emoji="🃏" label={t.detail.jokerInfo(challenge.jokerRemaining, challenge.jokerAllowance)} />
         {challenge.firstDayJoinOnly ? <InfoChip emoji="⏱️" label={t.create.joinFirstDayOnly} /> : null}
       </View>
+
+      {/* Without this the faint amber gaps are just a colour nobody knows to
+          press. Only shown while there is actually something to repair. */}
+      {repairableDays.length > 0 ? (
+        <AppText
+          variant="meta"
+          color={colors.textTertiary}
+          style={{ textAlign: 'center', marginTop: 10 }}
+        >
+          {t.detail.jokerTapHint}
+        </AppText>
+      ) : null}
 
       {/* upcoming: invite is still open — let the owner pull people in later too */}
       {isUpcoming ? (
@@ -751,6 +783,20 @@ export default function DetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* tapped a gap on the ring — confirm before spending a joker */}
+      {jokerDay != null ? (
+        <JokerDaySheet
+          dayNumber={jokerDay}
+          totalDays={challenge.totalDays}
+          jokerRemaining={challenge.jokerRemaining}
+          onConfirm={() => {
+            actions.useJoker(jokerDay);
+            setJokerDay(null);
+          }}
+          onClose={() => setJokerDay(null)}
+        />
+      ) : null}
 
       {/* E8 gate */}
       {showMissed ? (
