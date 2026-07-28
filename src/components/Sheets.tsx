@@ -766,3 +766,85 @@ export function NudgeMessageSheet({
     </Animated.View>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Joker on a tapped gap — confirm before spending one                 */
+/* ------------------------------------------------------------------ */
+/**
+ * A joker is scarce and can't be taken back, so tapping a gap on the ring
+ * opens this instead of writing straight away. It names the day being
+ * repaired and what's left afterwards, so nobody spends their last one by
+ * brushing the ring.
+ */
+export function JokerDaySheet({
+  dayNumber,
+  totalDays,
+  jokerRemaining,
+  onConfirm,
+  onClose,
+}: {
+  dayNumber: number;
+  totalDays: number;
+  jokerRemaining: number;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        justifyContent: 'flex-end',
+        zIndex: 30,
+      }}
+    >
+      <Pressable
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        onPress={onClose}
+      />
+
+      <Animated.View
+        entering={SlideInDown.duration(280)}
+        style={{
+          backgroundColor: colors.bgElevated,
+          borderTopLeftRadius: radius.sheet,
+          borderTopRightRadius: radius.sheet,
+          paddingHorizontal: 24,
+          paddingTop: 12,
+          paddingBottom: 40,
+        }}
+      >
+        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+          <View
+            style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.strokeSubtle }}
+          />
+        </View>
+
+        <AppText variant="screenTitle" style={{ fontSize: 20, marginTop: 8 }}>
+          {t.detail.jokerDayTitle(dayNumber)}
+        </AppText>
+        <AppText variant="secondary" tabular style={{ marginTop: 6, marginBottom: 20 }}>
+          {t.common.dayOf(dayNumber, totalDays)} · {t.detail.jokerDayRemaining(jokerRemaining - 1)}
+        </AppText>
+
+        <View style={{ gap: 10 }}>
+          <Button
+            label={t.detail.jokerDayConfirm}
+            variant="amber"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              onConfirm();
+            }}
+          />
+          <Button label={t.common.cancel} variant="ghost" onPress={onClose} />
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+}

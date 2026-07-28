@@ -23,9 +23,12 @@ async function myParticipantId(challengeId: string, userId: string): Promise<str
 export async function insertCheckIn(
   challengeId: string,
   type: CheckInType = 'done',
+  /** Jokers only: which past day to repair. Omitted means yesterday. The
+   * server still validates that it is a real, past, uncovered day. */
+  dayNumber?: number,
 ): Promise<{ dayNumber: number }> {
   const { data, error } = await supabase.functions.invoke('check-in', {
-    body: { challenge_id: challengeId, type },
+    body: { challenge_id: challengeId, type, day_number: dayNumber },
   });
   if (error) throw await edgeFunctionError(error);
   return { dayNumber: (data as { day_number: number }).day_number };
