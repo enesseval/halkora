@@ -705,66 +705,67 @@ export default function CreateScreen() {
               <>
                 {/* "80%" of what, exactly? The number is meaningless without
                     the formula, and the formula is too long to sit inline. */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginTop: 24,
-                    marginBottom: 10,
-                  }}
-                >
-                  <AppText variant="meta" color={colors.textTertiary}>
-                    {t.create.stakeCollectiveTargetLabel}
-                  </AppText>
-                  <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setShowCollectiveHelp((v) => !v);
-                    }}
-                    hitSlop={10}
-                  >
-                    <Feather
-                      name={showCollectiveHelp ? 'x-circle' : 'help-circle'}
-                      size={15}
-                      color={showCollectiveHelp ? colors.ember : colors.textTertiary}
-                    />
-                  </Pressable>
-                </View>
-
-                {showCollectiveHelp ? (
-                  <Animated.View
-                    entering={FadeIn.duration(160)}
-                    style={{
-                      backgroundColor: colors.bgSurface,
-                      borderRadius: radius.card,
-                      borderWidth: hairline,
-                      borderColor: colors.strokeSubtle,
-                      padding: 14,
-                      marginBottom: 14,
-                      gap: 10,
-                    }}
-                  >
-                    <AppText variant="bodyMedium" style={{ fontSize: 15 }}>
-                      {t.create.stakeCollectiveHelpTitle}
-                    </AppText>
-                    <AppText variant="meta" color={colors.textSecondary}>
-                      {t.create.stakeCollectiveHelpBody}
-                    </AppText>
-                    <AppText variant="meta" color={colors.textPrimary} tabular>
-                      {t.create.stakeCollectiveHelpExample(
-                        collectivePct,
-                        totalDays,
-                        HELP_EXAMPLE_PEOPLE,
-                        Math.ceil((collectivePct / 100) * totalDays * HELP_EXAMPLE_PEOPLE),
-                        totalDays * HELP_EXAMPLE_PEOPLE,
-                      )}
-                    </AppText>
+                {/* zIndex + absolute box: the explanation floats over the
+                    content below instead of pushing it down, so opening it
+                    doesn't move the chips out from under your thumb. */}
+                <View style={{ zIndex: 10, marginTop: 24, marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <AppText variant="meta" color={colors.textTertiary}>
-                      {t.create.stakeCollectiveHelpNote}
+                      {t.create.stakeCollectiveTargetLabel}
                     </AppText>
-                  </Animated.View>
-                ) : null}
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setShowCollectiveHelp((v) => !v);
+                      }}
+                      hitSlop={10}
+                    >
+                      <Feather
+                        name={showCollectiveHelp ? 'x-circle' : 'help-circle'}
+                        size={15}
+                        color={showCollectiveHelp ? colors.ember : colors.textTertiary}
+                      />
+                    </Pressable>
+                  </View>
+
+                  {showCollectiveHelp ? (
+                    <Animated.View
+                      entering={FadeIn.duration(160)}
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 8,
+                        backgroundColor: colors.bgElevated,
+                        borderRadius: radius.card,
+                        borderWidth: hairline,
+                        borderColor: colors.strokeSubtle,
+                        padding: 14,
+                        gap: 10,
+                      }}
+                    >
+                      <AppText variant="bodyMedium" style={{ fontSize: 15 }}>
+                        {t.create.stakeCollectiveHelpTitle}
+                      </AppText>
+                      <AppText variant="meta" color={colors.textSecondary}>
+                        {t.create.stakeCollectiveHelpBody}
+                      </AppText>
+                      <AppText variant="meta" color={colors.textPrimary} tabular>
+                        {t.create.stakeCollectiveHelpExample(
+                          collectivePct,
+                          totalDays,
+                          HELP_EXAMPLE_PEOPLE,
+                          Math.ceil((collectivePct / 100) * totalDays * HELP_EXAMPLE_PEOPLE),
+                          totalDays * HELP_EXAMPLE_PEOPLE,
+                        )}
+                      </AppText>
+                      <AppText variant="meta" color={colors.textTertiary}>
+                        {t.create.stakeCollectiveHelpNote}
+                      </AppText>
+                    </Animated.View>
+                  ) : null}
+                </View>
 
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {[80, 90, 100].map((pct) => (
