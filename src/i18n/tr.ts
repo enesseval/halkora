@@ -203,10 +203,18 @@ export const tr = {
     joinUnlimitedHint: 'Herkes istediği zaman katılabilir.',
     stakeKindIndividual: 'Bireysel',
     stakeKindCollective: 'Kolektif',
-    stakeKindHint: 'Bireysel: eşiği geçemeyen öder. Kolektif: grup hedefi tutturamazsa hep birlikte.',
+    stakeKindHintIndividual: 'Eşiğin üstünde gün kaçıran öder. Herkes kendi hesabını verir.',
+    stakeKindHintCollective: 'Grup ortak hedefi tutturamazsa herkes birlikte öder.',
     stakeThresholdLabel: 'En fazla kaç gün kaçırılabilir?',
     stakeThresholdDay: (n: number) => (n === 0 ? 'Hiç' : `${n} gün`),
     stakeCollectiveTargetLabel: 'Grup hedefi',
+    stakeCollectiveHelpTitle: 'Hedef nasıl hesaplanır?',
+    stakeCollectiveHelpBody:
+      'Hedef, halka bittiğinde hesaplanır:\n\nyüzde × gün sayısı × kişi sayısı\n\nGrubun toplam check-in sayısı bu sayıya ulaşırsa bahis yanar, ulaşmazsa herkes öder. Kimin yaptığı önemli değil — biri fazladan yaparak diğerinin açığını kapatabilir.',
+    stakeCollectiveHelpExample: (pct: number, days: number, people: number, target: number, total: number) =>
+      `Örnek: ${people} kişi, ${days} gün, %${pct} → ${total} check-in'in ${target} tanesi gerekli.`,
+    stakeCollectiveHelpNote:
+      'Halka erken bitirilirse yalnızca geçen günler sayılır; katılımcı sayısı değişirse hedef de değişir.',
     stakeCollectivePlaceholder: 'Tutturursak hep beraber kahvaltı',
     lobbyOption: 'Grup dolunca başlat',
     lobbyOptionHint: 'Tarih vermeden kur — istediğin an ya da ileri bir tarih seçerek halka içinden başlatırsın.',

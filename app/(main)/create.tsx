@@ -23,6 +23,11 @@ import type { StakeKind } from '@/data/types';
 import { AppText, Button, Chip, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
 
+/** Head count used only to make the collective-target formula concrete. The
+ * real one isn't known while creating (a lobby has no participants yet), so
+ * the copy around it says "example". */
+const HELP_EXAMPLE_PEOPLE = 5;
+
 /** ~20% of the ring's length, so a 14-day ring suggests 3 and a 7-day one
  * suggests 1 — a starting point the owner can override. */
 function suggestedThreshold(totalDays: number): number {
@@ -341,6 +346,7 @@ export default function CreateScreen() {
   // the threshold pays; collective = the group hits a shared target or
   // nobody does.
   const [stakeKind, setStakeKind] = useState<StakeKind>(rematchSource?.stake?.kind ?? 'individual');
+  const [showCollectiveHelp, setShowCollectiveHelp] = useState(false);
   const [collectivePct, setCollectivePct] = useState(
     () => rematchSource?.stake?.collectiveTargetPct ?? 80,
   );
@@ -653,8 +659,12 @@ export default function CreateScreen() {
                 />
               </View>
             </View>
+            {/* only the chosen kind's explanation — showing both made the
+                selection read as if it didn't matter */}
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }}>
-              {t.create.stakeKindHint}
+              {stakeKind === 'individual'
+                ? t.create.stakeKindHintIndividual
+                : t.create.stakeKindHintCollective}
             </AppText>
 
             {stakeKind === 'individual' ? (
@@ -693,9 +703,69 @@ export default function CreateScreen() {
               </>
             ) : (
               <>
-                <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 24, marginBottom: 10 }}>
-                  {t.create.stakeCollectiveTargetLabel}
-                </AppText>
+                {/* "80%" of what, exactly? The number is meaningless without
+                    the formula, and the formula is too long to sit inline. */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 24,
+                    marginBottom: 10,
+                  }}
+                >
+                  <AppText variant="meta" color={colors.textTertiary}>
+                    {t.create.stakeCollectiveTargetLabel}
+                  </AppText>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setShowCollectiveHelp((v) => !v);
+                    }}
+                    hitSlop={10}
+                  >
+                    <Feather
+                      name={showCollectiveHelp ? 'x-circle' : 'help-circle'}
+                      size={15}
+                      color={showCollectiveHelp ? colors.ember : colors.textTertiary}
+                    />
+                  </Pressable>
+                </View>
+
+                {showCollectiveHelp ? (
+                  <Animated.View
+                    entering={FadeIn.duration(160)}
+                    style={{
+                      backgroundColor: colors.bgSurface,
+                      borderRadius: radius.card,
+                      borderWidth: hairline,
+                      borderColor: colors.strokeSubtle,
+                      padding: 14,
+                      marginBottom: 14,
+                      gap: 10,
+                    }}
+                  >
+                    <AppText variant="bodyMedium" style={{ fontSize: 15 }}>
+                      {t.create.stakeCollectiveHelpTitle}
+                    </AppText>
+                    <AppText variant="meta" color={colors.textSecondary}>
+                      {t.create.stakeCollectiveHelpBody}
+                    </AppText>
+                    <AppText variant="meta" color={colors.textPrimary} tabular>
+                      {t.create.stakeCollectiveHelpExample(
+                        collectivePct,
+                        totalDays,
+                        HELP_EXAMPLE_PEOPLE,
+                        Math.ceil((collectivePct / 100) * totalDays * HELP_EXAMPLE_PEOPLE),
+                        totalDays * HELP_EXAMPLE_PEOPLE,
+                      )}
+                    </AppText>
+                    <AppText variant="meta" color={colors.textTertiary}>
+                      {t.create.stakeCollectiveHelpNote}
+                    </AppText>
+                  </Animated.View>
+                ) : null}
+
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {[80, 90, 100].map((pct) => (
                     <Chip

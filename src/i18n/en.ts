@@ -199,10 +199,18 @@ export const en: Dictionary = {
     joinUnlimitedHint: 'Anyone can join anytime.',
     stakeKindIndividual: 'Individual',
     stakeKindCollective: 'Collective',
-    stakeKindHint: 'Individual: whoever misses too many days pays. Collective: if the group misses its target, everyone does.',
+    stakeKindHintIndividual: 'Whoever misses more days than the threshold pays. Everyone answers for themselves.',
+    stakeKindHintCollective: "If the group misses its shared target, everyone pays together.",
     stakeThresholdLabel: 'How many days can be missed at most?',
     stakeThresholdDay: (n: number) => (n === 0 ? 'None' : `${n} days`),
     stakeCollectiveTargetLabel: 'Group target',
+    stakeCollectiveHelpTitle: 'How is the target worked out?',
+    stakeCollectiveHelpBody:
+      'The target is worked out when the ring ends:\n\npercentage × days × people\n\nIf the group\'s total check-ins reach that number the stake is off; if not, everyone pays. It does not matter who did them — one person can cover for another by doing extra.',
+    stakeCollectiveHelpExample: (pct: number, days: number, people: number, target: number, total: number) =>
+      `Example: ${people} people, ${days} days, ${pct}% → ${target} of ${total} check-ins needed.`,
+    stakeCollectiveHelpNote:
+      'End the ring early and only the elapsed days count; if the number of participants changes, so does the target.',
     stakeCollectivePlaceholder: 'Breakfast together if we hit it',
     lobbyOption: 'Start when the group is ready',
     lobbyOptionHint: 'Create it with no date — start it yourself anytime, or pick a future date, from inside the ring.',
