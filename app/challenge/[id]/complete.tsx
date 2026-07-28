@@ -87,9 +87,13 @@ export default function CompleteScreen() {
 
   const stats = challenge.finishStats;
   const advanced = challenge.advancedStats;
-  // Mini ring on the perfect-days card: fill = perfectDays / totalDays.
+  // Mini ring on the perfect-days card. It marks WHICH days everyone covered,
+  // matching the big ring above it — filling the first N segments instead made
+  // the two rings disagree about the same challenge, since a ring reads as a
+  // calendar everywhere else in the app.
+  const perfectSet = new Set(advanced?.perfectDayNumbers ?? []);
   const perfectRing: SegmentState[] = Array.from({ length: challenge.totalDays }, (_, i) =>
-    i < (advanced?.perfectDays ?? 0) ? 'done' : 'empty',
+    perfectSet.has(i + 1) ? 'done' : 'empty',
   );
   const finishers = [...challenge.participants].sort(
     (a, b) => (b.completedDays ?? 0) - (a.completedDays ?? 0),
