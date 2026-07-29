@@ -333,6 +333,21 @@ extension HalkoraSnapshot {
     return total
   }
 
+  /// The ring for the streak widget: only the current run is lit.
+  ///
+  /// The progress ring was the wrong picture there — it drew how far the halka
+  /// has come while the number in the middle said something else entirely, so
+  /// the two disagreed on the same card. This lights exactly the days the
+  /// streak is made of, ending at the most recent one.
+  func streakSegments(at now: Date) -> [SegmentKind] {
+    let run = streak(at: now)
+    let last = isOver(at: now) ? totalDays : currentDay(at: now)
+    let from = max(last - run + 1, 1)
+    return (1...max(totalDays, 1)).map { n in
+      run > 0 && n >= from && n <= last ? .done : .waiting
+    }
+  }
+
   /// The next `count` moments at which this snapshot's derived state changes
   /// on its own — one per day boundary. Pre-building an entry for each is
   /// what keeps the widget correct without spending reloads.
@@ -496,6 +511,61 @@ struct CheckInIntent: AppIntent {
   }
 }
 
+/// Moves the shared "which halka" cursor, or the "Bugün" page.
+///
+/// This replaces time-based rotation. Rotation was never dependable: WidgetKit
+/// draws pre-built entries when it decides to, minute granularity is not
+/// guaranteed, and on the Lock Screen it is sparser still — so the card
+/// changed sometimes, which reads as a glitch rather than a feature. A button
+/// moves the cursor when the person presses it, and nothing depends on the
+/// system's timing.
+struct CycleIntent: AppIntent {
+  static var title: LocalizedStringResource = "Sonraki"
+
+  /// Which cursor to move — `cursorHalka` (per-halka widgets share one, so
+  /// they all show the same ring) or `cursorToday` (the Bugün page).
+  @Parameter(title: "Kapsam")
+  var scope: String
+
+  @Parameter(title: "Yön")
+  var delta: Int
+
+  init() {}
+  init(scope: String, delta: Int) {
+    self.scope = scope
+    self.delta = delta
+  }
+
+  func perform() async throws -> some IntentResult {
+    setCursor(scope, cursor(scope) + delta)
+    WidgetCenter.shared.reloadAllTimelines()
+    return .result()
+  }
+}
+
+let cursorHalka = "halka"
+let cursorToday = "today"
+
+/// Cursors live in the App Group next to the snapshot. They're stored raw and
+/// wrapped at read time against the CURRENT list length — the list changes
+/// under them (a halka ends, another is created) and a stored index that was
+/// valid yesterday would point past the end today.
+private func cursor(_ scope: String) -> Int {
+  UserDefaults(suiteName: appGroup)?.integer(forKey: "cursor.\(scope)") ?? 0
+}
+
+private func setCursor(_ scope: String, _ value: Int) {
+  UserDefaults(suiteName: appGroup)?.set(value, forKey: "cursor.\(scope)")
+}
+
+/// Wraps `raw` into 0..<count, correctly for negative values too — Swift's %
+/// keeps the sign of the dividend, so a "previous" tap at index 0 would
+/// otherwise land on a negative index.
+func wrapped(_ raw: Int, _ count: Int) -> Int {
+  guard count > 0 else { return 0 }
+  return ((raw % count) + count) % count
+}
+
 // MARK: - Per-instance configuration
 
 struct ChallengeEntity: AppEntity {
@@ -595,8 +665,13 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     // between them locally as each date arrives, so only the one
     // timeline(for:) call counts against the refresh budget, not each
     // switch. Capped at 3 (matching the spec's "max 3 dots").
+    // More than one halka: the shared cursor decides which, and the nav
+    // control on the card moves it. No timer involved.
     if all.count > 1 {
-      return rotatingTimeline(for: Array(all.prefix(3)))
+      let shown = Array(all.prefix(3))
+      let index = wrapped(cursor(cursorHalka), shown.count)
+      return dayBoundaryTimeline(
+        for: shown[index], rotationCount: shown.count, rotationIndex: index)
     }
 
     guard let single = all.first(where: { !$0.checkedInToday(at: Date()) }) ?? all.first else {
@@ -609,55 +684,22 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     return dayBoundaryTimeline(for: single)
   }
 
-  /// Rotate between halkalar (spec 03).
-  ///
-  /// One minute per halka, not the spec's 15. The whole point of the widget
-  /// is closing a day without opening the app, and nobody waits a quarter of
-  /// an hour for their second ring to come around. A minute is also the
-  /// floor: WidgetKit renders pre-built entries at their dates, but it does
-  /// not honour sub-minute granularity, so asking for 30s would just drop
-  /// entries unpredictably.
-  ///
-  /// The slots are pinned to the wall clock rather than started from "now".
-  /// Building the timeline from `now` looked right and was not: the timeline
-  /// is rebuilt constantly — every widget check-in and every trip through the
-  /// app reloads it — and each rebuild restarted the cycle at slot 0, so the
-  /// first halka in the list was the only one anyone ever saw. Anchored to
-  /// the clock, a rebuild lands mid-cycle exactly where the old timeline was.
-  ///
-  /// One timeline carries two hours of slots so rotation continues on entries
-  /// WidgetKit already holds, instead of depending on reloads the budget may
-  /// refuse.
-  private func rotatingTimeline(for shown: [HalkoraSnapshot]) -> Timeline<HalkoraEntry> {
-    let interval: TimeInterval = 60
-    let currentSlot = Int(Date().timeIntervalSince1970 / interval)
-    let entries = (0..<120).map { offset -> HalkoraEntry in
-      let slot = currentSlot + offset
-      let index = slot % shown.count
-      // The first date is the start of the CURRENT slot, i.e. in the past.
-      // That's deliberate — WidgetKit shows the newest entry not in the
-      // future, so the right halka appears immediately instead of after a
-      // wait. Every entry derives its state from its own date, so a day
-      // boundary inside the window is handled without a reload.
-      return HalkoraEntry(
-        date: Date(timeIntervalSince1970: Double(slot) * interval),
-        snapshot: shown[index], rotationCount: shown.count, rotationIndex: index)
-    }
-    return Timeline(entries: entries, policy: .atEnd)
-  }
-
   /// One entry now plus one per upcoming day boundary, so the day counter
   /// and the "checked in today" state flip on schedule using entries
   /// WidgetKit already holds — no reload budget spent, which is the only
   /// thing that actually works here (see the note above the derivation).
-  private func dayBoundaryTimeline(for snapshot: HalkoraSnapshot) -> Timeline<HalkoraEntry> {
+  private func dayBoundaryTimeline(
+    for snapshot: HalkoraSnapshot, rotationCount: Int = 1, rotationIndex: Int = 0
+  ) -> Timeline<HalkoraEntry> {
     let now = Date()
     // Fast mode burns a "day" every 60s, so it needs many more points to
     // cover a useful test window; real days only need a few.
     let count = snapshot.fastDays != 0 ? 30 : 4
     let dates = [now] + snapshot.upcomingRollovers(after: now, count: count)
     let entries = dates.map {
-      HalkoraEntry(date: $0, snapshot: snapshot, rotationCount: 1, rotationIndex: 0)
+      HalkoraEntry(
+        date: $0, snapshot: snapshot,
+        rotationCount: rotationCount, rotationIndex: rotationIndex)
     }
     return Timeline(entries: entries, policy: .atEnd)
   }
@@ -669,7 +711,9 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     {
       return picked
     }
-    return all.first(where: { !$0.checkedInToday(at: Date()) }) ?? all.first
+    guard all.count > 1 else { return all.first }
+    let shown = Array(all.prefix(3))
+    return shown[wrapped(cursor(cursorHalka), shown.count)]
   }
 }
 
@@ -810,6 +854,58 @@ private struct RotationDots: View {
           .frame(width: i == index ? 12 : 5, height: 5)
       }
     }
+  }
+}
+
+/// The nav control: previous, position, next. Deliberately UNFILLED — the
+/// spec reserves the filled capsule for check-in, and a second solid button
+/// would compete with the only one that matters.
+private struct NavControl: View {
+  let scope: String
+  let count: Int
+  let index: Int
+  /// Shows "2/5" instead of dots once there are more positions than dots can
+  /// carry legibly (the spec caps dots at three).
+  var numeric: Bool = false
+
+  var body: some View {
+    HStack(spacing: 7) {
+      Button(intent: CycleIntent(scope: scope, delta: -1)) {
+        Image(systemName: "chevron.left")
+          .font(.system(size: 9, weight: .bold))
+          .foregroundStyle(halkoraTextSecondary)
+          .frame(width: 14, height: 18)
+      }
+      .buttonStyle(.plain)
+
+      if numeric {
+        Text("\(index + 1)/\(count)")
+          .font(wButton(10))
+          .monospacedDigit()
+          .foregroundStyle(halkoraTextTertiary)
+      } else {
+        HStack(spacing: 4) {
+          ForEach(0..<count, id: \.self) { i in
+            Capsule()
+              .fill(i == index ? halkoraEmber : Color.white.opacity(0.18))
+              .frame(width: i == index ? 10 : 4, height: 4)
+          }
+        }
+      }
+
+      Button(intent: CycleIntent(scope: scope, delta: 1)) {
+        Image(systemName: "chevron.right")
+          .font(.system(size: 9, weight: .bold))
+          .foregroundStyle(halkoraTextSecondary)
+          .frame(width: 14, height: 18)
+      }
+      .buttonStyle(.plain)
+    }
+    .padding(.horizontal, 7)
+    .padding(.vertical, 3)
+    .overlay(
+      Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.5)
+    )
   }
 }
 
@@ -1014,8 +1110,8 @@ struct HalkoraMediumView: View {
           }
           Spacer(minLength: 0)
           if entry.rotationCount > 1 {
-            RotationDots(count: entry.rotationCount, index: entry.rotationIndex)
-              .padding(.top, 3)
+            NavControl(
+              scope: cursorHalka, count: entry.rotationCount, index: entry.rotationIndex)
           }
         }
 
@@ -1178,8 +1274,8 @@ struct HalkoraLargeView: View {
         }
         Spacer(minLength: 8)
         if entry.rotationCount > 1 {
-          RotationDots(count: entry.rotationCount, index: entry.rotationIndex)
-            .padding(.top, 4)
+          NavControl(
+            scope: cursorHalka, count: entry.rotationCount, index: entry.rotationIndex)
         }
       }
 
@@ -1253,7 +1349,20 @@ struct HalkoraLargeView: View {
       // The group, person by person. Only when today's counts are still the
       // ones we synced — an out-of-date roster would mark people done for a
       // day that has already turned over, which is worse than showing none.
+      //
+      // A rule and a label above it: without them the grid floated at the
+      // bottom edge with no relationship to anything, and the card read as
+      // two unrelated cards stacked.
       if !roster.isEmpty && s.groupCountsFresh(at: at) {
+        Rectangle()
+          .fill(Color.white.opacity(0.07))
+          .frame(height: 0.5)
+          .padding(.bottom, 10)
+        Text(c.todayTitle.uppercased())
+          .font(wMeta(9))
+          .kerning(1.4)
+          .foregroundStyle(halkoraTextTertiary)
+          .padding(.bottom, 8)
         // Wrapping by hand: WidgetKit has no Grid that flows on iOS 17, and a
         // fixed column count would clip a larger group.
         let rows = stride(from: 0, to: roster.count, by: 6).map {
@@ -1342,8 +1451,10 @@ struct HalkoraLockView: View {
       ZStack {
         AccessoryWidgetBackground()
         RingView(segments: s.ringSegments(at: at), lineWidth: 4, maxSegments: 14, monochrome: true)
-        // Day number while pending; a check once done.
-        if s.checkedInToday(at: at) {
+        // Day number while pending; a check once done. A finished ring reads
+        // as done too — the fix for "Gün 14/14 · Check-in yap" reached the
+        // home-screen views but not these, which never consulted isCompleted.
+        if s.checkedInToday(at: at) || s.isCompleted(at: at) {
           Image(systemName: "checkmark").font(.system(size: 14, weight: .bold))
         } else if s.isActive {
           Text("\(s.currentDay(at: at))").font(.system(size: 15, weight: .semibold)).monospacedDigit()
@@ -1372,7 +1483,9 @@ struct HalkoraLockView: View {
         HStack(spacing: 4) {
           Text(c.dayLong(s.currentDay(at: at), s.totalDays)).monospacedDigit()
           Text("·")
-          if s.checkedInToday(at: at) {
+          if s.isCompleted(at: at) {
+            doneLabelWithCheck(c.completedLabel)
+          } else if s.checkedInToday(at: at) {
             doneLabelWithCheck(c.doneLabel)
           } else {
             Text(c.checkInCta)
@@ -1395,13 +1508,17 @@ struct HalkoraLockView: View {
       let c = copyFor(s.locale)
       // One line, mini arc as the brand mark.
       Label {
-        if s.checkedInToday(at: at) {
+        if s.isCompleted(at: at) {
+          Text("\(c.brand) · \(c.completedLabel) ✓")
+        } else if s.checkedInToday(at: at) {
           Text("\(c.brand) · \(c.doneLabel) ✓")
         } else {
           Text("\(c.brand) · \(c.dayLong(s.currentDay(at: at), s.totalDays))")
         }
       } icon: {
-        Image(systemName: s.checkedInToday(at: at) ? "circle.righthalf.filled" : "circle.dashed")
+        Image(
+          systemName: s.checkedInToday(at: at) || s.isCompleted(at: at)
+            ? "circle.righthalf.filled" : "circle.dashed")
       }
     } else {
       Label(copyFor(nil).brand, systemImage: "circle.dashed")
@@ -1456,21 +1573,27 @@ struct HalkoraLockWidget: Widget {
 struct HalkoraListEntry: TimelineEntry {
   let date: Date
   fileprivate let snapshots: [HalkoraSnapshot]
+  /// Raw page cursor. Wrapped by the VIEW rather than here, because how many
+  /// rows fit — and therefore how many pages exist — depends on the family,
+  /// which the provider doesn't know.
+  let cursor: Int
 }
 
 /// No AppIntent configuration: there is nothing to pick, the widget is the
 /// whole list by definition.
 struct HalkoraListProvider: TimelineProvider {
   func placeholder(in context: Context) -> HalkoraListEntry {
-    HalkoraListEntry(date: .now, snapshots: [samplePreview])
+    HalkoraListEntry(date: .now, snapshots: [samplePreview], cursor: 0)
   }
 
   func getSnapshot(in context: Context, completion: @escaping (HalkoraListEntry) -> Void) {
     if context.isPreview {
-      completion(HalkoraListEntry(date: .now, snapshots: [samplePreview]))
+      completion(HalkoraListEntry(date: .now, snapshots: [samplePreview], cursor: 0))
       return
     }
-    completion(HalkoraListEntry(date: .now, snapshots: loadActiveChallenges()))
+    completion(
+      HalkoraListEntry(
+        date: .now, snapshots: loadActiveChallenges(), cursor: cursor(cursorToday)))
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<HalkoraListEntry>) -> Void) {
@@ -1485,9 +1608,24 @@ struct HalkoraListProvider: TimelineProvider {
         moments.insert(d)
       }
     }
+    let page = cursor(cursorToday)
     let dates = [now] + moments.sorted().prefix(24)
-    let entries = dates.map { HalkoraListEntry(date: $0, snapshots: all) }
+    let entries = dates.map { HalkoraListEntry(date: $0, snapshots: all, cursor: page) }
     completion(Timeline(entries: entries, policy: all.isEmpty ? .never : .atEnd))
+  }
+}
+
+/// Covered today, or still owed. Filled ember vs a hollow waiting ring —
+/// the same two states the big ring uses, at a size where they still read.
+private struct StatusDot: View {
+  let done: Bool
+
+  var body: some View {
+    Circle()
+      .fill(done ? halkoraEmber : Color.clear)
+      .frame(width: 10, height: 10)
+      .overlay(Circle().stroke(done ? Color.clear : halkoraWaiting, lineWidth: 2))
+      .frame(width: 22, height: 22)
   }
 }
 
@@ -1500,8 +1638,10 @@ private struct TodayRow: View {
   var body: some View {
     let s = snapshot
     HStack(spacing: 10) {
-      RingView(segments: s.ringSegments(at: at), lineWidth: 3.5, maxSegments: 31)
-        .frame(width: 30, height: 30)
+      // A ring at 30pt is unreadable — the segments turn to mush and it reads
+      // as texture, not state. The day is already spelled out in the row, so
+      // a single dot carries what's left: covered or still owed.
+      StatusDot(done: s.checkedInToday(at: at) || s.isCompleted(at: at))
 
       VStack(alignment: .leading, spacing: 1) {
         Text(s.title)
@@ -1551,14 +1691,21 @@ struct HalkoraListView: View {
     let c = copyFor(live.first?.locale ?? entry.snapshots.first?.locale)
     let openCount = live.filter { $0.isActive && !$0.checkedInToday(at: at) }.count
     let activeCount = live.filter { $0.isActive }.count
+    // Anything past the first page used to simply not exist (saha testi
+    // bulgusu: "3'ten fazla challenge varsa 4. hiç gözükmüyor").
+    let pageCount = max(Int(ceil(Double(live.count) / Double(rowLimit))), 1)
+    let page = wrapped(entry.cursor, pageCount)
+    let start = page * rowLimit
+    let shown = Array(live[min(start, live.count)..<min(start + rowLimit, live.count)])
 
     VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .firstTextBaseline) {
+      // .center, not a text baseline: the nav control isn't text and would
+      // hang off a baseline meant for two labels.
+      HStack(alignment: .center) {
         Text(c.todayTitle)
           .font(wTitle(15))
           .kerning(-0.3)
           .foregroundStyle(halkoraTextPrimary)
-        Spacer(minLength: 6)
         if activeCount > 0 {
           Text(
             openCount == 0
@@ -1568,6 +1715,10 @@ struct HalkoraListView: View {
           .font(wMeta(10))
           .monospacedDigit()
           .foregroundStyle(openCount == 0 ? halkoraEmber : halkoraTextTertiary)
+        }
+        Spacer(minLength: 6)
+        if pageCount > 1 {
+          NavControl(scope: cursorToday, count: pageCount, index: page, numeric: true)
         }
       }
       .padding(.bottom, 10)
@@ -1587,7 +1738,7 @@ struct HalkoraListView: View {
         Spacer(minLength: 0)
       } else {
         VStack(spacing: 8) {
-          ForEach(live.prefix(rowLimit), id: \.challengeId) { s in
+          ForEach(shown, id: \.challengeId) { s in
             TodayRow(snapshot: s, at: at, copy: c)
           }
         }
@@ -1649,14 +1800,15 @@ struct HalkoraStreakView: View {
           .foregroundStyle(halkoraTextTertiary)
         Spacer(minLength: 4)
         if entry.rotationCount > 1 {
-          RotationDots(count: entry.rotationCount, index: entry.rotationIndex)
+          NavControl(
+            scope: cursorHalka, count: entry.rotationCount, index: entry.rotationIndex)
         }
       }
 
       Spacer(minLength: 6)
 
       ZStack {
-        RingView(segments: s.ringSegments(at: at), lineWidth: 6, maxSegments: 16)
+        RingView(segments: s.streakSegments(at: at), lineWidth: 6, maxSegments: 16)
           .frame(width: 96, height: 96)
         Text("\(streak)")
           .font(wCounter(34))
@@ -1774,7 +1926,7 @@ struct HalkoraLockStreakView: View {
       ZStack {
         if let s = entry.snapshot {
           RingView(
-            segments: s.ringSegments(at: at), lineWidth: 5, maxSegments: 14, monochrome: true)
+            segments: s.streakSegments(at: at), lineWidth: 5, maxSegments: 14, monochrome: true)
         }
         VStack(spacing: -2) {
           Text("\(streak)")
