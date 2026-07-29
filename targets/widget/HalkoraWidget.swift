@@ -1342,8 +1342,10 @@ struct HalkoraLockView: View {
       ZStack {
         AccessoryWidgetBackground()
         RingView(segments: s.ringSegments(at: at), lineWidth: 4, maxSegments: 14, monochrome: true)
-        // Day number while pending; a check once done.
-        if s.checkedInToday(at: at) {
+        // Day number while pending; a check once done. A finished ring reads
+        // as done too — the fix for "Gün 14/14 · Check-in yap" reached the
+        // home-screen views but not these, which never consulted isCompleted.
+        if s.checkedInToday(at: at) || s.isCompleted(at: at) {
           Image(systemName: "checkmark").font(.system(size: 14, weight: .bold))
         } else if s.isActive {
           Text("\(s.currentDay(at: at))").font(.system(size: 15, weight: .semibold)).monospacedDigit()
@@ -1372,7 +1374,9 @@ struct HalkoraLockView: View {
         HStack(spacing: 4) {
           Text(c.dayLong(s.currentDay(at: at), s.totalDays)).monospacedDigit()
           Text("·")
-          if s.checkedInToday(at: at) {
+          if s.isCompleted(at: at) {
+            doneLabelWithCheck(c.completedLabel)
+          } else if s.checkedInToday(at: at) {
             doneLabelWithCheck(c.doneLabel)
           } else {
             Text(c.checkInCta)
@@ -1395,13 +1399,17 @@ struct HalkoraLockView: View {
       let c = copyFor(s.locale)
       // One line, mini arc as the brand mark.
       Label {
-        if s.checkedInToday(at: at) {
+        if s.isCompleted(at: at) {
+          Text("\(c.brand) · \(c.completedLabel) ✓")
+        } else if s.checkedInToday(at: at) {
           Text("\(c.brand) · \(c.doneLabel) ✓")
         } else {
           Text("\(c.brand) · \(c.dayLong(s.currentDay(at: at), s.totalDays))")
         }
       } icon: {
-        Image(systemName: s.checkedInToday(at: at) ? "circle.righthalf.filled" : "circle.dashed")
+        Image(
+          systemName: s.checkedInToday(at: at) || s.isCompleted(at: at)
+            ? "circle.righthalf.filled" : "circle.dashed")
       }
     } else {
       Label(copyFor(nil).brand, systemImage: "circle.dashed")
