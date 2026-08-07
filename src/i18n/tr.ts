@@ -201,6 +201,10 @@ export const tr = {
     joinUnlimited: 'Sınırsız',
     joinFirstDayOnly: 'Sadece ilk gün',
     joinUnlimitedHint: 'Herkes istediği zaman katılabilir.',
+    deadlineLabel: 'Kesim saati',
+    deadlineHint: "Check-in'ler her gün bu saate kadar yapılabilir.",
+    deadlineMidnight: 'Gece yarısı',
+    deadlineCustom: 'Özel saat',
     stakeKindIndividual: 'Bireysel',
     stakeKindCollective: 'Kolektif',
     stakeKindHintIndividual: 'Eşiğin üstünde gün kaçıran öder. Herkes kendi hesabını verir.',
@@ -282,6 +286,7 @@ export const tr = {
     todayCheckIn: "Bugünün check-in'i",
     useJoker: (n: number) => `Dün için joker kullan · ${n} hakkın var`,
     jokerInfo: (remaining: number, allowance: number) => `${remaining}/${allowance} joker hakkı`,
+    deadlineInfo: (time: string) => `Her gün ${time}'a kadar`,
     jokerTapHint: 'Halkadaki boşluklara dokunup jokerini kullanabilirsin',
     jokerDayTitle: (day: number) => `${day}. güne joker koyulsun mu?`,
     jokerDayRemaining: (n: number) =>

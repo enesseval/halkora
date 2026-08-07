@@ -28,6 +28,19 @@ import { useT } from '@/i18n';
  * the copy around it says "example". */
 const HELP_EXAMPLE_PEOPLE = 5;
 
+/** The three the spec asks for. Midnight is the default and means the plain
+ * calendar day — the behaviour every ring had before deadlines existed. */
+const DEADLINE_PRESETS = ['10:00', '21:00', '00:00'];
+
+/** "21:00" as a Date today, so the native time picker opens where the current
+ * choice already is. */
+function deadlineAsDate(hhmm: string): Date {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h ?? 0, m ?? 0, 0, 0);
+  return d;
+}
+
 /** ~20% of the ring's length, so a 14-day ring suggests 3 and a 7-day one
  * suggests 1 — a starting point the owner can override. */
 function suggestedThreshold(totalDays: number): number {
@@ -329,6 +342,11 @@ export default function CreateScreen() {
   const [startDate, setStartDate] = useState<Date>(tomorrow);
   const [showPicker, setShowPicker] = useState(false);
   const [joker, setJoker] = useState(1);
+  // Faz 1 — kesim saati. Ayrı bir adım yerine bu adımda: "günün nasıl işlediği"
+  // sorusu joker ile aynı yere ait, ve varsayılanda bırakılırsa hiçbir ek
+  // karmaşıklık göstermiyor.
+  const [deadline, setDeadline] = useState('00:00');
+  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
   // Kurucu-tetiklemeli başlangıç (saha testi bulgusu) — true iken start
   // seçimindeki 3 pill (Bugün/Yarın/Tarih seç) yok sayılır, challenge
   // status='lobby' ile kurulur (startChallenge sonradan gerçek başlangıcı verir).
@@ -387,6 +405,7 @@ export default function CreateScreen() {
       startTomorrow: !isToday,
       startDateISO,
       joker,
+      deadlineTime: deadline,
       startsLabel: isToday ? undefined : startsLabel,
       stake: stakeText
         ? {
@@ -635,6 +654,47 @@ export default function CreateScreen() {
                 </View>
               ))}
             </View>
+
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 28, marginBottom: 10 }}>
+              {t.create.deadlineLabel}
+            </AppText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {DEADLINE_PRESETS.map((v) => (
+                <Chip
+                  key={v}
+                  label={v === '00:00' ? t.create.deadlineMidnight : v}
+                  selected={deadline === v}
+                  onPress={() => setDeadline(v)}
+                />
+              ))}
+              <Chip
+                label={
+                  DEADLINE_PRESETS.includes(deadline) ? t.create.deadlineCustom : deadline
+                }
+                selected={!DEADLINE_PRESETS.includes(deadline)}
+                onPress={() => setShowDeadlinePicker(true)}
+              />
+            </View>
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10 }}>
+              {t.create.deadlineHint}
+            </AppText>
+
+            {showDeadlinePicker ? (
+              <DateTimePicker
+                value={deadlineAsDate(deadline)}
+                mode="time"
+                display="spinner"
+                onChange={(e: DateTimePickerEvent, picked?: Date) => {
+                  setShowDeadlinePicker(Platform.OS === 'ios' && e.type !== 'dismissed');
+                  if (e.type === 'dismissed' || !picked) return;
+                  setDeadline(
+                    `${String(picked.getHours()).padStart(2, '0')}:${String(
+                      picked.getMinutes(),
+                    ).padStart(2, '0')}`,
+                  );
+                }}
+              />
+            ) : null}
           </>
         ) : null}
 

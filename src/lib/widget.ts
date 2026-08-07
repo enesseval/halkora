@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { ExtensionStorage } from '@bacons/apple-targets';
 import type { Challenge } from '@/data/types';
 import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
+import { cycleStart } from '@/lib/cycle';
 import { getLocale } from '@/i18n';
 
 /**
@@ -11,12 +12,11 @@ import { getLocale } from '@/i18n';
  */
 function dayKeyFor(c: Challenge): string {
   if (FAST_DAYS) return String(fastDaysSince(c.createdAt) + 1);
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: c.timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
+  // The CYCLE it belongs to, not the calendar date — with a 21:00 deadline a
+  // check-in made at 22:00 belongs to the cycle that opened then, and keying
+  // it by the calendar date would make it look stale to the widget five
+  // minutes later. Identical to the calendar date at the default 00:00.
+  return cycleStart(c.timezone, c.deadlineTime);
 }
 
 // Same App Group id as app.json's ios.entitlements + targets/widget's
@@ -135,6 +135,9 @@ export function syncWidgetSnapshot(challenges: Challenge[]): void {
         // mirrors daysSinceStart() from src/data/challenges.ts exactly —
         // change one, change the other.
         timezone: c.timezone,
+        // Faz 1: the day closes here, not at midnight. The widget re-derives
+        // the cycle itself for the same reason it re-derives the day.
+        deadlineTime: c.deadlineTime,
         startDate: c.startDate ?? '',
         createdAt: c.createdAt,
         fastDays: FAST_DAYS ? 1 : 0,

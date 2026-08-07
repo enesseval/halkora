@@ -566,6 +566,11 @@ export default function DetailScreen() {
           anywhere in Detail (saha testi bulgusu). */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 14 }}>
         <InfoChip emoji="🃏" label={t.detail.jokerInfo(challenge.jokerRemaining, challenge.jokerAllowance)} />
+        {/* Only worth saying when it isn't midnight — "her gün 00:00'a kadar"
+            is just a longer way of writing "her gün". */}
+        {challenge.deadlineTime !== '00:00' ? (
+          <InfoChip emoji="⏰" label={t.detail.deadlineInfo(challenge.deadlineTime)} />
+        ) : null}
         {challenge.firstDayJoinOnly ? <InfoChip emoji="⏱️" label={t.create.joinFirstDayOnly} /> : null}
       </View>
 

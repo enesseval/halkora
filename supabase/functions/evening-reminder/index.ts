@@ -40,19 +40,45 @@ function copyFor(locale: string | null | undefined): (typeof COPY)['tr'] {
   return COPY[(locale as Locale) ?? 'tr'] ?? COPY.tr;
 }
 
-function localHour(timeZone: string): number {
-  return Number(
-    new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hour12: false }).format(new Date()),
-  );
+/**
+ * Which local hour this ring's reminder belongs to — the hour before its
+ * deadline. Midnight is the exception and keeps 20:00: it is the default every
+ * ring has, and moving it to 23:00 would silently start pushing people at
+ * night.
+ */
+function reminderHour(deadline: string | null): number {
+  const hhmm = (deadline ?? '00:00').slice(0, 5);
+  if (hhmm === '00:00') return 20;
+  const hour = Number(hhmm.slice(0, 2));
+  return (hour + 23) % 24;
 }
 
-function localDateStr(timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
+/** The opening date of the cycle we're in, as "YYYY-MM-DD". Mirrors
+ * public.challenge_cycle_start() and src/lib/cycle.ts — one formula, four
+ * copies, change them together. */
+function cycleStartFor(timeZone: string, deadline: string): string {
+  const date = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(new Date());
+  const time = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date());
+  if (time >= deadline) return date;
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function localHour(timeZone: string): number {
+  return Number(
+    new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hour12: false }).format(new Date()),
+  );
 }
 
 Deno.serve(async (req) => {
@@ -76,10 +102,17 @@ Deno.serve(async (req) => {
     // excluded here.
     const { data: challenges } = await admin
       .from('challenges')
-      .select('id, start_date, timezone, total_days')
+      .select('id, start_date, timezone, total_days, deadline_time')
       .neq('status', 'completed');
 
-    const eveningChallenges = (challenges ?? []).filter((c) => localHour(c.timezone as string) === 20);
+    // The reminder belongs to the deadline, not to a fixed hour: a ring that
+    // closes at 10:00 wants a nudge at 09:00, and telling it at 20:00 is ten
+    // hours too late. Midnight keeps its 20:00 slot rather than moving to
+    // 23:00 — that's the existing, deliberate behaviour and a push at eleven
+    // at night is not a kindness.
+    const eveningChallenges = (challenges ?? []).filter(
+      (c) => localHour(c.timezone as string) === reminderHour(c.deadline_time as string | null),
+    );
     if (eveningChallenges.length === 0) {
       return new Response(JSON.stringify({ reminded: 0 }), { status: 200 });
     }
@@ -95,10 +128,10 @@ Deno.serve(async (req) => {
       // a challenge nobody has actually started.
       if (!challenge.start_date) continue;
       const timeZone = challenge.timezone as string;
-      const todayStr = localDateStr(timeZone);
+      const deadline = ((challenge.deadline_time as string | null) ?? '00:00').slice(0, 5);
       const startDate = new Date(`${challenge.start_date as string}T00:00:00Z`);
-      const today = new Date(`${todayStr}T00:00:00Z`);
-      const currentDay = Math.round((today.getTime() - startDate.getTime()) / 86_400_000) + 1;
+      const cycle = new Date(`${cycleStartFor(timeZone, deadline)}T00:00:00Z`);
+      const currentDay = Math.round((cycle.getTime() - startDate.getTime()) / 86_400_000) + 1;
       if (currentDay < 1 || currentDay > (challenge.total_days as number)) continue;
 
       const { data: participants } = await admin
