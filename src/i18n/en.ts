@@ -447,6 +447,7 @@ export const en: Dictionary = {
 
   chat: {
     day: (n: number) => `Day ${n}`,
+    beforeStart: 'Before it starts',
     reloadFailed: "Couldn't load chat",
   },
 

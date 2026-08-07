@@ -467,6 +467,9 @@ export const tr = {
 
   chat: {
     day: (n: number) => `Gün ${n}`,
+    // Halka başlamadan atılan mesajlar 0. güne yazılıyor; "Gün 0" diye bir
+    // gün yok, o yüzden ayrı bir etiket.
+    beforeStart: 'Başlamadan önce',
     reloadFailed: 'Sohbet yüklenemedi',
   },
 

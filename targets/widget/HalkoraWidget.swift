@@ -1485,14 +1485,22 @@ struct HalkoraLockView: View {
         TickBar(segments: s.ringSegments(at: at))
           .frame(height: 4)
         HStack(spacing: 4) {
-          Text(c.dayLong(s.currentDay(at: at), s.totalDays)).monospacedDigit()
-          Text("·")
-          if s.isCompleted(at: at) {
-            doneLabelWithCheck(c.completedLabel)
-          } else if s.checkedInToday(at: at) {
-            doneLabelWithCheck(c.doneLabel)
+          if s.isActive {
+            Text(c.dayLong(s.currentDay(at: at), s.totalDays)).monospacedDigit()
+            Text("·")
+            if s.isCompleted(at: at) {
+              doneLabelWithCheck(c.completedLabel)
+            } else if s.checkedInToday(at: at) {
+              doneLabelWithCheck(c.doneLabel)
+            } else {
+              Text(c.checkInCta)
+            }
           } else {
-            Text(c.checkInCta)
+            // A ring that hasn't started has no day to be on. The counter used
+            // to run anyway and printed the negative distance to the start
+            // date — "Gün -6/14" (saha testi bulgusu). Every other surface
+            // already said "14 Ağustos'ta başlıyor"; these three didn't ask.
+            Text(s.startsLabel.isEmpty ? c.daysCount(s.totalDays) : s.startsLabel)
           }
         }
         .font(.system(size: 12, weight: .regular))
@@ -1512,7 +1520,9 @@ struct HalkoraLockView: View {
       let c = copyFor(s.locale)
       // One line, mini arc as the brand mark.
       Label {
-        if s.isCompleted(at: at) {
+        if !s.isActive {
+          Text("\(c.brand) · \(s.startsLabel.isEmpty ? c.daysCount(s.totalDays) : s.startsLabel)")
+        } else if s.isCompleted(at: at) {
           Text("\(c.brand) · \(c.completedLabel) ✓")
         } else if s.checkedInToday(at: at) {
           Text("\(c.brand) · \(c.doneLabel) ✓")

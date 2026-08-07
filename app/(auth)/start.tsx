@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -74,20 +74,31 @@ export default function StartScreen() {
 
   const [mode, setMode] = useState<'fork' | 'join'>('fork');
   const [input, setInput] = useState('');
-  const [clip, setClip] = useState<string | null>(null);
+  /** The value arrived by pasting rather than typing — changes the card's
+   * wording, nothing else. */
+  const [pasted, setPasted] = useState(false);
 
-  // Auto-detect an invite in the clipboard when the join view opens.
-  useEffect(() => {
-    if (mode !== 'join') return;
+  // Apple's own paste control (UIPasteControl) hands over the clipboard
+  // WITHOUT the "Allow Paste?" prompt. Reading the clipboard on mount, which
+  // is what this screen used to do, is what raised that prompt — and it fired
+  // once, before the code had even been copied, so a code copied afterwards
+  // was never seen (saha testi bulgusu: "yapıştıra bastım ama yapıştırmadı").
+  const pasteButtonAvailable = Clipboard.isPasteButtonAvailable;
+
+  /** Fallback for where the paste control doesn't exist. Prompts, but only
+   * when the person actually asked to paste. */
+  const readClipboard = () => {
     Clipboard.getStringAsync()
-      .then((v) => setClip(v))
+      .then((v) => {
+        if (!v?.trim()) return;
+        setInput(v.trim());
+        setPasted(true);
+      })
       .catch(() => {});
-  }, [mode]);
+  };
 
-  const typedCode = extractCode(input);
-  const clipCode = extractCode(clip);
-  const code = typedCode ?? (!input.trim() ? clipCode : null);
-  const fromClipboard = !typedCode && !!clipCode;
+  const code = extractCode(input);
+  const fromClipboard = pasted;
 
   const join = () => {
     if (!code) return;
@@ -116,13 +127,35 @@ export default function StartScreen() {
           <Feather name="link" size={16} color={colors.textTertiary} />
           <TextInput
             value={input}
-            onChangeText={setInput}
+            onChangeText={(v) => {
+              setInput(v);
+              setPasted(false);
+            }}
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
+          {pasteButtonAvailable ? (
+            <Clipboard.ClipboardPasteButton
+              acceptedContentTypes={['plain-text']}
+              displayMode="iconOnly"
+              cornerStyle="capsule"
+              backgroundColor={colors.ember}
+              foregroundColor={colors.bgBase}
+              style={{ width: 34, height: 34 }}
+              onPress={(data) => {
+                if (data.type !== 'text' || !data.text?.trim()) return;
+                setInput(data.text.trim());
+                setPasted(true);
+              }}
+            />
+          ) : (
+            <Pressable onPress={readClipboard} hitSlop={8}>
+              <Feather name="clipboard" size={18} color={colors.ember} />
+            </Pressable>
+          )}
         </View>
 
         {code ? (
