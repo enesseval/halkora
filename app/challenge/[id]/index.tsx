@@ -625,6 +625,7 @@ export default function DetailScreen() {
             participant={item.p}
             totalDays={challenge.totalDays}
             currentDay={challenge.currentDay}
+            canNudge={!isUpcoming}
             onNudge={() => setNudgeTarget(item.p)}
           />
         );

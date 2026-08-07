@@ -38,7 +38,13 @@ export async function insertChallenge(
       total_days: input.totalDays,
       start_date: input.lobby ? null : (input.startDateISO ?? todayInTimezone(timezone)),
       timezone,
-      status: input.lobby ? 'lobby' : input.startTomorrow ? 'upcoming' : 'active',
+      // Only two stored values carry meaning: 'lobby' (no start date yet) and
+      // 'completed' (authoritative, set by ending). Whether a dated ring is
+      // upcoming or running is read off start_date every time it's mapped, so
+      // storing 'upcoming' here just created a value nothing maintains —
+      // 42 rows in production still said 'upcoming' with a start date weeks
+      // past. Write the neutral value and let the dates answer.
+      status: input.lobby ? 'lobby' : 'active',
       joker_allowance: input.joker ?? 1,
       first_day_join_only: input.firstDayJoinOnly ?? false,
     })
