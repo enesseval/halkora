@@ -237,11 +237,15 @@ extension HalkoraSnapshot {
   /// it's running, and a ring that ends while the app is closed would
   /// otherwise keep offering a check-in forever.
   func rawDay(at now: Date) -> Int {
-    if fastDays != 0 {
+    guard !startDate.isEmpty else { return 0 }
+    // Fast mode accelerates a ring that has BEGUN; it must not begin one.
+    // Anchored to createdAt it used to report day 1 immediately, so a ring
+    // scheduled weeks out read as running here too. Mirrors the same gate in
+    // daysSinceStart() (src/data/challenges.ts) and the check-in function.
+    if fastDays != 0 && dateString(now, in: timezone) >= startDate {
       guard let created = parseISO(createdAt) else { return 1 }
       return max(Int(now.timeIntervalSince(created) / 60) + 1, 1)
     }
-    guard !startDate.isEmpty else { return 0 }
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US_POSIX")
     f.timeZone = TimeZone(identifier: "UTC")

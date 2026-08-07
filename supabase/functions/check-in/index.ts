@@ -85,6 +85,25 @@ Deno.serve(async (req) => {
     // must mirror the client's src/lib/fastDays.ts exactly, and both sides
     // must be toggled together (supabase secrets set FAST_DAYS=1 + redeploy
     // here, EXPO_PUBLIC_FAST_DAYS=1 on the client). Never in production.
+    // The start date gates BOTH modes, and is checked before the day math
+    // rather than through it. FAST_DAYS anchors its 1-minute days to
+    // created_at, so its currentDay is >= 1 the instant a challenge exists —
+    // which meant the CHALLENGE_NOT_STARTED check below could never fire in
+    // test mode, and a ring starting three weeks from now accepted check-ins
+    // on the day it was created (found in production data: day_number tracked
+    // minutes-since-creation on a ring whose start_date was 21 days out).
+    // Test mode may accelerate a running ring; it must not start an unstarted
+    // one.
+    const ringToday = new Intl.DateTimeFormat('en-CA', {
+      timeZone: challenge.timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date()); // "YYYY-MM-DD" — sorts lexicographically
+    if (ringToday < (challenge.start_date as string)) {
+      return fail('CHALLENGE_NOT_STARTED');
+    }
+
     let currentDay: number;
     if (Deno.env.get('FAST_DAYS') === '1') {
       currentDay =
