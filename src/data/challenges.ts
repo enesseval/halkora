@@ -38,7 +38,13 @@ export async function insertChallenge(
       total_days: input.totalDays,
       start_date: input.lobby ? null : (input.startDateISO ?? todayInTimezone(timezone)),
       timezone,
-      status: input.lobby ? 'lobby' : input.startTomorrow ? 'upcoming' : 'active',
+      // Only two stored values carry meaning: 'lobby' (no start date yet) and
+      // 'completed' (authoritative, set by ending). Whether a dated ring is
+      // upcoming or running is read off start_date every time it's mapped, so
+      // storing 'upcoming' here just created a value nothing maintains —
+      // 42 rows in production still said 'upcoming' with a start date weeks
+      // past. Write the neutral value and let the dates answer.
+      status: input.lobby ? 'lobby' : 'active',
       joker_allowance: input.joker ?? 1,
       first_day_join_only: input.firstDayJoinOnly ?? false,
     })
@@ -165,15 +171,24 @@ function todayInTimezone(timezone: string): string {
  * participant in a different timezone than the challenge can see "bugün
  * işaretlenebilir" on screen and get rejected server-side. 0 === starts today. */
 function daysSinceStart(startISO: string, timezone: string, createdAtISO: string): number {
-  // Test-only acceleration: 1 day == 1 minute, anchored to created_at
-  // because start_date has no time-of-day (see src/lib/fastDays.ts).
-  if (FAST_DAYS) return fastDaysSince(createdAtISO);
   const todayStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(new Date()); // "YYYY-MM-DD"
+  // Test-only acceleration: 1 day == 1 minute, anchored to created_at
+  // because start_date has no time-of-day (see src/lib/fastDays.ts).
+  //
+  // The start date still gates it. Fast mode used to return a positive day
+  // straight away, so a ring scheduled weeks out showed as running and took
+  // check-ins the moment it was created. Acceleration applies to a ring that
+  // has begun; it doesn't begin one.
+  //
+  // Before the start date it falls through to the real calendar math below,
+  // so "3 gün sonra başlıyor" stays truthful instead of collapsing to a flat
+  // "not started".
+  if (FAST_DAYS && todayStr >= startISO) return fastDaysSince(createdAtISO);
   const start = new Date(`${startISO}T00:00:00Z`);
   const today = new Date(`${todayStr}T00:00:00Z`);
   return Math.round((today.getTime() - start.getTime()) / 86_400_000);

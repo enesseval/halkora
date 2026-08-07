@@ -13,6 +13,9 @@ interface Props {
   totalDays: number;
   currentDay: number;
   onNudge: () => void;
+  /** A ring that hasn't started has no day to be behind on, so there is
+   * nothing to nudge anyone about. */
+  canNudge?: boolean;
 }
 
 /** Build a plausible personal ring so each row reads individually. */
@@ -24,7 +27,13 @@ function personalDays(p: Participant, total: number, currentDay: number): Segmen
   return buildDays(total, explicit);
 }
 
-export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: Props) {
+export function ParticipantRow({
+  participant,
+  totalDays,
+  currentDay,
+  onNudge,
+  canNudge: nudgingAllowed = true,
+}: Props) {
   const { t } = useT();
   // The nudge button used to only appear once someone had been silent 2+
   // days — showed up so rarely it read as broken (saha testi bulgusu: "1-2
@@ -36,7 +45,7 @@ export function ParticipantRow({ participant, totalDays, currentDay, onNudge }: 
   // bulgusu: "kendime de atabiliyorum saçma"), and the old 2-day gate
   // happened to hide this because you're never "silent" relative to
   // yourself the same way, but removing that gate exposed it.
-  const canNudge = !participant.isMe && !participant.checkedInToday;
+  const canNudge = nudgingAllowed && !participant.isMe && !participant.checkedInToday;
   const reallySilent = canNudge && (participant.silentDays ?? 0) >= 2;
   const shakeX = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }));
