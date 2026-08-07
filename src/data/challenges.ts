@@ -3,6 +3,7 @@ import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
 import { buildDays, formatShortDate } from '@/lib/day';
 import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
+import { DEFAULT_DEADLINE, cycleStart, daysBetween } from '@/lib/cycle';
 import { computeStakeOutcome } from './stakeOutcome';
 import { getDict, getLocale } from '@/i18n';
 
@@ -46,6 +47,9 @@ export async function insertChallenge(
       // past. Write the neutral value and let the dates answer.
       status: input.lobby ? 'lobby' : 'active',
       joker_allowance: input.joker ?? 1,
+      // Faz 1: the day closes here instead of at midnight. Left at the default
+      // the ring behaves exactly as it did before deadlines existed.
+      deadline_time: input.deadlineTime ?? DEFAULT_DEADLINE,
       first_day_join_only: input.firstDayJoinOnly ?? false,
     })
     .select('id, invite_code')
@@ -90,6 +94,8 @@ interface ChallengeRow {
   joker_allowance: number;
   first_day_join_only: boolean;
   created_at: string;
+  /** "HH:MM:SS" — when the day closes, in the challenge's own timezone. */
+  deadline_time: string | null;
   owner_id: string | null;
   // Set only when the challenge was ended EARLY (docs/db-stake-v2.sql §2).
   ended_on_day: number | null;
@@ -170,13 +176,15 @@ function todayInTimezone(timezone: string): string {
  * Function's day math (docs/PHASE2-SUPABASE.md "Ek F") exactly, or a
  * participant in a different timezone than the challenge can see "bugün
  * işaretlenebilir" on screen and get rejected server-side. 0 === starts today. */
-function daysSinceStart(startISO: string, timezone: string, createdAtISO: string): number {
-  const todayStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date()); // "YYYY-MM-DD"
+function daysSinceStart(
+  startISO: string,
+  timezone: string,
+  createdAtISO: string,
+  deadline: string,
+): number {
+  // Which cycle we're in, not which calendar date it is (Faz 1). With the
+  // default 00:00 deadline the two are the same thing.
+  const cycle = cycleStart(timezone, deadline);
   // Test-only acceleration: 1 day == 1 minute, anchored to created_at
   // because start_date has no time-of-day (see src/lib/fastDays.ts).
   //
@@ -185,13 +193,11 @@ function daysSinceStart(startISO: string, timezone: string, createdAtISO: string
   // check-ins the moment it was created. Acceleration applies to a ring that
   // has begun; it doesn't begin one.
   //
-  // Before the start date it falls through to the real calendar math below,
-  // so "3 gün sonra başlıyor" stays truthful instead of collapsing to a flat
+  // Before the start date it falls through to the real cycle math below, so
+  // "3 gün sonra başlıyor" stays truthful instead of collapsing to a flat
   // "not started".
-  if (FAST_DAYS && todayStr >= startISO) return fastDaysSince(createdAtISO);
-  const start = new Date(`${startISO}T00:00:00Z`);
-  const today = new Date(`${todayStr}T00:00:00Z`);
-  return Math.round((today.getTime() - start.getTime()) / 86_400_000);
+  if (FAST_DAYS && cycle >= startISO) return fastDaysSince(createdAtISO);
+  return daysBetween(startISO, cycle);
 }
 
 function hhmm(iso: string): string {
@@ -260,6 +266,7 @@ function mapLobbyRow(
     jokerRemaining: row.joker_allowance,
     jokerAllowance: row.joker_allowance,
     timezone: row.timezone,
+    deadlineTime: (row.deadline_time ?? DEFAULT_DEADLINE).slice(0, 5),
     startDate: row.start_date,
     createdAt: row.created_at,
     hasMissedYesterday: false,
@@ -287,7 +294,8 @@ function mapRow(
   if (row.status === 'lobby' || !row.start_date) {
     return mapLobbyRow(row, parts, profMap, myUserId, stake);
   }
-  const diff = daysSinceStart(row.start_date, row.timezone, row.created_at);
+  const deadline = row.deadline_time ?? DEFAULT_DEADLINE;
+  const diff = daysSinceStart(row.start_date, row.timezone, row.created_at, deadline);
   const rawDay = diff + 1; // day 1 == start day
   const dateBasedStatus: Challenge['status'] =
     rawDay <= 0 ? 'upcoming' : rawDay > row.total_days ? 'completed' : 'active';
@@ -395,7 +403,10 @@ function mapRow(
             parts.map((p) => [
               p.user_id,
               row.start_date && p.joined_at
-                ? Math.max(daysSinceStart(row.start_date, row.timezone, p.joined_at) + 1, 1)
+                ? Math.max(
+                    daysSinceStart(row.start_date, row.timezone, p.joined_at, deadline) + 1,
+                    1,
+                  )
                 : 1,
             ]),
           ),
@@ -467,6 +478,7 @@ function mapRow(
     jokerRemaining: Math.max(row.joker_allowance - jokerUsed, 0),
     jokerAllowance: row.joker_allowance,
     timezone: row.timezone,
+    deadlineTime: (row.deadline_time ?? DEFAULT_DEADLINE).slice(0, 5),
     startDate: row.start_date,
     createdAt: row.created_at,
     hasMissedYesterday,
@@ -522,7 +534,7 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
     supabase
       .from('challenges')
       .select(
-        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at, owner_id, ended_on_day',
+        'id, title, daily_action, total_days, start_date, timezone, status, invite_code, joker_allowance, first_day_join_only, created_at, owner_id, ended_on_day, deadline_time',
       )
       .in('id', ids),
     supabase

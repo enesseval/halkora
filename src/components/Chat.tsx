@@ -17,7 +17,10 @@ export function DayDivider({ day }: { day: number }) {
     >
       <View style={{ flex: 1, height: hairline, backgroundColor: colors.strokeSubtle }} />
       <AppText variant="meta" color={colors.textTertiary} tabular>
-        {t.chat.day(day)}
+        {/* Messages sent before the ring starts are filed under day 0, and
+            there is no such day — the divider read "Gün 0" (saha testi
+            bulgusu). The group is already talking, they just haven't begun. */}
+        {day > 0 ? t.chat.day(day) : t.chat.beforeStart}
       </AppText>
       <View style={{ flex: 1, height: hairline, backgroundColor: colors.strokeSubtle }} />
     </View>

@@ -19,6 +19,40 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/** Local wall-clock parts of `at` in `timeZone`, as "YYYY-MM-DD" and "HH:MM". */
+function localParts(timeZone: string, at = new Date()): { date: string; time: string } {
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(at);
+  const time = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(at);
+  return { date, time };
+}
+
+/**
+ * The opening date of the cycle `at` falls in, as "YYYY-MM-DD".
+ *
+ * Cycle D runs (D at deadline) → (D+1 at deadline). Labelling by the opening
+ * moment is what makes deadline "00:00" behave exactly like a calendar day:
+ * a local time is never < "00:00", so the answer is always today. Mirrors
+ * public.challenge_cycle_start() in SQL and cycleStartFor() in
+ * src/lib/cycle.ts — three copies of one formula, change them together.
+ */
+export function cycleStartFor(timeZone: string, deadline: string, at = new Date()): string {
+  const { date, time } = localParts(timeZone, at);
+  if (time >= deadline.slice(0, 5)) return date;
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function fail(message: string, status = 400): Response {
   return new Response(JSON.stringify({ error: message }), {
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -59,7 +93,9 @@ Deno.serve(async (req) => {
 
     const { data: challenge, error: chErr } = await admin
       .from('challenges')
-      .select('id, start_date, timezone, total_days, status, joker_allowance, created_at')
+      .select(
+        'id, start_date, timezone, total_days, status, joker_allowance, created_at, deadline_time',
+      )
       .eq('id', challengeId)
       .single();
     if (chErr || !challenge) return fail('CHALLENGE_NOT_FOUND', 404);
@@ -94,13 +130,15 @@ Deno.serve(async (req) => {
     // minutes-since-creation on a ring whose start_date was 21 days out).
     // Test mode may accelerate a running ring; it must not start an unstarted
     // one.
-    const ringToday = new Intl.DateTimeFormat('en-CA', {
-      timeZone: challenge.timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date()); // "YYYY-MM-DD" — sorts lexicographically
-    if (ringToday < (challenge.start_date as string)) {
+    // A "day" runs deadline → deadline, not midnight → midnight (Faz 1). The
+    // cycle is labelled by the moment it OPENS, which makes deadline 00:00
+    // collapse to the plain calendar day with no special case — see the
+    // migration f1_deadline_time_and_cycle_math for why that direction.
+    const cycleStart = cycleStartFor(
+      challenge.timezone as string,
+      (challenge.deadline_time as string | null) ?? '00:00',
+    );
+    if (cycleStart < (challenge.start_date as string)) {
       return fail('CHALLENGE_NOT_STARTED');
     }
 
@@ -109,15 +147,9 @@ Deno.serve(async (req) => {
       currentDay =
         Math.floor((Date.now() - new Date(challenge.created_at as string).getTime()) / 60_000) + 1;
     } else {
-      const todayStr = new Intl.DateTimeFormat('en-CA', {
-        timeZone: challenge.timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date()); // "YYYY-MM-DD"
       const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
-      const today = new Date(`${todayStr}T00:00:00Z`);
-      currentDay = Math.round((today.getTime() - startDate.getTime()) / 86_400_000) + 1;
+      const cycle = new Date(`${cycleStart}T00:00:00Z`);
+      currentDay = Math.round((cycle.getTime() - startDate.getTime()) / 86_400_000) + 1;
     }
 
     if (currentDay < 1) return fail('CHALLENGE_NOT_STARTED');

@@ -82,28 +82,38 @@ export function QuickStartSheet({
   const keyboardHeight = useKeyboardHeight();
   const [mode, setMode] = useState<'choose' | 'join'>('choose');
   const [input, setInput] = useState('');
-  const [clip, setClip] = useState<string | null>(null);
+  /** The value arrived by pasting rather than typing — changes the card's
+   * wording, nothing else. */
+  const [pasted, setPasted] = useState(false);
 
   useEffect(() => {
     if (!visible) {
       setMode('choose');
       setInput('');
+      setPasted(false);
     }
   }, [visible]);
 
-  useEffect(() => {
-    if (mode !== 'join') return;
-    Clipboard.getStringAsync()
-      .then((v) => setClip(v))
-      .catch(() => {});
-  }, [mode]);
-
   if (!visible) return null;
 
-  const typedCode = extractCode(input);
-  const clipCode = extractCode(clip);
-  const code = typedCode ?? (!input.trim() ? clipCode : null);
-  const fromClipboard = !typedCode && !!clipCode;
+  // Same reasoning as app/(auth)/start.tsx: reading the clipboard on open
+  // raises iOS's "Allow Paste?" prompt, fires once before the code has been
+  // copied, and left a later copy unseen. Apple's paste control needs no
+  // prompt and runs when the person asks for it.
+  const pasteButtonAvailable = Clipboard.isPasteButtonAvailable;
+
+  const readClipboard = () => {
+    Clipboard.getStringAsync()
+      .then((v) => {
+        if (!v?.trim()) return;
+        setInput(v.trim());
+        setPasted(true);
+      })
+      .catch(() => {});
+  };
+
+  const code = extractCode(input);
+  const fromClipboard = pasted;
 
   const goCreate = () => {
     onClose();
@@ -220,7 +230,10 @@ export function QuickStartSheet({
               <Feather name="link" size={16} color={colors.textTertiary} />
               <TextInput
                 value={input}
-                onChangeText={setInput}
+                onChangeText={(v) => {
+                  setInput(v);
+                  setPasted(false);
+                }}
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
@@ -228,6 +241,25 @@ export function QuickStartSheet({
                 autoFocus
                 style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
               />
+              {pasteButtonAvailable ? (
+                <Clipboard.ClipboardPasteButton
+                  acceptedContentTypes={['plain-text']}
+                  displayMode="iconOnly"
+                  cornerStyle="capsule"
+                  backgroundColor={colors.ember}
+                  foregroundColor={colors.bgBase}
+                  style={{ width: 34, height: 34 }}
+                  onPress={(data) => {
+                    if (data.type !== 'text' || !data.text?.trim()) return;
+                    setInput(data.text.trim());
+                    setPasted(true);
+                  }}
+                />
+              ) : (
+                <Pressable onPress={readClipboard} hitSlop={8}>
+                  <Feather name="clipboard" size={18} color={colors.ember} />
+                </Pressable>
+              )}
             </View>
 
             {code ? (

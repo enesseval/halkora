@@ -19,6 +19,9 @@ export interface CreateChallengeInput {
   startDateISO?: string;
   /** joker allowance chosen in E3 step 3 */
   joker?: number;
+  /** "HH:MM" — when the day closes. Omitted means midnight, i.e. the plain
+   * calendar day every ring used before deadlines existed. */
+  deadlineTime?: string;
   /** override the "starts" copy (e.g. a custom future date) */
   startsLabel?: string;
   stake?: Stake;
@@ -269,6 +272,7 @@ export const useMockStore = create<MockState>((set, get) => ({
       // have written: the creating device's timezone, and today as the start
       // unless it's a lobby/tomorrow challenge.
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      deadlineTime: input.deadlineTime ?? '00:00',
       startDate: input.lobby ? null : (input.startDateISO ?? new Date().toISOString().slice(0, 10)),
       createdAt: new Date().toISOString(),
       hasMissedYesterday: false,

@@ -105,6 +105,9 @@ export interface Challenge {
    * "tekrar uygulamaya girene kadar yeni güne widget geçmiyor").
    * `startDate` is null while status === 'lobby' (not started yet). */
   timezone: string;
+  /** "HH:MM" — when the day closes in this ring's own timezone. "00:00" is
+   * the plain calendar day, which is what every ring had before deadlines. */
+  deadlineTime: string;
   startDate: string | null; // "YYYY-MM-DD"
   createdAt: string; // ISO — FAST_DAYS test mode anchors its 1-minute days here
   /** Set when the challenge was ended EARLY — the day it actually stopped on.

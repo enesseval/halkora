@@ -146,6 +146,10 @@ private struct HalkoraSnapshot: Codable {
   var dailyAction: String
   var totalDays: Int
   var timezone: String
+  /// "HH:MM" — when the day closes in this ring's timezone. Optional so a
+  /// snapshot written before deadlines existed still decodes; absent means
+  /// midnight, i.e. the plain calendar day.
+  var deadlineTime: String?
   var startDate: String  // "YYYY-MM-DD" ("" for a lobby challenge)
   var createdAt: String  // ISO — FAST_DAYS anchors its 1-minute days here
   // ExtensionStorage.set only allows string/number values inside an object
@@ -227,7 +231,7 @@ extension HalkoraSnapshot {
   /// Mirrors dayKeyFor() in src/lib/widget.ts — keep both in sync.
   func todayKey(at now: Date) -> String {
     if fastDays != 0 { return String(currentDay(at: now)) }
-    return dateString(now, in: timezone)
+    return cycleStart(at: now)
   }
 
   /// Mirrors `rawDay` in src/data/challenges.ts — UNCLAMPED, so it keeps
@@ -236,13 +240,37 @@ extension HalkoraSnapshot {
   /// drops finished halkalar from the sync, but it can only do that while
   /// it's running, and a ring that ends while the app is closed would
   /// otherwise keep offering a check-in forever.
+  /// The opening date of the cycle `now` falls in, as "YYYY-MM-DD".
+  ///
+  /// A day runs deadline → deadline (Faz 1). Naming the cycle after the moment
+  /// it OPENS is what makes the default "00:00" identical to a calendar day
+  /// with no special case — a local time is never earlier than midnight.
+  /// Mirrors public.challenge_cycle_start() in SQL, cycleStartFor() in the
+  /// check-in function and cycleStart() in src/lib/cycle.ts.
+  func cycleStart(at now: Date) -> String {
+    let date = dateString(now, in: timezone)
+    let deadline = String((deadlineTime ?? "00:00").prefix(5))
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = TimeZone(identifier: timezone) ?? .current
+    f.dateFormat = "HH:mm"
+    if f.string(from: now) >= deadline { return date }
+    let u = DateFormatter()
+    u.locale = Locale(identifier: "en_US_POSIX")
+    u.timeZone = TimeZone(identifier: "UTC")
+    u.dateFormat = "yyyy-MM-dd"
+    guard let d = u.date(from: date) else { return date }
+    return u.string(from: d.addingTimeInterval(-86_400))
+  }
+
   func rawDay(at now: Date) -> Int {
     guard !startDate.isEmpty else { return 0 }
+    let cycle = cycleStart(at: now)
     // Fast mode accelerates a ring that has BEGUN; it must not begin one.
     // Anchored to createdAt it used to report day 1 immediately, so a ring
     // scheduled weeks out read as running here too. Mirrors the same gate in
     // daysSinceStart() (src/data/challenges.ts) and the check-in function.
-    if fastDays != 0 && dateString(now, in: timezone) >= startDate {
+    if fastDays != 0 && cycle >= startDate {
       guard let created = parseISO(createdAt) else { return 1 }
       return max(Int(now.timeIntervalSince(created) / 60) + 1, 1)
     }
@@ -250,8 +278,7 @@ extension HalkoraSnapshot {
     f.locale = Locale(identifier: "en_US_POSIX")
     f.timeZone = TimeZone(identifier: "UTC")
     f.dateFormat = "yyyy-MM-dd"
-    guard let start = f.date(from: startDate),
-      let today = f.date(from: dateString(now, in: timezone))
+    guard let start = f.date(from: startDate), let today = f.date(from: cycle)
     else { return 0 }
     let diff = (today.timeIntervalSince(start) / 86_400).rounded()
     return Int(diff) + 1
@@ -368,12 +395,21 @@ extension HalkoraSnapshot {
     let tz = TimeZone(identifier: timezone) ?? .current
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
-    return (1...count).compactMap { offset in
-      guard let day = cal.date(byAdding: .day, value: offset, to: now) else { return nil }
-      // A minute past midnight, not exactly midnight — rendering a hair
-      // early would recompute the SAME day.
-      return cal.startOfDay(for: day).addingTimeInterval(60)
-    }
+    // The day turns at the deadline now, not at midnight — scheduling entries
+    // for midnight on a 21:00 ring would flip the counter three hours late.
+    let parts = String((deadlineTime ?? "00:00").prefix(5)).split(separator: ":")
+    let hour = Int(parts.first ?? "0") ?? 0
+    let minute = parts.count > 1 ? (Int(parts[1]) ?? 0) : 0
+    return (0...count).compactMap { offset -> Date? in
+      guard let day = cal.date(byAdding: .day, value: offset, to: now),
+        let at = cal.date(
+          bySettingHour: hour, minute: minute, second: 0, of: cal.startOfDay(for: day))
+      else { return nil }
+      // A minute past the boundary, not exactly on it — rendering a hair
+      // early would recompute the SAME cycle.
+      let moment = at.addingTimeInterval(60)
+      return moment > now ? moment : nil
+    }.prefix(count).map { $0 }
   }
 }
 
@@ -1485,14 +1521,22 @@ struct HalkoraLockView: View {
         TickBar(segments: s.ringSegments(at: at))
           .frame(height: 4)
         HStack(spacing: 4) {
-          Text(c.dayLong(s.currentDay(at: at), s.totalDays)).monospacedDigit()
-          Text("·")
-          if s.isCompleted(at: at) {
-            doneLabelWithCheck(c.completedLabel)
-          } else if s.checkedInToday(at: at) {
-            doneLabelWithCheck(c.doneLabel)
+          if s.isActive {
+            Text(c.dayLong(s.currentDay(at: at), s.totalDays)).monospacedDigit()
+            Text("·")
+            if s.isCompleted(at: at) {
+              doneLabelWithCheck(c.completedLabel)
+            } else if s.checkedInToday(at: at) {
+              doneLabelWithCheck(c.doneLabel)
+            } else {
+              Text(c.checkInCta)
+            }
           } else {
-            Text(c.checkInCta)
+            // A ring that hasn't started has no day to be on. The counter used
+            // to run anyway and printed the negative distance to the start
+            // date — "Gün -6/14" (saha testi bulgusu). Every other surface
+            // already said "14 Ağustos'ta başlıyor"; these three didn't ask.
+            Text(s.startsLabel.isEmpty ? c.daysCount(s.totalDays) : s.startsLabel)
           }
         }
         .font(.system(size: 12, weight: .regular))
@@ -1512,7 +1556,9 @@ struct HalkoraLockView: View {
       let c = copyFor(s.locale)
       // One line, mini arc as the brand mark.
       Label {
-        if s.isCompleted(at: at) {
+        if !s.isActive {
+          Text("\(c.brand) · \(s.startsLabel.isEmpty ? c.daysCount(s.totalDays) : s.startsLabel)")
+        } else if s.isCompleted(at: at) {
           Text("\(c.brand) · \(c.completedLabel) ✓")
         } else if s.checkedInToday(at: at) {
           Text("\(c.brand) · \(c.doneLabel) ✓")
