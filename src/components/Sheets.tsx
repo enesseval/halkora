@@ -1,20 +1,102 @@
-import { useEffect, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Alert, Modal, Pressable, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Button } from './ui';
+
+/**
+ * The shell every sheet with a text field sits in.
+ *
+ * It exists because of one fact that defeated three attempts at fixing the
+ * keyboard: these sheets are rendered inside `Screen`, which is a SafeAreaView
+ * carrying `paddingHorizontal: 20` plus the top/bottom insets — and Yoga lays
+ * absolutely-positioned children out against the parent's PADDING box, not the
+ * screen. So an overlay pinned to `top/left/right/bottom: 0` was really pinned
+ * to a box ~20pt narrower and ~34pt shorter than the screen. Every offset
+ * computed against the keyboard's screen coordinates was wrong by that much,
+ * whether it came from KeyboardAvoidingView or from padding by a measured
+ * height, and the scrim never covered the bottom inset either.
+ *
+ * A Modal is hosted in its own full-screen window, outside that padding box,
+ * so `paddingBottom = keyboardHeight` is exactly right with no inset
+ * arithmetic left to get wrong. This is the whole fix — the sheets' own
+ * content is untouched.
+ *
+ * `onShow` rather than `autoFocus`: a field inside a Modal can autofocus
+ * before the window is on screen, and the keyboard then never comes up.
+ * Focusing once the Modal reports itself presented is deterministic.
+ */
+function SheetOverlay({
+  onClose,
+  onShow,
+  children,
+}: {
+  onClose: () => void;
+  onShow?: () => void;
+  children: ReactNode;
+}) {
+  const keyboardHeight = useKeyboardHeight();
+
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="none"
+      onShow={onShow}
+      // Android's hardware back button — a sheet should close, not leave the
+      // screen. No-op on iOS.
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Animated.View
+        entering={FadeIn.duration(180)}
+        style={{ flex: 1, backgroundColor: colors.scrim }}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+          <Pressable style={{ flex: 1 }} onPress={onClose} />
+          {children}
+        </View>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+/** The sheet card itself — surface, rounded top, grab handle. */
+function SheetCard({ children }: { children: ReactNode }) {
+  return (
+    <Animated.View
+      entering={SlideInDown.duration(260)}
+      style={{
+        backgroundColor: colors.bgSurface,
+        borderTopLeftRadius: radius.sheet,
+        borderTopRightRadius: radius.sheet,
+        borderWidth: hairline,
+        borderColor: colors.strokeSubtle,
+        paddingHorizontal: spacing.screenX,
+        paddingTop: 12,
+        paddingBottom: 36,
+      }}
+    >
+      <View
+        style={{
+          alignSelf: 'center',
+          width: 40,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.strokeSubtle,
+          marginBottom: 20,
+        }}
+      />
+      {children}
+    </Animated.View>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* E8 — Missed Day / Return (full-screen gate on detail entry)         */
@@ -224,6 +306,7 @@ export function NameSheet({
   const [value, setValue] = useState(current);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (visible) {
@@ -251,106 +334,55 @@ export function NameSheet({
   };
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(180)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        zIndex: 30,
-      }}
-    >
-      {/* Same approach as the join screen (app/(auth)/start.tsx), which keeps
-          its field above the keyboard reliably: let KeyboardAvoidingView do
-          it. Padding by a measured keyboard height was off by Screen's
-          safe-area inset and left this field covered (saha testi bulgusu). */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <Animated.View
-          entering={SlideInDown.duration(260)}
+    <SheetOverlay onClose={onClose} onShow={() => inputRef.current?.focus()}>
+      <SheetCard>
+        <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+          {t.settings.nameEditTitle}
+        </AppText>
+        <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
+          {t.settings.nameEditHint}
+        </AppText>
+
+        <View
           style={{
-            backgroundColor: colors.bgSurface,
-            borderTopLeftRadius: radius.sheet,
-            borderTopRightRadius: radius.sheet,
+            marginTop: 18,
+            backgroundColor: colors.bgElevated,
+            borderRadius: radius.pill,
             borderWidth: hairline,
-            borderColor: colors.strokeSubtle,
-            paddingHorizontal: spacing.screenX,
-            paddingTop: 12,
-            paddingBottom: 36,
-            // The keyboard height we pad by is measured against the physical
-            // screen, while this overlay sits inside Screen's safe-area inset —
-            // so the two disagree by the inset, and on a tall sheet that was
-            // enough to leave the input under the keyboard (saha testi
-            // bulgusu). Capping the height and letting the content scroll
-            // means the input stays reachable whether or not the measurement
-            // is exact, instead of depending on it being exact.
-            maxHeight: '85%',
+            borderColor: error ? colors.joker : colors.strokeSubtle,
+            paddingHorizontal: 16,
+            height: 52,
+            justifyContent: 'center',
           }}
         >
-          <View
-            style={{
-              alignSelf: 'center',
-              width: 40,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: colors.strokeSubtle,
-              marginBottom: 20,
-            }}
+          <TextInput
+            ref={inputRef}
+            value={value}
+            onChangeText={setValue}
+            placeholder={t.settings.namePlaceholder}
+            placeholderTextColor={colors.textTertiary}
+            maxLength={40}
+            returnKeyType="done"
+            onSubmitEditing={submit}
+            style={{ color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
           />
-          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
-            {t.settings.nameEditTitle}
+        </View>
+
+        {error ? (
+          <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+            {error}
           </AppText>
-          <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
-            {t.settings.nameEditHint}
-          </AppText>
+        ) : null}
 
-          <View
-            style={{
-              marginTop: 18,
-              backgroundColor: colors.bgElevated,
-              borderRadius: radius.pill,
-              borderWidth: hairline,
-              borderColor: error ? colors.joker : colors.strokeSubtle,
-              paddingHorizontal: 16,
-              height: 52,
-              justifyContent: 'center',
-            }}
-          >
-            <TextInput
-              value={value}
-              onChangeText={setValue}
-              placeholder={t.settings.namePlaceholder}
-              placeholderTextColor={colors.textTertiary}
-              autoFocus
-              maxLength={40}
-              returnKeyType="done"
-              onSubmitEditing={submit}
-              style={{ color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
-            />
-          </View>
-
-          {error ? (
-            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
-              {error}
-            </AppText>
-          ) : null}
-
-          <View style={{ marginTop: 20 }}>
-            <Button
-              label={saving ? t.settings.nameSaving : t.settings.nameSave}
-              onPress={submit}
-              disabled={!canSave}
-            />
-          </View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Animated.View>
+        <View style={{ marginTop: 20 }}>
+          <Button
+            label={saving ? t.settings.nameSaving : t.settings.nameSave}
+            onPress={submit}
+            disabled={!canSave}
+          />
+        </View>
+      </SheetCard>
+    </SheetOverlay>
   );
 }
 
@@ -372,6 +404,7 @@ export function UsernameSheet({
   const [value, setValue] = useState(current ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (visible) {
@@ -403,114 +436,62 @@ export function UsernameSheet({
   };
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(180)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        zIndex: 30,
-      }}
-    >
-      {/* Same approach as the join screen (app/(auth)/start.tsx), which keeps
-          its field above the keyboard reliably: let KeyboardAvoidingView do
-          it. Padding by a measured keyboard height was off by Screen's
-          safe-area inset and left this field covered (saha testi bulgusu). */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <Animated.View
-          entering={SlideInDown.duration(260)}
+    <SheetOverlay onClose={onClose} onShow={() => inputRef.current?.focus()}>
+      <SheetCard>
+        <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+          {t.settings.usernameEditTitle}
+        </AppText>
+        <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
+          {t.settings.usernameEditHint}
+        </AppText>
+
+        <View
           style={{
-            backgroundColor: colors.bgSurface,
-            borderTopLeftRadius: radius.sheet,
-            borderTopRightRadius: radius.sheet,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            marginTop: 18,
+            backgroundColor: colors.bgElevated,
+            borderRadius: radius.pill,
             borderWidth: hairline,
-            borderColor: colors.strokeSubtle,
-            paddingHorizontal: spacing.screenX,
-            paddingTop: 12,
-            paddingBottom: 36,
-            // The keyboard height we pad by is measured against the physical
-            // screen, while this overlay sits inside Screen's safe-area inset —
-            // so the two disagree by the inset, and on a tall sheet that was
-            // enough to leave the input under the keyboard (saha testi
-            // bulgusu). Capping the height and letting the content scroll
-            // means the input stays reachable whether or not the measurement
-            // is exact, instead of depending on it being exact.
-            maxHeight: '85%',
+            borderColor: error ? colors.joker : colors.strokeSubtle,
+            paddingHorizontal: 16,
+            height: 52,
           }}
         >
-          <View
-            style={{
-              alignSelf: 'center',
-              width: 40,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: colors.strokeSubtle,
-              marginBottom: 20,
-            }}
+          <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.textTertiary }}>
+            @
+          </AppText>
+          <TextInput
+            ref={inputRef}
+            value={value}
+            onChangeText={(raw) => setValue(sanitize(raw))}
+            placeholder={t.settings.usernamePlaceholder}
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={20}
+            returnKeyType="done"
+            onSubmitEditing={submit}
+            style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
           />
+        </View>
 
-          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
-            {t.settings.usernameEditTitle}
+        {error ? (
+          <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+            {error}
           </AppText>
-          <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
-            {t.settings.usernameEditHint}
-          </AppText>
+        ) : null}
 
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              marginTop: 18,
-              backgroundColor: colors.bgElevated,
-              borderRadius: radius.pill,
-              borderWidth: hairline,
-              borderColor: error ? colors.joker : colors.strokeSubtle,
-              paddingHorizontal: 16,
-              height: 52,
-            }}
-          >
-            <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.textTertiary }}>
-              @
-            </AppText>
-            <TextInput
-              value={value}
-              onChangeText={(raw) => setValue(sanitize(raw))}
-              placeholder={t.settings.usernamePlaceholder}
-              placeholderTextColor={colors.textTertiary}
-              autoFocus
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={20}
-              returnKeyType="done"
-              onSubmitEditing={submit}
-              style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
-            />
-          </View>
-
-          {error ? (
-            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
-              {error}
-            </AppText>
-          ) : null}
-
-          <View style={{ marginTop: 20 }}>
-            <Button
-              label={saving ? t.settings.usernameSaving : t.settings.usernameSave}
-              onPress={submit}
-              disabled={!canSave}
-            />
-          </View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Animated.View>
+        <View style={{ marginTop: 20 }}>
+          <Button
+            label={saving ? t.settings.usernameSaving : t.settings.usernameSave}
+            onPress={submit}
+            disabled={!canSave}
+          />
+        </View>
+      </SheetCard>
+    </SheetOverlay>
   );
 }
 
@@ -629,110 +610,57 @@ export function OwnerSettingsSheet({
   };
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(180)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        zIndex: 30,
-      }}
-    >
-      {/* See UsernameSheet's comment: live keyboard-height padding, not
-          KeyboardAvoidingView (which mis-measures inside absolute overlays). */}
-      {/* Same approach as the join screen (app/(auth)/start.tsx), which keeps
-          its field above the keyboard reliably: let KeyboardAvoidingView do
-          it. Padding by a measured keyboard height was off by Screen's
-          safe-area inset and left this field covered (saha testi bulgusu). */}
-      <KeyboardAvoidingView
-        style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <Animated.View
-          entering={SlideInDown.duration(260)}
-          style={{
-            backgroundColor: colors.bgSurface,
-            borderTopLeftRadius: radius.sheet,
-            borderTopRightRadius: radius.sheet,
-            borderWidth: hairline,
-            borderColor: colors.strokeSubtle,
-            paddingHorizontal: spacing.screenX,
-            paddingTop: 12,
-            paddingBottom: 36,
-            // The keyboard height we pad by is measured against the physical
-            // screen, while this overlay sits inside Screen's safe-area inset —
-            // so the two disagree by the inset, and on a tall sheet that was
-            // enough to leave the input under the keyboard (saha testi
-            // bulgusu). Capping the height and letting the content scroll
-            // means the input stays reachable whether or not the measurement
-            // is exact, instead of depending on it being exact.
-            maxHeight: '85%',
-          }}
-        >
-          <View
-            style={{
-              alignSelf: 'center',
-              width: 40,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: colors.strokeSubtle,
-              marginBottom: 20,
-            }}
-          />
-          <AppText variant="screenTitle" style={{ fontSize: 22 }}>
-            {t.detail.ownerSettingsTitle}
+    <SheetOverlay onClose={onClose}>
+      <SheetCard>
+        <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+          {t.detail.ownerSettingsTitle}
+        </AppText>
+
+        <EditField label={t.detail.ownerSettingsTitleLabel} value={title} onChangeText={setTitle} />
+        <EditField
+          label={t.detail.ownerSettingsDailyActionLabel}
+          value={dailyAction}
+          onChangeText={setDailyAction}
+        />
+        <EditField
+          label={t.detail.ownerSettingsStakeLabel}
+          value={stakeText}
+          onChangeText={setStakeText}
+          placeholder={t.detail.ownerSettingsStakePlaceholder}
+        />
+
+        {error ? (
+          <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+            {error}
           </AppText>
+        ) : null}
 
-          <EditField label={t.detail.ownerSettingsTitleLabel} value={title} onChangeText={setTitle} />
-          <EditField
-            label={t.detail.ownerSettingsDailyActionLabel}
-            value={dailyAction}
-            onChangeText={setDailyAction}
+        <View style={{ marginTop: 20 }}>
+          <Button
+            label={saving ? t.detail.ownerSettingsSaving : t.detail.ownerSettingsSave}
+            onPress={submit}
+            disabled={!canSave}
           />
-          <EditField
-            label={t.detail.ownerSettingsStakeLabel}
-            value={stakeText}
-            onChangeText={setStakeText}
-            placeholder={t.detail.ownerSettingsStakePlaceholder}
-          />
+        </View>
 
-          {error ? (
-            <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
-              {error}
-            </AppText>
-          ) : null}
-
-          <View style={{ marginTop: 20 }}>
-            <Button
-              label={saving ? t.detail.ownerSettingsSaving : t.detail.ownerSettingsSave}
-              onPress={submit}
-              disabled={!canSave}
-            />
-          </View>
-
-          {/* Destructive — faint, never red, matches Settings' delete-account
-              pattern (a deliberate confirm dialog stands between the tap and
-              the actual delete, not the button's own color). */}
-          <Pressable
-            onPress={confirmDelete}
-            disabled={deleting}
-            style={({ pressed }) => ({
-              alignItems: 'center',
-              paddingTop: 18,
-              opacity: pressed || deleting ? 0.6 : 1,
-            })}
-          >
-            <AppText variant="secondary" color={colors.joker}>
-              {deleting ? t.detail.deletingChallenge : t.detail.deleteChallenge}
-            </AppText>
-          </Pressable>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Animated.View>
+        {/* Destructive — faint, never red, matches Settings' delete-account
+            pattern (a deliberate confirm dialog stands between the tap and
+            the actual delete, not the button's own color). */}
+        <Pressable
+          onPress={confirmDelete}
+          disabled={deleting}
+          style={({ pressed }) => ({
+            alignItems: 'center',
+            paddingTop: 18,
+            opacity: pressed || deleting ? 0.6 : 1,
+          })}
+        >
+          <AppText variant="secondary" color={colors.joker}>
+            {deleting ? t.detail.deletingChallenge : t.detail.deleteChallenge}
+          </AppText>
+        </Pressable>
+      </SheetCard>
+    </SheetOverlay>
   );
 }
 

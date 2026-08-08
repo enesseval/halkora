@@ -231,11 +231,11 @@ export function QuickStartSheet({
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
-                // autoCorrect={false} maps to autocorrectionType = .no, which
-                // hides iOS's suggestion strip — the strip that offers the
-                // one-tap paste. Correction stays on so it can be drawn.
+                // See app/(auth)/start.tsx for the full reasoning: correction
+                // stays on so iOS draws the QuickType bar at all, and NO
+                // textContentType is set, because any specific one replaces
+                // the clipboard chip with that kind of autofill instead.
                 spellCheck={false}
-                textContentType="oneTimeCode"
                 autoFocus
                 style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
               />

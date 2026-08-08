@@ -128,13 +128,21 @@ export default function StartScreen() {
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            // The one-tap paste is iOS's own suggestion strip above the keyboard,
-            // not a button of ours. autoCorrect={false} maps to
-            // autocorrectionType = .no, which hides that strip outright — which
-            // is why nothing appeared. Correction stays ON so the strip can be
-            // drawn; spell-check is the part that had to go for a code.
+            // The one-tap paste is iOS's own suggestion strip above the
+            // keyboard, not a button of ours. Two things have to hold for it
+            // to appear, and I had each of them wrong in turn:
+            //   1. autoCorrect must stay ON. autoCorrect={false} maps to
+            //      autocorrectionType = .no, which removes the QuickType bar
+            //      entirely — and the paste chip is drawn IN that bar.
+            //   2. NO textContentType. A specific one tells iOS to fill the
+            //      bar with that kind of autofill instead: "oneTimeCode"
+            //      offers only codes harvested from Messages, "URL" only
+            //      saved URLs. The generic clipboard chip belongs to the
+            //      plain bar, so the right value here is none at all.
+            // Nothing else is set for the same reason — keyboardType stays
+            // default so the space bar survives, and a code typed by hand is
+            // unaffected because autocorrect only acts on word boundaries.
             spellCheck={false}
-            textContentType="oneTimeCode"
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
