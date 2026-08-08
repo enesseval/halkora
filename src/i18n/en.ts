@@ -161,6 +161,7 @@ export const en: Dictionary = {
     codeLabel: (code: string) => `Code: ${code}`,
     detailHint: "You'll see the details and participants on the next screen.",
     joinThisChallenge: 'Join this challenge',
+    paste: 'Paste',
     wrongInvite: 'Wrong invite? Paste the link above.',
   },
 

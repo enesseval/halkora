@@ -137,14 +137,20 @@ export default function StartScreen() {
             autoCorrect={false}
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
+        </View>
+
+        {/* Its own row rather than crammed into the pill — Apple won't let the
+            paste control be restyled, so inside the field it fought the
+            existing design instead of joining it. */}
+        <View style={{ flexDirection: 'row', marginTop: 12 }}>
           {pasteButtonAvailable ? (
             <Clipboard.ClipboardPasteButton
               acceptedContentTypes={['plain-text']}
-              displayMode="iconOnly"
+              displayMode="iconAndLabel"
               cornerStyle="capsule"
-              backgroundColor={colors.ember}
-              foregroundColor={colors.bgBase}
-              style={{ width: 34, height: 34 }}
+              backgroundColor={colors.bgElevated}
+              foregroundColor={colors.ember}
+              style={{ width: 132, height: 38 }}
               onPress={(data) => {
                 if (data.type !== 'text' || !data.text?.trim()) return;
                 setInput(data.text.trim());
@@ -152,8 +158,25 @@ export default function StartScreen() {
               }}
             />
           ) : (
-            <Pressable onPress={readClipboard} hitSlop={8}>
-              <Feather name="clipboard" size={18} color={colors.ember} />
+            <Pressable
+              onPress={readClipboard}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 7,
+                height: 38,
+                paddingHorizontal: 16,
+                borderRadius: radius.pill,
+                backgroundColor: colors.bgElevated,
+                borderWidth: hairline,
+                borderColor: colors.strokeSubtle,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Feather name="clipboard" size={15} color={colors.ember} />
+              <AppText variant="secondary" color={colors.ember}>
+                {t.start.paste}
+              </AppText>
             </Pressable>
           )}
         </View>
@@ -181,30 +204,45 @@ export default function StartScreen() {
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
               {t.start.detailHint}
             </AppText>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                join();
-              }}
-              style={({ pressed }) => ({
-                marginTop: 16,
-                height: 52,
-                borderRadius: radius.pill,
-                backgroundColor: colors.ember,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.9 : 1,
-              })}
-            >
-              <AppText style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>
-                {t.start.joinThisChallenge}
-              </AppText>
-            </Pressable>
           </View>
         ) : null}
 
         <View style={{ flex: 1 }} />
-        <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center', paddingBottom: spacing.section }}>
+
+        {/* Always here, dimmed until the code is complete. It used to live
+            inside the card above, which only rendered once a code parsed —
+            and with the keyboard up that card sat below the fold, so typing a
+            code by hand looked like it did nothing (saha testi bulgusu:
+            "yapıştırmada çalışıyor, elle girince açılmıyor"). */}
+        <Pressable
+          disabled={!code}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            join();
+          }}
+          style={({ pressed }) => ({
+            height: 52,
+            borderRadius: radius.pill,
+            backgroundColor: code ? colors.ember : colors.bgElevated,
+            borderWidth: code ? 0 : hairline,
+            borderColor: colors.strokeSubtle,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed && code ? 0.9 : 1,
+          })}
+        >
+          <AppText
+            style={{
+              fontFamily: fonts.bodyBold,
+              fontSize: 17,
+              color: code ? colors.bgBase : colors.textTertiary,
+            }}
+          >
+            {t.start.joinThisChallenge}
+          </AppText>
+        </Pressable>
+
+        <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center', paddingTop: 14, paddingBottom: spacing.section }}>
           {t.start.wrongInvite}
         </AppText>
         </KeyboardAvoidingView>

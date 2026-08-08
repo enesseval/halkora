@@ -241,14 +241,19 @@ export function QuickStartSheet({
                 autoFocus
                 style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
               />
+            </View>
+
+            {/* Its own row — Apple won't let the paste control be restyled, so
+                inside the field it fought the design instead of joining it. */}
+            <View style={{ flexDirection: 'row', marginTop: 12 }}>
               {pasteButtonAvailable ? (
                 <Clipboard.ClipboardPasteButton
                   acceptedContentTypes={['plain-text']}
-                  displayMode="iconOnly"
+                  displayMode="iconAndLabel"
                   cornerStyle="capsule"
-                  backgroundColor={colors.ember}
-                  foregroundColor={colors.bgBase}
-                  style={{ width: 34, height: 34 }}
+                  backgroundColor={colors.bgElevated}
+                  foregroundColor={colors.ember}
+                  style={{ width: 132, height: 38 }}
                   onPress={(data) => {
                     if (data.type !== 'text' || !data.text?.trim()) return;
                     setInput(data.text.trim());
@@ -256,40 +261,69 @@ export function QuickStartSheet({
                   }}
                 />
               ) : (
-                <Pressable onPress={readClipboard} hitSlop={8}>
-                  <Feather name="clipboard" size={18} color={colors.ember} />
+                <Pressable
+                  onPress={readClipboard}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 7,
+                    height: 38,
+                    paddingHorizontal: 16,
+                    borderRadius: radius.pill,
+                    backgroundColor: colors.bgElevated,
+                    borderWidth: hairline,
+                    borderColor: colors.strokeSubtle,
+                    opacity: pressed ? 0.85 : 1,
+                  })}
+                >
+                  <Feather name="clipboard" size={15} color={colors.ember} />
+                  <AppText variant="secondary" color={colors.ember}>
+                    {t.start.paste}
+                  </AppText>
                 </Pressable>
               )}
             </View>
 
             {code ? (
-              <View style={{ marginTop: 14 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <Feather name="clipboard" size={13} color={colors.ember} />
-                  <AppText variant="meta" color={colors.ember}>
-                    {fromClipboard ? t.start.foundInClipboard : t.start.inviteReady}
-                  </AppText>
-                </View>
-                <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                    goJoin();
-                  }}
-                  style={({ pressed }) => ({
-                    height: 52,
-                    borderRadius: radius.pill,
-                    backgroundColor: colors.ember,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.9 : 1,
-                  })}
-                >
-                  <AppText style={{ fontFamily: fonts.bodyBold, fontSize: 17, color: colors.bgBase }}>
-                    {t.start.joinThisChallenge}
-                  </AppText>
-                </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 }}>
+                <Feather name="clipboard" size={13} color={colors.ember} />
+                <AppText variant="meta" color={colors.ember}>
+                  {fromClipboard ? t.start.foundInClipboard : t.start.inviteReady}
+                </AppText>
               </View>
             ) : null}
+
+            {/* Always rendered, dimmed until the code is complete — it used to
+                live inside the block above and only existed once a code
+                parsed, so typing one by hand looked like it did nothing. */}
+            <Pressable
+              disabled={!code}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                goJoin();
+              }}
+              style={({ pressed }) => ({
+                marginTop: 14,
+                height: 52,
+                borderRadius: radius.pill,
+                backgroundColor: code ? colors.ember : colors.bgElevated,
+                borderWidth: code ? 0 : hairline,
+                borderColor: colors.strokeSubtle,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed && code ? 0.9 : 1,
+              })}
+            >
+              <AppText
+                style={{
+                  fontFamily: fonts.bodyBold,
+                  fontSize: 17,
+                  color: code ? colors.bgBase : colors.textTertiary,
+                }}
+              >
+                {t.start.joinThisChallenge}
+              </AppText>
+            </Pressable>
           </>
         )}
       </Animated.View>
