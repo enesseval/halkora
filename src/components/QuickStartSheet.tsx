@@ -100,41 +100,9 @@ export function QuickStartSheet({
   // raises iOS's "Allow Paste?" prompt, fires once before the code has been
   // copied, and left a later copy unseen. Apple's paste control needs no
   // prompt and runs when the person asks for it.
-  const pasteButtonAvailable = Clipboard.isPasteButtonAvailable;
-  // ...and only worth showing when there is actually something to paste.
-  // hasStringAsync answers that WITHOUT reading the contents, so it raises no
-  // permission prompt — iOS already offers its own paste suggestion above the
-  // keyboard, and a second button that does nothing is just clutter.
-  const [clipboardHasText, setClipboardHasText] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    const check = () => {
-      Clipboard.hasStringAsync()
-        .then((has) => {
-          if (alive) setClipboardHasText(has);
-        })
-        .catch(() => {});
-    };
-    check();
-    // Copying happens in another app, so re-check when we come back.
-    const sub = AppState.addEventListener('change', (st) => {
-      if (st === 'active') check();
-    });
-    return () => {
-      alive = false;
-      sub.remove();
-    };
-  }, []);
 
-  const readClipboard = () => {
-    Clipboard.getStringAsync()
-      .then((v) => {
-        if (!v?.trim()) return;
-        setInput(v.trim());
-        setPasted(true);
-      })
-      .catch(() => {});
-  };
+
+
 
   const code = extractCode(input);
   const fromClipboard = pasted;
@@ -261,7 +229,13 @@ export function QuickStartSheet({
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
+                // The one-tap paste is iOS's own suggestion strip above the keyboard, not
+                // a button of ours — that's what this field is set up to invite.
+                // Autocorrect stays off (it would mangle a ten-character code) and
+                // textContentType is what still gets the strip drawn for code fields.
                 autoCorrect={false}
+                spellCheck={false}
+                textContentType="oneTimeCode"
                 autoFocus
                 style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
               />
@@ -269,46 +243,7 @@ export function QuickStartSheet({
 
             {/* Its own row — Apple won't let the paste control be restyled, so
                 inside the field it fought the design instead of joining it. */}
-            {clipboardHasText ? (
-            <View style={{ flexDirection: 'row', marginTop: 12 }}>
-              {pasteButtonAvailable ? (
-                <Clipboard.ClipboardPasteButton
-                  acceptedContentTypes={['plain-text']}
-                  displayMode="iconAndLabel"
-                  cornerStyle="capsule"
-                  backgroundColor={colors.bgElevated}
-                  foregroundColor={colors.ember}
-                  style={{ width: 132, height: 38 }}
-                  onPress={(data) => {
-                    if (data.type !== 'text' || !data.text?.trim()) return;
-                    setInput(data.text.trim());
-                    setPasted(true);
-                  }}
-                />
-              ) : (
-                <Pressable
-                  onPress={readClipboard}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 7,
-                    height: 38,
-                    paddingHorizontal: 16,
-                    borderRadius: radius.pill,
-                    backgroundColor: colors.bgElevated,
-                    borderWidth: hairline,
-                    borderColor: colors.strokeSubtle,
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Feather name="clipboard" size={15} color={colors.ember} />
-                  <AppText variant="secondary" color={colors.ember}>
-                    {t.start.paste}
-                  </AppText>
-                </Pressable>
-              )}
-            </View>
-            ) : null}
+            
 
             {code ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 }}>
