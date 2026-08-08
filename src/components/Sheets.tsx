@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Alert, Modal, Pressable, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
@@ -28,27 +28,42 @@ import { AppText, Button } from './ui';
  * arithmetic left to get wrong. This is the whole fix — the sheets' own
  * content is untouched.
  *
- * `onShow` rather than `autoFocus`: a field inside a Modal can autofocus
- * before the window is on screen, and the keyboard then never comes up.
- * Focusing once the Modal reports itself presented is deterministic.
+ * Focus is asked for repeatedly rather than once. The keyboard only comes up
+ * if the field becomes first responder, and whether that request lands
+ * depends on how far along the Modal's own window presentation is — ask too
+ * early and iOS drops it silently, which leaves the sheet sitting open with
+ * no keyboard at all. `autoFocus` is exactly that too-early case, and a
+ * single call in `onShow` turned out to be one as well. focus() is
+ * idempotent, so the honest fix is to ask at several points instead of
+ * betting on one of them being the right one.
  */
 function SheetOverlay({
   onClose,
-  onShow,
+  focusRef,
   children,
 }: {
   onClose: () => void;
-  onShow?: () => void;
+  focusRef?: RefObject<TextInput | null>;
   children: ReactNode;
 }) {
   const keyboardHeight = useKeyboardHeight();
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const focusField = () => focusRef?.current?.focus();
+
+  useEffect(() => {
+    focusField();
+    timers.current = [setTimeout(focusField, 60), setTimeout(focusField, 250)];
+    return () => timers.current.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Modal
       visible
       transparent
       animationType="none"
-      onShow={onShow}
+      onShow={focusField}
       // Android's hardware back button — a sheet should close, not leave the
       // screen. No-op on iOS.
       onRequestClose={onClose}
@@ -334,7 +349,7 @@ export function NameSheet({
   };
 
   return (
-    <SheetOverlay onClose={onClose} onShow={() => inputRef.current?.focus()}>
+    <SheetOverlay onClose={onClose} focusRef={inputRef}>
       <SheetCard>
         <AppText variant="screenTitle" style={{ fontSize: 22 }}>
           {t.settings.nameEditTitle}
@@ -436,7 +451,7 @@ export function UsernameSheet({
   };
 
   return (
-    <SheetOverlay onClose={onClose} onShow={() => inputRef.current?.focus()}>
+    <SheetOverlay onClose={onClose} focusRef={inputRef}>
       <SheetCard>
         <AppText variant="screenTitle" style={{ fontSize: 22 }}>
           {t.settings.usernameEditTitle}
