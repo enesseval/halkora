@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react';
 import { AppState, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { codeProblem, extractCode } from '@/lib/invite';
+import {
+  PASTE_ACCESSORY_ID,
+  PasteAccessory,
+  usePasteAccessory,
+} from '@/components/PasteAccessory';
 import { AppText, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
 
@@ -78,14 +82,10 @@ export default function StartScreen() {
    * wording, nothing else. */
   const [pasted, setPasted] = useState(false);
 
-  // Apple's own paste control (UIPasteControl) hands over the clipboard
-  // WITHOUT the "Allow Paste?" prompt. Reading the clipboard on mount, which
-  // is what this screen used to do, is what raised that prompt — and it fired
-  // once, before the code had even been copied, so a code copied afterwards
-  // was never seen (saha testi bulgusu: "yapıştıra bastım ama yapıştırmadı").
-
-
-
+  // One-tap paste, docked above the keyboard — see PasteAccessory for why
+  // that's Apple's own control rather than iOS's QuickType chip or a button
+  // of ours. Nothing is asked of the clipboard until the field is focused.
+  const paste = usePasteAccessory();
 
   const code = extractCode(input);
   const fromClipboard = pasted;
@@ -127,25 +127,30 @@ export default function StartScreen() {
             }}
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
+            onFocus={paste.check}
+            inputAccessoryViewID={PASTE_ACCESSORY_ID}
+            // Codes are substr(md5(...), 1, 10) — lowercase hex — and the
+            // lookup is `where invite_code = p_code`, with no lower() on
+            // either side. Upper-casing the field would break every join.
             autoCapitalize="none"
-            // The one-tap paste is iOS's own suggestion strip above the
-            // keyboard, not a button of ours. Two things have to hold for it
-            // to appear, and I had each of them wrong in turn:
-            //   1. autoCorrect must stay ON. autoCorrect={false} maps to
-            //      autocorrectionType = .no, which removes the QuickType bar
-            //      entirely — and the paste chip is drawn IN that bar.
-            //   2. NO textContentType. A specific one tells iOS to fill the
-            //      bar with that kind of autofill instead: "oneTimeCode"
-            //      offers only codes harvested from Messages, "URL" only
-            //      saved URLs. The generic clipboard chip belongs to the
-            //      plain bar, so the right value here is none at all.
-            // Nothing else is set for the same reason — keyboardType stays
-            // default so the space bar survives, and a code typed by hand is
-            // unaffected because autocorrect only acts on word boundaries.
+            // No textContentType on purpose: a specific one makes iOS fill
+            // the QuickType bar with that flavour of autofill instead
+            // ("oneTimeCode" offers only codes from Messages, "URL" only
+            // saved URLs), and neither is what we want there.
             spellCheck={false}
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
+
+        {/* Pasted text takes the same route as typed text: straight into
+            onChangeText, then extractCode and the existing validation. */}
+        <PasteAccessory
+          visible={paste.available && !code}
+          onPaste={(text) => {
+            setInput(text);
+            setPasted(true);
+          }}
+        />
 
         {problem ? (
           <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>
