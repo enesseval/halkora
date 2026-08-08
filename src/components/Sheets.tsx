@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
@@ -271,6 +271,14 @@ export function NameSheet({
             paddingHorizontal: spacing.screenX,
             paddingTop: 12,
             paddingBottom: 36,
+            // The keyboard height we pad by is measured against the physical
+            // screen, while this overlay sits inside Screen's safe-area inset —
+            // so the two disagree by the inset, and on a tall sheet that was
+            // enough to leave the input under the keyboard (saha testi
+            // bulgusu). Capping the height and letting the content scroll
+            // means the input stays reachable whether or not the measurement
+            // is exact, instead of depending on it being exact.
+            maxHeight: '85%',
           }}
         >
           <View
@@ -413,6 +421,14 @@ export function UsernameSheet({
             paddingHorizontal: spacing.screenX,
             paddingTop: 12,
             paddingBottom: 36,
+            // The keyboard height we pad by is measured against the physical
+            // screen, while this overlay sits inside Screen's safe-area inset —
+            // so the two disagree by the inset, and on a tall sheet that was
+            // enough to leave the input under the keyboard (saha testi
+            // bulgusu). Capping the height and letting the content scroll
+            // means the input stays reachable whether or not the measurement
+            // is exact, instead of depending on it being exact.
+            maxHeight: '85%',
           }}
         >
           <View
@@ -425,6 +441,12 @@ export function UsernameSheet({
               marginBottom: 20,
             }}
           />
+          {/* Scrollable so a capped sheet can never strand the field. */}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
           <AppText variant="screenTitle" style={{ fontSize: 22 }}>
             {t.settings.usernameEditTitle}
           </AppText>
@@ -477,6 +499,7 @@ export function UsernameSheet({
               disabled={!canSave}
             />
           </View>
+          </ScrollView>
         </Animated.View>
       </View>
     </Animated.View>
@@ -626,6 +649,14 @@ export function OwnerSettingsSheet({
             paddingHorizontal: spacing.screenX,
             paddingTop: 12,
             paddingBottom: 36,
+            // The keyboard height we pad by is measured against the physical
+            // screen, while this overlay sits inside Screen's safe-area inset —
+            // so the two disagree by the inset, and on a tall sheet that was
+            // enough to leave the input under the keyboard (saha testi
+            // bulgusu). Capping the height and letting the content scroll
+            // means the input stays reachable whether or not the measurement
+            // is exact, instead of depending on it being exact.
+            maxHeight: '85%',
           }}
         >
           <View

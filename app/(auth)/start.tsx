@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -84,6 +84,30 @@ export default function StartScreen() {
   // once, before the code had even been copied, so a code copied afterwards
   // was never seen (saha testi bulgusu: "yapıştıra bastım ama yapıştırmadı").
   const pasteButtonAvailable = Clipboard.isPasteButtonAvailable;
+  // ...and only worth showing when there is actually something to paste.
+  // hasStringAsync answers that WITHOUT reading the contents, so it raises no
+  // permission prompt — iOS already offers its own paste suggestion above the
+  // keyboard, and a second button that does nothing is just clutter.
+  const [clipboardHasText, setClipboardHasText] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const check = () => {
+      Clipboard.hasStringAsync()
+        .then((has) => {
+          if (alive) setClipboardHasText(has);
+        })
+        .catch(() => {});
+    };
+    check();
+    // Copying happens in another app, so re-check when we come back.
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') check();
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
 
   /** Fallback for where the paste control doesn't exist. Prompts, but only
    * when the person actually asked to paste. */
@@ -142,6 +166,7 @@ export default function StartScreen() {
         {/* Its own row rather than crammed into the pill — Apple won't let the
             paste control be restyled, so inside the field it fought the
             existing design instead of joining it. */}
+        {clipboardHasText ? (
         <View style={{ flexDirection: 'row', marginTop: 12 }}>
           {pasteButtonAvailable ? (
             <Clipboard.ClipboardPasteButton
@@ -180,6 +205,7 @@ export default function StartScreen() {
             </Pressable>
           )}
         </View>
+        ) : null}
 
         {code ? (
           <View
