@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
-import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
 import { AppText, Button } from './ui';
@@ -218,7 +225,6 @@ export function NameSheet({
   const [value, setValue] = useState(current);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -258,7 +264,14 @@ export function NameSheet({
         zIndex: 30,
       }}
     >
-      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+      {/* Same approach as the join screen (app/(auth)/start.tsx), which keeps
+          its field above the keyboard reliably: let KeyboardAvoidingView do
+          it. Padding by a measured keyboard height was off by Screen's
+          safe-area inset and left this field covered (saha testi bulgusu). */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
@@ -271,6 +284,14 @@ export function NameSheet({
             paddingHorizontal: spacing.screenX,
             paddingTop: 12,
             paddingBottom: 36,
+            // The keyboard height we pad by is measured against the physical
+            // screen, while this overlay sits inside Screen's safe-area inset —
+            // so the two disagree by the inset, and on a tall sheet that was
+            // enough to leave the input under the keyboard (saha testi
+            // bulgusu). Capping the height and letting the content scroll
+            // means the input stays reachable whether or not the measurement
+            // is exact, instead of depending on it being exact.
+            maxHeight: '85%',
           }}
         >
           <View
@@ -329,7 +350,7 @@ export function NameSheet({
             />
           </View>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 }
@@ -352,7 +373,6 @@ export function UsernameSheet({
   const [value, setValue] = useState(current ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -396,11 +416,14 @@ export function UsernameSheet({
         zIndex: 30,
       }}
     >
-      {/* paddingBottom = the LIVE keyboard height (useKeyboardHeight) — not
-          KeyboardAvoidingView, which mis-measures inside absolute overlays
-          (relative frame vs the keyboard's screen coords) and left the input
-          partly covered on device. */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+      {/* Same approach as the join screen (app/(auth)/start.tsx), which keeps
+          its field above the keyboard reliably: let KeyboardAvoidingView do
+          it. Padding by a measured keyboard height was off by Screen's
+          safe-area inset and left this field covered (saha testi bulgusu). */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
@@ -413,6 +436,14 @@ export function UsernameSheet({
             paddingHorizontal: spacing.screenX,
             paddingTop: 12,
             paddingBottom: 36,
+            // The keyboard height we pad by is measured against the physical
+            // screen, while this overlay sits inside Screen's safe-area inset —
+            // so the two disagree by the inset, and on a tall sheet that was
+            // enough to leave the input under the keyboard (saha testi
+            // bulgusu). Capping the height and letting the content scroll
+            // means the input stays reachable whether or not the measurement
+            // is exact, instead of depending on it being exact.
+            maxHeight: '85%',
           }}
         >
           <View
@@ -425,6 +456,12 @@ export function UsernameSheet({
               marginBottom: 20,
             }}
           />
+          {/* Scrollable so a capped sheet can never strand the field. */}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
           <AppText variant="screenTitle" style={{ fontSize: 22 }}>
             {t.settings.usernameEditTitle}
           </AppText>
@@ -477,8 +514,9 @@ export function UsernameSheet({
               disabled={!canSave}
             />
           </View>
+          </ScrollView>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 }
@@ -543,7 +581,6 @@ export function OwnerSettingsSheet({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const keyboardHeight = useKeyboardHeight();
 
   useEffect(() => {
     if (visible) {
@@ -613,7 +650,14 @@ export function OwnerSettingsSheet({
     >
       {/* See UsernameSheet's comment: live keyboard-height padding, not
           KeyboardAvoidingView (which mis-measures inside absolute overlays). */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+      {/* Same approach as the join screen (app/(auth)/start.tsx), which keeps
+          its field above the keyboard reliably: let KeyboardAvoidingView do
+          it. Padding by a measured keyboard height was off by Screen's
+          safe-area inset and left this field covered (saha testi bulgusu). */}
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <Animated.View
           entering={SlideInDown.duration(260)}
@@ -626,6 +670,14 @@ export function OwnerSettingsSheet({
             paddingHorizontal: spacing.screenX,
             paddingTop: 12,
             paddingBottom: 36,
+            // The keyboard height we pad by is measured against the physical
+            // screen, while this overlay sits inside Screen's safe-area inset —
+            // so the two disagree by the inset, and on a tall sheet that was
+            // enough to leave the input under the keyboard (saha testi
+            // bulgusu). Capping the height and letting the content scroll
+            // means the input stays reachable whether or not the measurement
+            // is exact, instead of depending on it being exact.
+            maxHeight: '85%',
           }}
         >
           <View
@@ -686,7 +738,7 @@ export function OwnerSettingsSheet({
             </AppText>
           </Pressable>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 }

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -83,19 +83,9 @@ export default function StartScreen() {
   // is what this screen used to do, is what raised that prompt — and it fired
   // once, before the code had even been copied, so a code copied afterwards
   // was never seen (saha testi bulgusu: "yapıştıra bastım ama yapıştırmadı").
-  const pasteButtonAvailable = Clipboard.isPasteButtonAvailable;
 
-  /** Fallback for where the paste control doesn't exist. Prompts, but only
-   * when the person actually asked to paste. */
-  const readClipboard = () => {
-    Clipboard.getStringAsync()
-      .then((v) => {
-        if (!v?.trim()) return;
-        setInput(v.trim());
-        setPasted(true);
-      })
-      .catch(() => {});
-  };
+
+
 
   const code = extractCode(input);
   const fromClipboard = pasted;
@@ -134,7 +124,13 @@ export default function StartScreen() {
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
+            // The one-tap paste is iOS's own suggestion strip above the keyboard, not
+            // a button of ours — that's what this field is set up to invite.
+            // Autocorrect stays off (it would mangle a ten-character code) and
+            // textContentType is what still gets the strip drawn for code fields.
             autoCorrect={false}
+            spellCheck={false}
+            textContentType="oneTimeCode"
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
@@ -142,44 +138,7 @@ export default function StartScreen() {
         {/* Its own row rather than crammed into the pill — Apple won't let the
             paste control be restyled, so inside the field it fought the
             existing design instead of joining it. */}
-        <View style={{ flexDirection: 'row', marginTop: 12 }}>
-          {pasteButtonAvailable ? (
-            <Clipboard.ClipboardPasteButton
-              acceptedContentTypes={['plain-text']}
-              displayMode="iconAndLabel"
-              cornerStyle="capsule"
-              backgroundColor={colors.bgElevated}
-              foregroundColor={colors.ember}
-              style={{ width: 132, height: 38 }}
-              onPress={(data) => {
-                if (data.type !== 'text' || !data.text?.trim()) return;
-                setInput(data.text.trim());
-                setPasted(true);
-              }}
-            />
-          ) : (
-            <Pressable
-              onPress={readClipboard}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 7,
-                height: 38,
-                paddingHorizontal: 16,
-                borderRadius: radius.pill,
-                backgroundColor: colors.bgElevated,
-                borderWidth: hairline,
-                borderColor: colors.strokeSubtle,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Feather name="clipboard" size={15} color={colors.ember} />
-              <AppText variant="secondary" color={colors.ember}>
-                {t.start.paste}
-              </AppText>
-            </Pressable>
-          )}
-        </View>
+        
 
         {code ? (
           <View
