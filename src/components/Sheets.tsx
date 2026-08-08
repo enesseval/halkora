@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   TextInput,
   View,
 } from 'react-native';
@@ -456,12 +455,7 @@ export function UsernameSheet({
               marginBottom: 20,
             }}
           />
-          {/* Scrollable so a capped sheet can never strand the field. */}
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
+
           <AppText variant="screenTitle" style={{ fontSize: 22 }}>
             {t.settings.usernameEditTitle}
           </AppText>
@@ -514,7 +508,6 @@ export function UsernameSheet({
               disabled={!canSave}
             />
           </View>
-          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
     </Animated.View>
