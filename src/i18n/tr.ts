@@ -165,6 +165,7 @@ export const tr = {
     codeLabel: (code: string) => `Kod: ${code}`,
     detailHint: 'Detay ve katılımcıları bir sonraki ekranda görürsün.',
     joinThisChallenge: "Bu challenge'a katıl",
+    paste: 'Yapıştır',
     wrongInvite: 'Yanlış davet mi? Linki yukarıya yapıştır.',
   },
 
@@ -468,6 +469,17 @@ export const tr = {
     joining: 'Katılıyor…',
     joinCta: 'Katıl',
     socialProof: (names: string, rest: number) => `${names} ve ${rest} kişi katıldı`,
+  },
+
+  widgetHint: {
+    cardTitle: 'Bu halkayı kilit ekranına taşı',
+    cardSubtitle: 'Uygulamayı açmadan check-in yap.',
+    sheetTitle: 'Widget nasıl eklenir?',
+    step1: 'Kilit ekranına uzun bas, "Özelleştir"e dokun.',
+    step2: 'Widget ekle → Halkora\'yı seç.',
+    step3: 'Widget\'a uzun basıp "Düzenle" ile halkanı sabitleyebilirsin.',
+    gotIt: 'Anladım',
+    settingsRow: "Widget'lar",
   },
 
   chat: {

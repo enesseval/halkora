@@ -12,7 +12,7 @@ import { useMockStore } from '@/stores/mockStore';
 import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
-import { NameSheet, UsernameSheet } from '@/components/Sheets';
+import { NameSheet, UsernameSheet, WidgetHintSheet } from '@/components/Sheets';
 import { useT, type Locale } from '@/i18n';
 
 /** null while the initial permission check is in flight. Push is native-only —
@@ -123,6 +123,7 @@ export default function SettingsScreen() {
   const [deleting, setDeleting] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
   const [editingName, setEditingName] = useState(false);
+  const [showWidgetHint, setShowWidgetHint] = useState(false);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -256,6 +257,15 @@ export default function SettingsScreen() {
               label={t.settings.notifications}
               value={notifGranted === null ? '' : notifGranted ? t.settings.notificationsOn : t.settings.notificationsOff}
               onPress={() => Linking.openSettings().catch(() => {})}
+            />
+            <Divider />
+            {/* Permanent home for the widget instructions — the one-shot card
+                on the detail screen is easy to miss or dismiss, and there was
+                nowhere to go looking for it afterwards (Faz 2 §2.6). */}
+            <Row
+              icon="smartphone"
+              label={t.widgetHint.settingsRow}
+              onPress={() => setShowWidgetHint(true)}
             />
             {configured ? (
               <>
@@ -403,6 +413,8 @@ export default function SettingsScreen() {
         onClose={() => setEditingUsername(false)}
         onSave={saveUsername}
       />
+
+      {showWidgetHint ? <WidgetHintSheet onClose={() => setShowWidgetHint(false)} /> : null}
 
       <NameSheet
         visible={editingName}

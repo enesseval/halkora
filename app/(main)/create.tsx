@@ -32,19 +32,85 @@ const HELP_EXAMPLE_PEOPLE = 5;
  * calendar day — the behaviour every ring had before deadlines existed. */
 const DEADLINE_PRESETS = ['10:00', '21:00', '00:00'];
 
-/** "21:00" as a Date today, so the native time picker opens where the current
- * choice already is. */
-function deadlineAsDate(hhmm: string): Date {
-  const [h, m] = hhmm.split(':').map(Number);
-  const d = new Date();
-  d.setHours(h ?? 0, m ?? 0, 0, 0);
-  return d;
-}
+/** Every hour of the day. Minutes are deliberately not offered: a cut-off at
+ * 21:30 rather than 21:00 changes nothing anyone can feel, and a minute wheel
+ * makes the choice look more consequential than it is. */
+const DEADLINE_HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
 
 /** ~20% of the ring's length, so a 14-day ring suggests 3 and a 7-day one
  * suggests 1 — a starting point the owner can override. */
 function suggestedThreshold(totalDays: number): number {
   return Math.max(Math.round(totalDays * 0.2), 0);
+}
+
+/** Hour-only wheel for the cut-off, in the same modal shell as the day-count
+ * picker so the two custom choices in this flow behave identically. */
+function HourPickerSheet({
+  visible,
+  value,
+  onChange,
+  onClose,
+}: {
+  visible: boolean;
+  value: string;
+  onChange: (hhmm: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  if (!visible) return null;
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}
+    >
+      <BlurView intensity={40} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Animated.View
+          entering={SlideInDown.duration(260)}
+          style={{
+            backgroundColor: colors.bgSurface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            paddingHorizontal: spacing.screenX,
+            paddingTop: 12,
+            paddingBottom: 36,
+          }}
+        >
+          <View
+            style={{
+              alignSelf: 'center',
+              width: 40,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: colors.strokeSubtle,
+              marginBottom: 12,
+            }}
+          />
+          <AppText variant="screenTitle" style={{ fontSize: 22, marginBottom: 4 }}>
+            {t.create.deadlineLabel}
+          </AppText>
+          <Picker
+            selectedValue={value}
+            onValueChange={(v) => {
+              Haptics.selectionAsync().catch(() => {});
+              onChange(String(v));
+            }}
+            itemStyle={{ color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 19 }}
+            style={Platform.OS !== 'ios' ? { color: colors.textPrimary } : undefined}
+            dropdownIconColor={colors.textPrimary}
+          >
+            {DEADLINE_HOURS.map((h) => (
+              <Picker.Item key={h} label={h} value={h} color={colors.textPrimary} />
+            ))}
+          </Picker>
+          <Button label={t.common.done} onPress={onClose} />
+        </Animated.View>
+      </BlurView>
+    </Animated.View>
+  );
 }
 
 /** One start-date choice pill (Bugün / Yarın / custom calendar date). */
@@ -679,22 +745,12 @@ export default function CreateScreen() {
               {t.create.deadlineHint}
             </AppText>
 
-            {showDeadlinePicker ? (
-              <DateTimePicker
-                value={deadlineAsDate(deadline)}
-                mode="time"
-                display="spinner"
-                onChange={(e: DateTimePickerEvent, picked?: Date) => {
-                  setShowDeadlinePicker(Platform.OS === 'ios' && e.type !== 'dismissed');
-                  if (e.type === 'dismissed' || !picked) return;
-                  setDeadline(
-                    `${String(picked.getHours()).padStart(2, '0')}:${String(
-                      picked.getMinutes(),
-                    ).padStart(2, '0')}`,
-                  );
-                }}
-              />
-            ) : null}
+            <HourPickerSheet
+              visible={showDeadlinePicker}
+              value={deadline}
+              onChange={setDeadline}
+              onClose={() => setShowDeadlinePicker(false)}
+            />
           </>
         ) : null}
 

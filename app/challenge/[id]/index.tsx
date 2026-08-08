@@ -46,7 +46,14 @@ import {
   MomentumSheet,
   OwnerSettingsSheet,
   NudgeMessageSheet,
+  WidgetHintSheet,
 } from '@/components/Sheets';
+import { hasWidgetInstalled } from '@/lib/widget';
+import {
+  HINT_AFTER_CHECKINS,
+  dismissWidgetHint,
+  isWidgetHintDismissed,
+} from '@/lib/widgetHint';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
@@ -133,6 +140,27 @@ export default function DetailScreen() {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   /** Day whose gap the user tapped on the ring — null when no sheet is open. */
   const [jokerDay, setJokerDay] = useState<number | null>(null);
+  /** Faz 2 §2.6 — offer the widget once the habit is real, never before. */
+  const [widgetHintReady, setWidgetHintReady] = useState(false);
+  const [showWidgetHint, setShowWidgetHint] = useState(false);
+
+  const myCheckins = challenge?.days.filter((d) => d === 'done' || d === 'joker').length ?? 0;
+  useEffect(() => {
+    // Three conditions, all of which have to hold: enough check-ins to call it
+    // a habit, no widget already drawing, and never dismissed. Anything less
+    // and this is an advert rather than a tip.
+    if (myCheckins < HINT_AFTER_CHECKINS || hasWidgetInstalled()) {
+      setWidgetHintReady(false);
+      return;
+    }
+    let alive = true;
+    isWidgetHintDismissed().then((done) => {
+      if (alive) setWidgetHintReady(!done);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [myCheckins]);
 
   // Saha testi bulgusu: "bu challange içindeyken onunla ilgili bildirim
   // üstte gözükmesin, zaten bakıyorum" — src/lib/push.ts's notification
@@ -574,6 +602,44 @@ export default function DetailScreen() {
         {challenge.firstDayJoinOnly ? <InfoChip emoji="⏱️" label={t.create.joinFirstDayOnly} /> : null}
       </View>
 
+      {widgetHintReady ? (
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            setShowWidgetHint(true);
+          }}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            marginTop: 18,
+            padding: 14,
+            borderRadius: radius.card,
+            backgroundColor: colors.bgElevated,
+            borderWidth: hairline,
+            borderColor: colors.strokeSubtle,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <Feather name="smartphone" size={18} color={colors.ember} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="bodyMedium">{t.widgetHint.cardTitle}</AppText>
+            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 2 }}>
+              {t.widgetHint.cardSubtitle}
+            </AppText>
+          </View>
+          <Pressable
+            hitSlop={10}
+            onPress={() => {
+              dismissWidgetHint();
+              setWidgetHintReady(false);
+            }}
+          >
+            <Feather name="x" size={16} color={colors.textTertiary} />
+          </Pressable>
+        </Pressable>
+      ) : null}
+
       {/* Without this the faint amber gaps are just a colour nobody knows to
           press. Only shown while there is actually something to repair. */}
       {repairableDays.length > 0 ? (
@@ -789,6 +855,17 @@ export default function DetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {showWidgetHint ? (
+        <WidgetHintSheet
+          onClose={() => {
+            // Seeing it through counts as an answer — it doesn't come back.
+            dismissWidgetHint();
+            setWidgetHintReady(false);
+            setShowWidgetHint(false);
+          }}
+        />
+      ) : null}
 
       {/* tapped a gap on the ring — confirm before spending a joker */}
       {jokerDay != null ? (
