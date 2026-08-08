@@ -232,12 +232,10 @@ export function QuickStartSheet({
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 // See app/(auth)/start.tsx for the full reasoning: correction
-                // stays on so iOS draws the QuickType bar at all, and the
-                // content type is URL because the invite LINK is what ends up
-                // on the clipboard — that match is what makes iOS offer the
-                // one-tap paste.
+                // stays on so iOS draws the QuickType bar at all, and NO
+                // textContentType is set, because any specific one replaces
+                // the clipboard chip with that kind of autofill instead.
                 spellCheck={false}
-                textContentType="URL"
                 autoFocus
                 style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
               />

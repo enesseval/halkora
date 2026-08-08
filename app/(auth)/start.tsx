@@ -129,21 +129,20 @@ export default function StartScreen() {
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
             // The one-tap paste is iOS's own suggestion strip above the
-            // keyboard, not a button of ours. Two things have to be true for
-            // it to appear, and only one of them was:
-            //   1. autoCorrect must stay ON — autoCorrect={false} maps to
+            // keyboard, not a button of ours. Two things have to hold for it
+            // to appear, and I had each of them wrong in turn:
+            //   1. autoCorrect must stay ON. autoCorrect={false} maps to
             //      autocorrectionType = .no, which removes the QuickType bar
-            //      the suggestion is drawn in.
-            //   2. the field's content type must match what's on the
-            //      clipboard. What people actually copy is the invite LINK
-            //      (halkora.app/j/CODE), so "URL" is the type iOS matches;
-            //      "oneTimeCode" only ever offers codes iOS harvested from
-            //      Messages, which is why nothing showed up.
-            // keyboardType is left alone on purpose: a raw code is typed here
-            // just as often as a link is pasted, and the .url keyboard trades
-            // the space bar for a ".com" key.
+            //      entirely — and the paste chip is drawn IN that bar.
+            //   2. NO textContentType. A specific one tells iOS to fill the
+            //      bar with that kind of autofill instead: "oneTimeCode"
+            //      offers only codes harvested from Messages, "URL" only
+            //      saved URLs. The generic clipboard chip belongs to the
+            //      plain bar, so the right value here is none at all.
+            // Nothing else is set for the same reason — keyboardType stays
+            // default so the space bar survives, and a code typed by hand is
+            // unaffected because autocorrect only acts on word boundaries.
             spellCheck={false}
-            textContentType="URL"
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
