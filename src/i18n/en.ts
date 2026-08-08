@@ -161,7 +161,9 @@ export const en: Dictionary = {
     codeLabel: (code: string) => `Code: ${code}`,
     detailHint: "You'll see the details and participants on the next screen.",
     joinThisChallenge: 'Join this challenge',
-    paste: 'Paste',
+    codeTooShort: (n: number) => `Code is short · ${n} characters so far`,
+    codeTooLong: (n: number) => `Code is too long · ${n} characters`,
+    codeInvalid: "That isn't an invite code or link.",
     wrongInvite: 'Wrong invite? Paste the link above.',
   },
 

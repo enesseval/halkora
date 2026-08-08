@@ -165,7 +165,9 @@ export const tr = {
     codeLabel: (code: string) => `Kod: ${code}`,
     detailHint: 'Detay ve katılımcıları bir sonraki ekranda görürsün.',
     joinThisChallenge: "Bu challenge'a katıl",
-    paste: 'Yapıştır',
+    codeTooShort: (n: number) => `Kod eksik · ${n} karakter girdin`,
+    codeTooLong: (n: number) => `Kod çok uzun · ${n} karakter girdin`,
+    codeInvalid: 'Bu bir davet kodu ya da linki değil.',
     wrongInvite: 'Yanlış davet mi? Linki yukarıya yapıştır.',
   },
 

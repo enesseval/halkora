@@ -6,7 +6,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useAuth } from '@/hooks/useAuth';
-import { extractCode } from '@/lib/invite';
+import { codeProblem, extractCode } from '@/lib/invite';
 import { AppText, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
 
@@ -89,6 +89,10 @@ export default function StartScreen() {
 
   const code = extractCode(input);
   const fromClipboard = pasted;
+  // A disabled button with no reason next to it is indistinguishable from a
+  // broken one — this says what the app is actually seeing.
+  const problem = codeProblem(input);
+  const typed = input.replace(/\s+/g, '').length;
 
   const join = () => {
     if (!code) return;
@@ -124,21 +128,27 @@ export default function StartScreen() {
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            // The one-tap paste is iOS's own suggestion strip above the keyboard, not
-            // a button of ours — that's what this field is set up to invite.
-            // Autocorrect stays off (it would mangle a ten-character code) and
-            // textContentType is what still gets the strip drawn for code fields.
-            autoCorrect={false}
+            // The one-tap paste is iOS's own suggestion strip above the keyboard,
+            // not a button of ours. autoCorrect={false} maps to
+            // autocorrectionType = .no, which hides that strip outright — which
+            // is why nothing appeared. Correction stays ON so the strip can be
+            // drawn; spell-check is the part that had to go for a code.
             spellCheck={false}
             textContentType="oneTimeCode"
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
 
-        {/* Its own row rather than crammed into the pill — Apple won't let the
-            paste control be restyled, so inside the field it fought the
-            existing design instead of joining it. */}
-        
+        {problem ? (
+          <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>
+            {problem === 'short'
+              ? t.start.codeTooShort(typed)
+              : problem === 'long'
+                ? t.start.codeTooLong(typed)
+                : t.start.codeInvalid}
+          </AppText>
+        ) : null}
+
 
         {code ? (
           <View

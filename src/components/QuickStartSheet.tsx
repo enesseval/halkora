@@ -6,7 +6,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
-import { extractCode } from '@/lib/invite';
+import { codeProblem, extractCode } from '@/lib/invite';
 import { useCreateGate } from '@/hooks';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
@@ -106,6 +106,8 @@ export function QuickStartSheet({
 
   const code = extractCode(input);
   const fromClipboard = pasted;
+  const problem = codeProblem(input);
+  const typed = input.replace(/\s+/g, '').length;
 
   const goCreate = () => {
     onClose();
@@ -229,11 +231,9 @@ export function QuickStartSheet({
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
-                // The one-tap paste is iOS's own suggestion strip above the keyboard, not
-                // a button of ours — that's what this field is set up to invite.
-                // Autocorrect stays off (it would mangle a ten-character code) and
-                // textContentType is what still gets the strip drawn for code fields.
-                autoCorrect={false}
+                // autoCorrect={false} maps to autocorrectionType = .no, which
+                // hides iOS's suggestion strip — the strip that offers the
+                // one-tap paste. Correction stays on so it can be drawn.
                 spellCheck={false}
                 textContentType="oneTimeCode"
                 autoFocus
@@ -241,9 +241,16 @@ export function QuickStartSheet({
               />
             </View>
 
-            {/* Its own row — Apple won't let the paste control be restyled, so
-                inside the field it fought the design instead of joining it. */}
-            
+            {problem ? (
+              <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>
+                {problem === 'short'
+                  ? t.start.codeTooShort(typed)
+                  : problem === 'long'
+                    ? t.start.codeTooLong(typed)
+                    : t.start.codeInvalid}
+              </AppText>
+            ) : null}
+
 
             {code ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 }}>
