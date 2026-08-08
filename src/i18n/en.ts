@@ -451,6 +451,17 @@ export const en: Dictionary = {
       rest === 1 ? `${names} and 1 other joined` : `${names} and ${rest} others joined`,
   },
 
+  widgetHint: {
+    cardTitle: 'Put this ring on your Lock Screen',
+    cardSubtitle: 'Check in without opening the app.',
+    sheetTitle: 'Adding the widget',
+    step1: 'Press and hold the Lock Screen, then tap "Customize".',
+    step2: 'Add widget → pick Halkora.',
+    step3: 'Press and hold the widget, then "Edit" to pin a ring to it.',
+    gotIt: 'Got it',
+    settingsRow: 'Widgets',
+  },
+
   chat: {
     day: (n: number) => `Day ${n}`,
     beforeStart: 'Before it starts',

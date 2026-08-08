@@ -848,3 +848,86 @@ export function JokerDaySheet({
     </Animated.View>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Faz 2 §2.6 — how to add the widget                                  */
+/* ------------------------------------------------------------------ */
+/**
+ * Three frames, one sentence each. iOS gives a widget no way to introduce
+ * itself and there is no such thing as a tooltip on the Home Screen, so the
+ * only place this can be explained is inside the app.
+ */
+export function WidgetHintSheet({ onClose }: { onClose: () => void }) {
+  const { t } = useT();
+  const steps = [t.widgetHint.step1, t.widgetHint.step2, t.widgetHint.step3];
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        justifyContent: 'flex-end',
+        zIndex: 30,
+      }}
+    >
+      <Pressable
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        onPress={onClose}
+      />
+      <Animated.View
+        entering={SlideInDown.duration(280)}
+        style={{
+          backgroundColor: colors.bgElevated,
+          borderTopLeftRadius: radius.sheet,
+          borderTopRightRadius: radius.sheet,
+          paddingHorizontal: 24,
+          paddingTop: 12,
+          paddingBottom: 40,
+        }}
+      >
+        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+          <View
+            style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.strokeSubtle }}
+          />
+        </View>
+
+        <AppText variant="screenTitle" style={{ fontSize: 20, marginTop: 8, marginBottom: 18 }}>
+          {t.widgetHint.sheetTitle}
+        </AppText>
+
+        <View style={{ gap: 14, marginBottom: 22 }}>
+          {steps.map((step, i) => (
+            <View key={step} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+              {/* Numbered because these are genuinely sequential — you cannot
+                  do the second before the first. */}
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                  backgroundColor: colors.emberSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <AppText variant="meta" color={colors.ember} tabular>
+                  {i + 1}
+                </AppText>
+              </View>
+              <AppText variant="bodyMedium" style={{ flex: 1 }}>
+                {step}
+              </AppText>
+            </View>
+          ))}
+        </View>
+
+        <Button label={t.widgetHint.gotIt} onPress={onClose} />
+      </Animated.View>
+    </Animated.View>
+  );
+}

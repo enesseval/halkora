@@ -471,6 +471,17 @@ export const tr = {
     socialProof: (names: string, rest: number) => `${names} ve ${rest} kişi katıldı`,
   },
 
+  widgetHint: {
+    cardTitle: 'Bu halkayı kilit ekranına taşı',
+    cardSubtitle: 'Uygulamayı açmadan check-in yap.',
+    sheetTitle: 'Widget nasıl eklenir?',
+    step1: 'Kilit ekranına uzun bas, "Özelleştir"e dokun.',
+    step2: 'Widget ekle → Halkora\'yı seç.',
+    step3: 'Widget\'a uzun basıp "Düzenle" ile halkanı sabitleyebilirsin.',
+    gotIt: 'Anladım',
+    settingsRow: "Widget'lar",
+  },
+
   chat: {
     day: (n: number) => `Gün ${n}`,
     // Halka başlamadan atılan mesajlar 0. güne yazılıyor; "Gün 0" diye bir

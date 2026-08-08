@@ -3,6 +3,7 @@ import { ExtensionStorage } from '@bacons/apple-targets';
 import type { Challenge } from '@/data/types';
 import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
 import { cycleStart } from '@/lib/cycle';
+import { byUrgency, urgencyOf } from '@/lib/widgetUrgency';
 import { getLocale } from '@/i18n';
 
 /**
@@ -109,14 +110,44 @@ function segmentsOf(c: Challenge): string {
     .join('');
 }
 
+/**
+ * Has a widget of ours actually rendered recently?
+ *
+ * The widget stamps `widgetSeenAt` into the shared container every time it
+ * builds a timeline (markWidgetAlive in HalkoraWidget.swift). WidgetKit's own
+ * getCurrentConfigurations is only reachable from native code this app
+ * doesn't have, and writing a native module to answer one boolean wasn't
+ * worth it when the widget already shares a container and can just say so.
+ *
+ * Stale after a week: a widget that hasn't drawn in seven days has almost
+ * certainly been removed, and the hint is worth offering again.
+ */
+export function hasWidgetInstalled(): boolean {
+  if (!storage) return false;
+  try {
+    const seen = storage.get('widgetSeenAt');
+    if (seen == null) return false;
+    const at = Number(seen) * 1000;
+    return Number.isFinite(at) && Date.now() - at < 7 * 86_400_000;
+  } catch {
+    return false;
+  }
+}
+
 export function syncWidgetSnapshot(challenges: Challenge[]): void {
   if (!storage) return;
   try {
     // Upcoming/lobby halkalar are included too — the widget has a real
     // "not started yet" state for them (widget spec 04). Completed ones are
     // dropped: nothing to act on, and they'd crowd out a live halka.
-    const relevant = challenges.filter(
-      (c) => c.status === 'active' || c.status === 'upcoming' || c.status === 'lobby',
+    // Faz 2 §2.3 — ordered here, not in Swift. The widget shows the array as
+    // it arrives; deciding which halka leads is a product judgement that
+    // changes more often than a layout, and this way it changes without a
+    // rebuild.
+    const relevant = byUrgency(
+      challenges.filter(
+        (c) => c.status === 'active' || c.status === 'upcoming' || c.status === 'lobby',
+      ),
     );
     const locale = getLocale();
     storage.set(
@@ -154,6 +185,15 @@ export function syncWidgetSnapshot(challenges: Challenge[]): void {
         syncedDayKey: dayKeyFor(c),
         participantsTotal: c.participants.length,
         participantsDoneToday: c.participants.filter((p) => p.checkedInToday).length,
+        // "Sıra sende" — everyone else has closed today. The strongest single
+        // thing the widget can say, and not derivable from the counts alone
+        // because it also depends on which of them is you.
+        userIsLast: urgencyOf(c).userIsLast ? 1 : 0,
+        // At most two names; the widget appends "+N" from participantsTotal.
+        pendingNames: urgencyOf(c)
+          .pendingNames.slice(0, 2)
+          .map((n) => n.replace(/[,]/g, ''))
+          .join(','),
         // Who's in, and who's still owed today — the large widget shows the
         // group person by person rather than as a count. Packed into one
         // string because ExtensionStorage only takes strings/numbers inside

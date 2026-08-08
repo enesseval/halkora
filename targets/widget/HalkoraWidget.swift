@@ -59,6 +59,12 @@ private struct WidgetCopy {
   let noneActive: String  // "Aktif halka yok"
   let streakUnit: (Int) -> String  // "7 gün seri"
   let streakWord: String  // "SERİ"
+  // Smart Mode (Faz 2 §2.5)
+  let yourTurn: String  // "Sıra sende"
+  let waitingOn: (String) -> String  // "Ayşe ve Mert bekliyor"
+  let waitingOnMore: (String, Int) -> String  // "Ayşe, Mert +3"
+  let streakAtRisk: (Int) -> String  // "Seri riskte · 2 halka kaldı"
+  let hoursLeft: (Int) -> String  // "3 saat kaldı"
 }
 
 private let copyTr = WidgetCopy(
@@ -80,7 +86,12 @@ private let copyTr = WidgetCopy(
   allClosed: "Bugün tamam",
   noneActive: "Aktif halka yok",
   streakUnit: { n in "\(n) gün seri" },
-  streakWord: "SERİ"
+  streakWord: "SERİ",
+  yourTurn: "Sıra sende",
+  waitingOn: { names in "\(names) bekliyor" },
+  waitingOnMore: { names, more in "\(names) +\(more) bekliyor" },
+  streakAtRisk: { n in n == 1 ? "Seri riskte · 1 halka kaldı" : "Seri riskte · \(n) halka kaldı" },
+  hoursLeft: { h in h <= 1 ? "1 saatten az" : "\(h) saat kaldı" }
 )
 
 private let copyEn = WidgetCopy(
@@ -102,7 +113,12 @@ private let copyEn = WidgetCopy(
   allClosed: "Today is done",
   noneActive: "No active rings",
   streakUnit: { n in "\(n) day streak" },
-  streakWord: "STREAK"
+  streakWord: "STREAK",
+  yourTurn: "It's on you",
+  waitingOn: { names in "waiting on \(names)" },
+  waitingOnMore: { names, more in "waiting on \(names) +\(more)" },
+  streakAtRisk: { n in n == 1 ? "Streak at risk · 1 ring left" : "Streak at risk · \(n) rings left" },
+  hoursLeft: { h in h <= 1 ? "under an hour" : "\(h)h left" }
 )
 
 private func copyFor(_ locale: String?) -> WidgetCopy {
@@ -170,13 +186,30 @@ private struct HalkoraSnapshot: Codable {
   /// takes only strings/numbers inside an object). Optional so a snapshot
   /// written by an older build still decodes.
   var roster: String?
+  /// Faz 2 §2.3 — everyone else has closed today. 0/1 because ExtensionStorage
+  /// won't carry booleans. Optional so an older snapshot still decodes.
+  var userIsLast: Int?
+  /// Up to two names the ring is still waiting on, comma-separated.
+  var pendingNames: String?
   var jokerRemaining: Int
   var state: String  // "active" | "upcoming" | "lobby"
   var startsLabel: String  // already localized by the app
   var locale: String?
 }
 
+/// Leaves a mark saying a widget of ours actually rendered.
+///
+/// The app reads this to know whether to offer its "put this on your Lock
+/// Screen" hint (Faz 2 §2.6). WidgetKit's own getCurrentConfigurations is
+/// only reachable from native code the app doesn't have, and a whole native
+/// module to answer one boolean isn't worth it — the widget already shares a
+/// container with the app, so it can simply say so itself.
+private func markWidgetAlive() {
+  UserDefaults(suiteName: appGroup)?.set(Date().timeIntervalSince1970, forKey: "widgetSeenAt")
+}
+
 private func loadActiveChallenges() -> [HalkoraSnapshot] {
+  markWidgetAlive()
   guard let defaults = UserDefaults(suiteName: appGroup),
     let data = defaults.data(forKey: activeChallengesKey),
     let list = try? JSONDecoder().decode([HalkoraSnapshot].self, from: data)
@@ -343,6 +376,29 @@ extension HalkoraSnapshot {
       }
     }
   }
+
+  /// Hours until this ring's cut-off, from `now` in its own timezone.
+  /// Drives both the countdown and how warm the card reads (Faz 2 §2.4).
+  func hoursToDeadline(at now: Date) -> Double {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = TimeZone(identifier: timezone) ?? .current
+    f.dateFormat = "HH:mm"
+    let parts = f.string(from: now).split(separator: ":")
+    let nowMinutes = (Int(parts.first ?? "0") ?? 0) * 60 + (parts.count > 1 ? Int(parts[1]) ?? 0 : 0)
+    let dl = String((deadlineTime ?? "00:00").prefix(5)).split(separator: ":")
+    let dlMinutes = (Int(dl.first ?? "0") ?? 0) * 60 + (dl.count > 1 ? Int(dl[1]) ?? 0 : 0)
+    // Past today's cut-off, the next one is a full cycle out.
+    return Double(((dlMinutes - nowMinutes) + 1440) % 1440) / 60.0
+  }
+
+  /// Names still owed today, already capped at two by the app.
+  var pendingList: [String] {
+    guard let pendingNames, !pendingNames.isEmpty else { return [] }
+    return pendingNames.split(separator: ",").map(String.init)
+  }
+
+  var isUserLast: Bool { (userIsLast ?? 0) != 0 }
 
   /// Consecutive covered days, counting back from the last settled day.
   ///
@@ -766,6 +822,7 @@ private let samplePreview = HalkoraSnapshot(
   segments: "dddddd--------", syncedDayKey: "", participantsTotal: 8,
   participantsDoneToday: 4,
   roster: "EK:1,SA:1,MY:1,DT:1,BÖ:0,CN:0,AR:0,ZG:0",
+  userIsLast: 0, pendingNames: "Ayşe,Mert",
   jokerRemaining: 1, state: "active", startsLabel: "",
   locale: "tr")
 
@@ -1897,6 +1954,54 @@ struct HalkoraStreakWidget: Widget {
 // Same monochrome constraint as the per-halka accessories: the system strips
 // color, so these lean on shape, weight and opacity.
 
+/// Faz 2 §2.5 — the one thing worth saying right now, in priority order.
+///
+/// The queue itself is ordered by the app (src/lib/widgetUrgency.ts); this
+/// only picks which SENTENCE the leading halka deserves. Splitting it that way
+/// keeps the ranking rule — the part that will keep changing — out of a binary
+/// that needs an Archive to update.
+private struct SmartLine {
+  let headline: String
+  let detail: String?
+  /// Warm once it's genuinely pressing, so the state reads before the words do.
+  let urgent: Bool
+}
+
+private func smartLine(for live: [HalkoraSnapshot], at now: Date, _ c: WidgetCopy) -> SmartLine {
+  let open = live.filter { !$0.checkedInToday(at: now) && !$0.isCompleted(at: now) }
+
+  // 1. The ring is waiting on this person alone. Nothing outranks it.
+  if let last = open.first(where: { $0.isUserLast }) {
+    return SmartLine(headline: c.yourTurn, detail: last.title, urgent: true)
+  }
+
+  // 2. Everything closed.
+  guard let next = open.first else {
+    return SmartLine(headline: c.allClosed, detail: nil, urgent: false)
+  }
+
+  // 3. Close to the cut-off with more than one still open — the evening
+  //    pressure case, expressed in hours rather than a fixed clock time so a
+  //    ring closing at 10:00 gets the same treatment as one closing at 21:00.
+  let hours = next.hoursToDeadline(at: now)
+  if hours <= 3 && open.count > 1 {
+    return SmartLine(
+      headline: c.streakAtRisk(open.count), detail: c.hoursLeft(Int(hours.rounded(.up))),
+      urgent: true)
+  }
+
+  // 4. Otherwise name who the leading ring is still owed by.
+  let pending = next.pendingList
+  let more = max(next.participantsTotal - next.participantsDoneToday - pending.count, 0)
+  let detail =
+    pending.isEmpty
+    ? c.hoursLeft(Int(hours.rounded(.up)))
+    : (more > 0
+      ? c.waitingOnMore(pending.joined(separator: ", "), more)
+      : c.waitingOn(pending.joined(separator: ", ")))
+  return SmartLine(headline: next.title, detail: detail, urgent: hours <= 3)
+}
+
 struct HalkoraLockTodayView: View {
   @Environment(\.widgetFamily) var family
   var entry: HalkoraListEntry
@@ -1910,18 +2015,27 @@ struct HalkoraLockTodayView: View {
 
     switch family {
     case .accessoryInline:
-      Text(total == 0 ? c.noneActive : "\(c.brand) · \(c.ringsClosed(done, total))")
+      Text(
+        total == 0
+          ? c.noneActive
+          : "\(c.brand) · \(smartLine(for: live, at: at, c).headline)")
     case .accessoryRectangular:
-      VStack(alignment: .leading, spacing: 3) {
-        Text(c.todayTitle).font(.system(size: 13, weight: .semibold))
+      // Smart Mode: one prioritised sentence rather than a summary. On the
+      // Lock Screen there's room for exactly one thing, so it should be the
+      // thing that most deserves the glance.
+      VStack(alignment: .leading, spacing: 2) {
         if total == 0 {
+          Text(c.todayTitle).font(.system(size: 13, weight: .semibold))
           Text(c.noneActive).font(.system(size: 12)).opacity(0.75)
         } else {
-          Text(done == total ? c.allClosed : c.ringsClosed(done, total))
-            .font(.system(size: 12))
-            .opacity(0.75)
-            .monospacedDigit()
-          // One tick per halka — the shortest honest summary of the day.
+          let line = smartLine(for: live, at: at, c)
+          Text(line.headline)
+            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+          if let detail = line.detail {
+            Text(detail).font(.system(size: 12)).opacity(0.75).lineLimit(1)
+          }
+          // One tick per halka — the day at a glance, under the sentence.
           HStack(spacing: 3) {
             ForEach(live.indices, id: \.self) { i in
               Capsule()
@@ -1929,6 +2043,7 @@ struct HalkoraLockTodayView: View {
                 .frame(height: 3)
             }
           }
+          .padding(.top, 2)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
