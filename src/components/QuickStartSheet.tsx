@@ -231,11 +231,13 @@ export function QuickStartSheet({
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
-                // autoCorrect={false} maps to autocorrectionType = .no, which
-                // hides iOS's suggestion strip — the strip that offers the
-                // one-tap paste. Correction stays on so it can be drawn.
+                // See app/(auth)/start.tsx for the full reasoning: correction
+                // stays on so iOS draws the QuickType bar at all, and the
+                // content type is URL because the invite LINK is what ends up
+                // on the clipboard — that match is what makes iOS offer the
+                // one-tap paste.
                 spellCheck={false}
-                textContentType="oneTimeCode"
+                textContentType="URL"
                 autoFocus
                 style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
               />

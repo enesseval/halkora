@@ -128,13 +128,22 @@ export default function StartScreen() {
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            // The one-tap paste is iOS's own suggestion strip above the keyboard,
-            // not a button of ours. autoCorrect={false} maps to
-            // autocorrectionType = .no, which hides that strip outright — which
-            // is why nothing appeared. Correction stays ON so the strip can be
-            // drawn; spell-check is the part that had to go for a code.
+            // The one-tap paste is iOS's own suggestion strip above the
+            // keyboard, not a button of ours. Two things have to be true for
+            // it to appear, and only one of them was:
+            //   1. autoCorrect must stay ON — autoCorrect={false} maps to
+            //      autocorrectionType = .no, which removes the QuickType bar
+            //      the suggestion is drawn in.
+            //   2. the field's content type must match what's on the
+            //      clipboard. What people actually copy is the invite LINK
+            //      (halkora.app/j/CODE), so "URL" is the type iOS matches;
+            //      "oneTimeCode" only ever offers codes iOS harvested from
+            //      Messages, which is why nothing showed up.
+            // keyboardType is left alone on purpose: a raw code is typed here
+            // just as often as a link is pasted, and the .url keyboard trades
+            // the space bar for a ".com" key.
             spellCheck={false}
-            textContentType="oneTimeCode"
+            textContentType="URL"
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
