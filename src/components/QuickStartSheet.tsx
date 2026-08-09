@@ -86,6 +86,19 @@ export function QuickStartSheet({
   /** The value arrived by pasting rather than typing — changes the card's
    * wording, nothing else. */
   const [pasted, setPasted] = useState(false);
+  // ALL hooks stay above the `if (!visible) return null` below. This sheet is
+  // mounted permanently and hides itself by returning early, so a hook placed
+  // after that line runs on some renders and not others — React counts a
+  // different number of hooks the moment the sheet opens and throws, which
+  // crashes the app on the "+" button. That exact bug shipped twice from this
+  // very spot; the early return is not a safe place to add anything.
+  //
+  // The field autofocuses, so opening this sheet is what triggers the paste
+  // prompt — which is the moment someone is trying to join anyway.
+  const readClipboard = useClipboardCode((found) => {
+    setInput(found);
+    setPasted(true);
+  });
 
   useEffect(() => {
     if (!visible) {
@@ -96,13 +109,6 @@ export function QuickStartSheet({
   }, [visible]);
 
   if (!visible) return null;
-
-  // The field autofocuses, so opening this sheet is what triggers the paste
-  // prompt — which is the moment someone is trying to join anyway.
-  const readClipboard = useClipboardCode((found) => {
-    setInput(found);
-    setPasted(true);
-  });
 
   const code = extractCode(input);
   const fromClipboard = pasted;
