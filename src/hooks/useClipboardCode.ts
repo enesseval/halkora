@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { extractCode } from '@/lib/invite';
 
@@ -20,8 +20,14 @@ import { extractCode } from '@/lib/invite';
  */
 export function useClipboardCode(onFound: (code: string) => void) {
   const alreadyRead = useRef(false);
+  // The callback is kept in a ref so the returned handler stays stable, but
+  // the ref is written in an effect rather than during render — a render must
+  // not mutate a ref (react-hooks/refs), and it doesn't need to here: the
+  // handler only ever runs later, from onFocus.
   const handler = useRef(onFound);
-  handler.current = onFound;
+  useEffect(() => {
+    handler.current = onFound;
+  }, [onFound]);
 
   return useCallback(() => {
     // Once per mount: focus comes and goes as people tap in and out of the
