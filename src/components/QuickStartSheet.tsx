@@ -7,11 +7,6 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { codeProblem, extractCode } from '@/lib/invite';
-import {
-  PASTE_ACCESSORY_ID,
-  PasteAccessory,
-  usePasteAccessory,
-} from './PasteAccessory';
 import { useCreateGate } from '@/hooks';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
@@ -100,18 +95,6 @@ export function QuickStartSheet({
   }, [visible]);
 
   if (!visible) return null;
-
-  // Same reasoning as app/(auth)/start.tsx: reading the clipboard on open
-  // raises iOS's "Allow Paste?" prompt, fires once before the code has been
-  // copied, and left a later copy unseen. Apple's paste control needs no
-  // prompt and runs when the person asks for it.
-
-
-
-
-  // One-tap paste above the keyboard; nothing is asked of the clipboard
-  // until this field is focused. See PasteAccessory.
-  const paste = usePasteAccessory();
 
   const code = extractCode(input);
   const fromClipboard = pasted;
@@ -239,8 +222,6 @@ export function QuickStartSheet({
                 }}
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
-                onFocus={paste.check}
-                inputAccessoryViewID={PASTE_ACCESSORY_ID}
                 // Lowercase on purpose — invite codes are lowercase hex and
                 // the server compares them as-is. See app/(auth)/start.tsx.
                 autoCapitalize="none"
@@ -250,13 +231,6 @@ export function QuickStartSheet({
               />
             </View>
 
-            <PasteAccessory
-              visible={paste.available && !code}
-              onPaste={(text) => {
-                setInput(text);
-                setPasted(true);
-              }}
-            />
 
             {problem ? (
               <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>

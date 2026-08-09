@@ -255,7 +255,9 @@ function mapLobbyRow(
   return {
     id: row.id,
     title: row.title,
-    dailyAction: `${t.common.today}: ${row.daily_action}`,
+    // No "Bugün:" prefix before the ring runs — there is no today yet
+    // (saha testi bulgusu: an unstarted ring was tagged as if it were live).
+    dailyAction: row.daily_action,
     dailyActionRaw: row.daily_action,
     totalDays: row.total_days,
     currentDay: 0,
@@ -465,7 +467,7 @@ function mapRow(
   return {
     id: row.id,
     title: row.title,
-    dailyAction: `${t.common.today}: ${row.daily_action}`,
+    dailyAction: status === 'active' ? `${t.common.today}: ${row.daily_action}` : row.daily_action,
     dailyActionRaw: row.daily_action,
     totalDays: row.total_days,
     currentDay,

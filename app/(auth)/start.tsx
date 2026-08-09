@@ -6,11 +6,6 @@ import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { codeProblem, extractCode } from '@/lib/invite';
-import {
-  PASTE_ACCESSORY_ID,
-  PasteAccessory,
-  usePasteAccessory,
-} from '@/components/PasteAccessory';
 import { AppText, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
 
@@ -82,11 +77,6 @@ export default function StartScreen() {
    * wording, nothing else. */
   const [pasted, setPasted] = useState(false);
 
-  // One-tap paste, docked above the keyboard — see PasteAccessory for why
-  // that's Apple's own control rather than iOS's QuickType chip or a button
-  // of ours. Nothing is asked of the clipboard until the field is focused.
-  const paste = usePasteAccessory();
-
   const code = extractCode(input);
   const fromClipboard = pasted;
   // A disabled button with no reason next to it is indistinguishable from a
@@ -127,8 +117,6 @@ export default function StartScreen() {
             }}
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
-            onFocus={paste.check}
-            inputAccessoryViewID={PASTE_ACCESSORY_ID}
             // Codes are substr(md5(...), 1, 10) — lowercase hex — and the
             // lookup is `where invite_code = p_code`, with no lower() on
             // either side. Upper-casing the field would break every join.
@@ -141,16 +129,6 @@ export default function StartScreen() {
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
-
-        {/* Pasted text takes the same route as typed text: straight into
-            onChangeText, then extractCode and the existing validation. */}
-        <PasteAccessory
-          visible={paste.available && !code}
-          onPaste={(text) => {
-            setInput(text);
-            setPasted(true);
-          }}
-        />
 
         {problem ? (
           <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>
