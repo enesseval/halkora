@@ -28,15 +28,22 @@ import { AppText, Button } from './ui';
  * arithmetic left to get wrong. This is the whole fix — the sheets' own
  * content is untouched.
  *
- * Focus is asked for repeatedly rather than once. The keyboard only comes up
- * if the field becomes first responder, and whether that request lands
- * depends on how far along the Modal's own window presentation is — ask too
- * early and iOS drops it silently, which leaves the sheet sitting open with
- * no keyboard at all. `autoFocus` is exactly that too-early case, and a
- * single call in `onShow` turned out to be one as well. focus() is
- * idempotent, so the honest fix is to ask at several points instead of
- * betting on one of them being the right one.
+ * Focus waits for the card's entering animation to finish, and that timing is
+ * the point rather than a detail. The keyboard only comes up once the field
+ * is first responder, so focusing immediately raises the keyboard WHILE
+ * SlideInDown is still running — and a reanimated entering animation drives
+ * the view toward the position it measured when it started, so the card
+ * settles at its pre-keyboard place and stays there. That is precisely the
+ * reported behaviour: opened by itself the field sits behind the keyboard,
+ * but dismiss the keyboard and tap the field by hand — after the animation —
+ * and it lands correctly.
+ *
+ * So the keyboard is allowed to arrive only once the card has stopped moving.
+ * Two attempts rather than one because focus() is idempotent and it costs
+ * nothing to be sure the first didn't fall on the animation's last frame.
  */
+const ENTER_MS = 260;
+
 function SheetOverlay({
   onClose,
   focusRef,
@@ -49,11 +56,12 @@ function SheetOverlay({
   const keyboardHeight = useKeyboardHeight();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const focusField = () => focusRef?.current?.focus();
-
   useEffect(() => {
-    focusField();
-    timers.current = [setTimeout(focusField, 60), setTimeout(focusField, 250)];
+    const focusField = () => focusRef?.current?.focus();
+    timers.current = [
+      setTimeout(focusField, ENTER_MS + 60),
+      setTimeout(focusField, ENTER_MS + 240),
+    ];
     return () => timers.current.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -63,7 +71,6 @@ function SheetOverlay({
       visible
       transparent
       animationType="none"
-      onShow={focusField}
       // Android's hardware back button — a sheet should close, not leave the
       // screen. No-op on iOS.
       onRequestClose={onClose}
@@ -86,7 +93,10 @@ function SheetOverlay({
 function SheetCard({ children }: { children: ReactNode }) {
   return (
     <Animated.View
-      entering={SlideInDown.duration(260)}
+      // Kept in step with ENTER_MS — focus is scheduled off this duration, so
+      // changing one without the other puts the keyboard back inside the
+      // animation and the card back behind it.
+      entering={SlideInDown.duration(ENTER_MS)}
       style={{
         backgroundColor: colors.bgSurface,
         borderTopLeftRadius: radius.sheet,
