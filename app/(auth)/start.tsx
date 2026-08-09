@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { useAuth } from '@/hooks/useAuth';
 import { codeProblem, extractCode } from '@/lib/invite';
+import { useClipboardCode } from '@/hooks/useClipboardCode';
 import { AppText, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
 
@@ -76,6 +77,12 @@ export default function StartScreen() {
   /** The value arrived by pasting rather than typing — changes the card's
    * wording, nothing else. */
   const [pasted, setPasted] = useState(false);
+  // Focusing the field asks iOS for the clipboard; if it holds an invite code
+  // it goes straight in. See useClipboardCode.
+  const readClipboard = useClipboardCode((code) => {
+    setInput(code);
+    setPasted(true);
+  });
 
   const code = extractCode(input);
   const fromClipboard = pasted;
@@ -117,6 +124,7 @@ export default function StartScreen() {
             }}
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
+            onFocus={readClipboard}
             // Codes are substr(md5(...), 1, 10) — lowercase hex — and the
             // lookup is `where invite_code = p_code`, with no lower() on
             // either side. Upper-casing the field would break every join.

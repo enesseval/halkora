@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { codeProblem, extractCode } from '@/lib/invite';
+import { useClipboardCode } from '@/hooks/useClipboardCode';
 import { useCreateGate } from '@/hooks';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
@@ -95,6 +96,13 @@ export function QuickStartSheet({
   }, [visible]);
 
   if (!visible) return null;
+
+  // The field autofocuses, so opening this sheet is what triggers the paste
+  // prompt — which is the moment someone is trying to join anyway.
+  const readClipboard = useClipboardCode((found) => {
+    setInput(found);
+    setPasted(true);
+  });
 
   const code = extractCode(input);
   const fromClipboard = pasted;
@@ -222,6 +230,7 @@ export function QuickStartSheet({
                 }}
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
+                onFocus={readClipboard}
                 // Lowercase on purpose — invite codes are lowercase hex and
                 // the server compares them as-is. See app/(auth)/start.tsx.
                 autoCapitalize="none"
