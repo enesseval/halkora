@@ -5,6 +5,7 @@ import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge, Momentum } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
+import type { ReportReason } from '@/data/moderation';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
@@ -774,6 +775,68 @@ export function NudgeMessageSheet({
  * repaired and what's left afterwards, so nobody spends their last one by
  * brushing the ring.
  */
+/* ------------------------------------------------------------------ */
+/* Guideline 1.2 — reporting a message                                  */
+/* ------------------------------------------------------------------ */
+/**
+ * A reason has to be picked rather than "report" being one anonymous tap:
+ * a report with no category can't be triaged, and being asked why makes
+ * casual mis-reporting less likely.
+ */
+export function ReportSheet({
+  onPick,
+  onClose,
+}: {
+  onPick: (reason: ReportReason) => void;
+  onClose: () => void;
+}) {
+  const { t } = useT();
+  const reasons: { key: ReportReason; label: string }[] = [
+    { key: 'harassment', label: t.moderation.reasonHarassment },
+    { key: 'hate', label: t.moderation.reasonHate },
+    { key: 'sexual', label: t.moderation.reasonSexual },
+    { key: 'violence', label: t.moderation.reasonViolence },
+    { key: 'spam', label: t.moderation.reasonSpam },
+    { key: 'other', label: t.moderation.reasonOther },
+  ];
+
+  return (
+    <SheetOverlay onClose={onClose}>
+      <SheetCard>
+        <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+          {t.moderation.reportTitle}
+        </AppText>
+        <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
+          {t.moderation.reportHint}
+        </AppText>
+
+        <View style={{ gap: 10, marginTop: 18 }}>
+          {reasons.map((r) => (
+            <Pressable
+              key={r.key}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                onPick(r.key);
+              }}
+              style={({ pressed }) => ({
+                backgroundColor: colors.bgElevated,
+                borderRadius: radius.badge,
+                borderWidth: hairline,
+                borderColor: colors.strokeSubtle,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <AppText variant="bodyMedium">{r.label}</AppText>
+            </Pressable>
+          ))}
+        </View>
+      </SheetCard>
+    </SheetOverlay>
+  );
+}
+
 export function JokerDaySheet({
   dayNumber,
   totalDays,

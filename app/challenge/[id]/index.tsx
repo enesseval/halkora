@@ -32,6 +32,7 @@ import {
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
 import { setActiveChallengeId } from '@/lib/push';
 import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -46,6 +47,7 @@ import {
   MomentumSheet,
   OwnerSettingsSheet,
   NudgeMessageSheet,
+  ReportSheet,
   WidgetHintSheet,
 } from '@/components/Sheets';
 import { hasWidgetInstalled } from '@/lib/widget';
@@ -119,6 +121,8 @@ export default function DetailScreen() {
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
   const [showOwnerSettings, setShowOwnerSettings] = useState(false);
+  // Guideline 1.2 — the message being reported, and the block confirmation.
+  const [reportTarget, setReportTarget] = useState<Message | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [nudgeTarget, setNudgeTarget] = useState<Participant | null>(null);
 
@@ -342,6 +346,60 @@ export default function DetailScreen() {
   const goHomeAfterExit = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/');
+  };
+
+  /**
+   * Blocking is two-way and undoable, but it still removes someone from your
+   * view of a group you're both in — worth one confirmation that spells out
+   * exactly what happens, rather than a silent tap.
+   */
+  const confirmBlock = (m: Message) => {
+    // Older mock-store messages carry no author id; nothing to block or
+    // report on those, and the menu is hidden for them below.
+    if (!m.authorId) return;
+    const authorId = m.authorId;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Alert.alert(t.moderation.blockTitle(m.authorName ?? t.common.person), t.moderation.blockBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.moderation.blockConfirm,
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await blockUser(authorId);
+            // Their messages are hidden by an RLS policy, so they disappear on
+            // the next fetch rather than needing to be filtered here.
+            retryChat();
+          } catch (e) {
+            Alert.alert(t.moderation.blockFailed, friendlyErrorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
+  const submitReport = async (reason: ReportReason) => {
+    const m = reportTarget;
+    if (!m || !id || !m.authorId) return;
+    setReportTarget(null);
+    try {
+      await reportMessage({
+        messageId: m.id,
+        reportedUserId: m.authorId,
+        challengeId: id,
+        messageText: m.text,
+        reason,
+      });
+      // Reporting and blocking are separate decisions, so the offer is made
+      // rather than assumed — someone may want the content reviewed without
+      // cutting the person out of the ring.
+      Alert.alert(t.moderation.reportSent, t.moderation.reportSentBody, [
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.moderation.blockConfirm, style: 'destructive', onPress: () => confirmBlock(m) },
+      ]);
+    } catch (e) {
+      Alert.alert(t.moderation.reportFailed, friendlyErrorMessage(e));
+    }
   };
 
   const confirmLeave = () => {
@@ -709,6 +767,8 @@ export default function DetailScreen() {
           <MessageBubble
             message={item.m}
             onReact={(emoji) => actions.react(item.m.id, emoji)}
+            onReport={item.m.authorId ? () => setReportTarget(item.m) : undefined}
+            onBlock={item.m.authorId ? () => confirmBlock(item.m) : undefined}
           />
         );
       case 'chatError':
@@ -916,6 +976,11 @@ export default function DetailScreen() {
           onSave={actions.updateDetails}
           onDelete={doDeleteChallenge}
         />
+      ) : null}
+
+      {/* Guideline 1.2 — reporting a message, reason first */}
+      {reportTarget ? (
+        <ReportSheet onPick={submitReport} onClose={() => setReportTarget(null)} />
       ) : null}
 
       {/* El sallama artık tek genel mesaj değil, birkaç anlamlı seçenekten
