@@ -253,6 +253,7 @@ export const tr = {
     notifyMessagePreview: 'Bildirimde mesaj içeriği',
     notifyMessagePreviewOn: 'Görünür',
     notifyMessagePreviewOff: 'Gizli',
+    purchasesDebug: 'DEV: mağaza tanılama',
     widgetDebug: 'Widget teşhis',
     account: 'Hesap',
     accountLinking: 'Bağlanıyor…',

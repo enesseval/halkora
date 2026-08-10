@@ -249,6 +249,7 @@ export const en: Dictionary = {
     notifyMessagePreview: 'Message content in notifications',
     notifyMessagePreviewOn: 'Visible',
     notifyMessagePreviewOff: 'Hidden',
+    purchasesDebug: 'DEV: store diagnostics',
     widgetDebug: 'Widget diagnostics',
     account: 'Account',
     accountLinking: 'Linking…',
