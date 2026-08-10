@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Linking, Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -8,6 +8,10 @@ import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { AppText, Button } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useT } from '@/i18n';
+import { fetchPlans, isCancelled, purchase, restore, type Plans } from '@/lib/purchases';
+import { refreshProfile } from '@/hooks/useAuth';
+import { friendlyErrorMessage } from '@/lib/errors';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 import type { SegmentState } from '@/data/types';
 
 /**
@@ -145,15 +149,76 @@ export default function Paywall() {
   const { reason } = useLocalSearchParams<{ reason?: string }>();
   const key = reasonKey(reason);
   const [plan, setPlan] = useState<Plan>('annual');
+  // Prices come from the store, never from a constant: they differ by
+  // storefront and Apple requires the viewer's real one. The strings in
+  // src/i18n are the fallback for the moment before they load (and for a
+  // device that can't reach the store at all).
+  const [plans, setPlans] = useState<Plans>({});
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchPlans()
+      .then((p) => {
+        if (alive) setPlans(p);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const close = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/');
   };
 
-  const notReady = () => {
+  const selected = plan === 'annual' ? plans.annual : plans.monthly;
+
+  const buy = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    Alert.alert(t.pro.notReadyTitle, t.pro.notReadyBody);
+    // No package means the store never answered — the products aren't
+    // approved yet, or there's no network. Saying so beats a dead button.
+    if (!selected) {
+      Alert.alert(t.pro.notReadyTitle, t.pro.notReadyBody);
+      return;
+    }
+    setBusy(true);
+    try {
+      const ok = await purchase(selected.pkg);
+      if (ok) await onEntitled();
+    } catch (e) {
+      // Backing out of Apple's sheet is a normal thing to do, not an error.
+      if (!isCancelled(e)) Alert.alert(t.pro.purchaseFailed, friendlyErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doRestore = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setBusy(true);
+    try {
+      const ok = await restore();
+      if (ok) await onEntitled();
+      else Alert.alert(t.pro.restoreNoneTitle, t.pro.restoreNoneBody);
+    } catch (e) {
+      if (!isCancelled(e)) Alert.alert(t.pro.restoreFailed, friendlyErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * The entitlement is live at RevenueCat, but `profiles.is_pro` is written by
+   * the webhook, which lands a moment later. Re-reading the profile is what
+   * turns Pro on in this app — the purchase result itself is never trusted as
+   * the source of truth.
+   */
+  const onEntitled = async () => {
+    await refreshProfile().catch(() => {});
+    Alert.alert(t.pro.thanksTitle, t.pro.thanksBody);
+    close();
   };
 
   return (
@@ -225,7 +290,7 @@ export default function Paywall() {
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 22 }}>
           <PlanCard
             label={t.pro.planMonthlyLabel}
-            price={t.pro.monthlyPrice}
+            price={plans.monthly?.price ?? t.pro.monthlyPrice}
             per={t.pro.monthlyPer}
             note={t.pro.monthlyNote}
             selected={plan === 'monthly'}
@@ -233,7 +298,7 @@ export default function Paywall() {
           />
           <PlanCard
             label={t.pro.planAnnualLabel}
-            price={t.pro.annualPrice}
+            price={plans.annual?.price ?? t.pro.annualPrice}
             per={t.pro.annualPer}
             note={t.pro.annualNote}
             badge={t.pro.saveBadge}
@@ -244,13 +309,37 @@ export default function Paywall() {
 
         {/* CTA */}
         <View style={{ marginTop: 22, gap: 12, alignItems: 'center' }}>
-          <Button label={t.pro.cta} onPress={notReady} style={{ alignSelf: 'stretch' }} />
-          <AppText variant="secondary" color={colors.textSecondary} onPress={notReady}>
+          <Button
+            label={busy ? t.pro.working : t.pro.cta}
+            onPress={buy}
+            disabled={busy}
+            style={{ alignSelf: 'stretch' }}
+          />
+          {/* Apple requires all four of these on a subscription screen: the
+              renewal terms, a restore path, and links to the terms and the
+              privacy policy. A missing restore button is its own rejection. */}
+          <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
+            {t.pro.renewalTerms}
+          </AppText>
+          <AppText variant="secondary" color={colors.textSecondary} onPress={doRestore}>
             {t.pro.restore}
           </AppText>
-          <AppText variant="meta" color={colors.textTertiary}>
-            {t.pro.legal}
-          </AppText>
+          <View style={{ flexDirection: 'row', gap: 14 }}>
+            <AppText
+              variant="meta"
+              color={colors.textTertiary}
+              onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
+            >
+              {t.moderation.termsLink}
+            </AppText>
+            <AppText
+              variant="meta"
+              color={colors.textTertiary}
+              onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
+            >
+              {t.moderation.privacyLink}
+            </AppText>
+          </View>
         </View>
       </Animated.View>
     </Animated.View>
