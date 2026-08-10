@@ -141,7 +141,8 @@ function SwipeableCompletedCard({ challenge, onPress }: { challenge: Challenge; 
 function SwipeableUpcomingRow({ challenge, onPress }: { challenge: Challenge; onPress: () => void }) {
   const rowActions = useRowSwipeActions(challenge);
   return (
-    <SwipeableRow actions={rowActions}>
+    // compact: this row is one line of text, not a card — see SwipeableRow.
+    <SwipeableRow actions={rowActions} compact>
       <UpcomingRow challenge={challenge} onPress={onPress} />
     </SwipeableRow>
   );

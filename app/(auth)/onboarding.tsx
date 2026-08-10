@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   TextInput,
   View,
@@ -14,6 +15,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { registerForPushToken } from '@/lib/push';
 import { takePendingInviteCode } from '@/lib/pendingInvite';
 import { slugifyUsername } from '@/lib/username';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 import { AppText, Avatar, AvatarStack, Button, Chip, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
 
@@ -208,6 +210,36 @@ function NameStep({
   );
 }
 
+/**
+ * Terms + privacy, with the zero-tolerance line Apple looks for. Links open
+ * the published pages rather than restating them in-app, so there is one
+ * canonical copy of each.
+ */
+function TermsNotice() {
+  const { t } = useT();
+  const link = (url: string) => () => {
+    Linking.openURL(url).catch(() => {});
+  };
+  return (
+    <View style={{ gap: 6 }}>
+      <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
+        {t.moderation.termsAgree}
+      </AppText>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
+        <AppText variant="meta" color={colors.textSecondary} onPress={link(TERMS_URL)}>
+          {t.moderation.termsLink}
+        </AppText>
+        <AppText variant="meta" color={colors.textSecondary} onPress={link(PRIVACY_URL)}>
+          {t.moderation.privacyLink}
+        </AppText>
+      </View>
+      <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center', marginTop: 2 }}>
+        {t.moderation.zeroTolerance}
+      </AppText>
+    </View>
+  );
+}
+
 /* O5 — push permission */
 function NotifStep() {
   const { t } = useT();
@@ -309,11 +341,17 @@ export default function OnboardingScreen() {
         <View style={{ gap: 16, paddingBottom: spacing.section, paddingTop: 8 }}>
           {!isName && !isNotif ? <Dots step={step} /> : null}
           {isName ? (
-            <Button
-              label={saving ? t.onboarding.name.saving : t.common.continue}
-              onPress={submitName}
-              disabled={!canSubmitName}
-            />
+            <>
+              <Button
+                label={saving ? t.onboarding.name.saving : t.common.continue}
+                onPress={submitName}
+                disabled={!canSubmitName}
+              />
+              {/* Guideline 1.2 — an app carrying user content needs the person
+                  to have agreed to its terms. Sits on the last step before an
+                  account exists, so consent precedes any content. */}
+              <TermsNotice />
+            </>
           ) : null}
           {isNotif ? (
             <>

@@ -54,6 +54,11 @@ private struct WidgetCopy {
   let dayLong: (Int, Int) -> String  // "Gün 7/14"
   // "Bugün" ve "Seri" widget'ları
   let todayTitle: String  // "Bugün"
+  /// Header when NOTHING is running yet — every ring is still upcoming. Saying
+  /// "Bugün" above a row that reads "Yarın başlıyor" stamps a day onto a ring
+  /// that hasn't got one (saha testi bulgusu). Matches the app's own "YAKINDA"
+  /// section on Home.
+  let soonTitle: String  // "Yakında"
   let ringsClosed: (Int, Int) -> String  // "2/3 halka kapandı"
   let allClosed: String  // "Bugün tamam"
   let noneActive: String  // "Aktif halka yok"
@@ -82,6 +87,7 @@ private let copyTr = WidgetCopy(
   brand: "Halka",
   dayLong: { c, t in "Gün \(c)/\(t)" },
   todayTitle: "Bugün",
+  soonTitle: "Yakında",
   ringsClosed: { done, total in "\(done)/\(total) halka kapandı" },
   allClosed: "Bugün tamam",
   noneActive: "Aktif halka yok",
@@ -109,6 +115,7 @@ private let copyEn = WidgetCopy(
   brand: "Halkora",
   dayLong: { c, t in "Day \(c)/\(t)" },
   todayTitle: "Today",
+  soonTitle: "Soon",
   ringsClosed: { done, total in "\(done)/\(total) rings closed" },
   allClosed: "Today is done",
   noneActive: "No active rings",
@@ -1809,7 +1816,10 @@ struct HalkoraListView: View {
       // .center, not a text baseline: the nav control isn't text and would
       // hang off a baseline meant for two labels.
       HStack(alignment: .center) {
-        Text(c.todayTitle)
+        // "Bugün" only when something is actually running today. With every
+        // ring still upcoming the rows read "Yarın başlıyor", and a "Bugün"
+        // above them stamps a day onto rings that haven't got one.
+        Text(activeCount > 0 ? c.todayTitle : c.soonTitle)
           .font(wTitle(15))
           .kerning(-0.3)
           .foregroundStyle(halkoraTextPrimary)

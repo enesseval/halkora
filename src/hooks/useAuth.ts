@@ -10,6 +10,7 @@ import { useMockStore } from '@/stores/mockStore';
 import { registerForPushToken } from '@/lib/push';
 import { syncWidgetSession, reconcileWidgetSession } from '@/lib/widgetAuth';
 import { syncWidgetSnapshot } from '@/lib/widget';
+import { configurePurchases } from '@/lib/purchases';
 import {
   savePushToken,
   clearPushToken,
@@ -67,6 +68,11 @@ async function loadProfileName(session: Session | null): Promise<void> {
     useAuthStore.setState({ name: null, username: null, isPro: false, messagePreview: true });
     return;
   }
+  // RevenueCat is pointed at the Supabase user id here rather than at app
+  // start, because that id is what the webhook uses to find the row to mark
+  // Pro. Configuring before a session exists would attach purchases to an
+  // anonymous RevenueCat id instead, and they would not survive a reinstall.
+  configurePurchases(session.user.id);
   const { data, error } = await supabase
     .from('profiles')
     .select('name, username, is_pro, notify_message_preview')

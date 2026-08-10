@@ -70,6 +70,11 @@ export const tr = {
     // showing the server's raw message — never a blank/broken alert.
     codes: {
       INVITE_NOT_FOUND: 'Davet kodu bulunamadı.',
+      MESSAGE_BLOCKED_PROFANITY: 'Mesaj gönderilmedi: küfür ya da hakaret içeren bir ifade var. İfadeyi çıkarıp tekrar dene.',
+      MESSAGE_BLOCKED_HATE: 'Mesaj gönderilmedi: bir kişiyi ya da grubu hedef alan nefret söylemi tespit edildi. Halkora bu tür içeriğe izin vermiyor.',
+      MESSAGE_BLOCKED_SEXUAL: 'Mesaj gönderilmedi: cinsel içerikli bir ifade var. Halkalar herkese açık bir ortam.',
+      MESSAGE_BLOCKED_VIOLENCE: 'Mesaj gönderilmedi: şiddet ya da tehdit içeren bir ifade var. Bu tür içerik hesabının kapatılmasına yol açabilir.',
+      BLOCKED_USER: 'Bu kişiyi engellemişsin. Mesaj göndermek için Ayarlar\u2019dan engeli kaldırman gerekiyor.',
       JOIN_WINDOW_CLOSED: "Bu challenge'a katılım süresi doldu — yalnızca ilk gün katılım açıktı.",
       NOT_A_MEMBER: "Bu challenge'in üyesi değilsin.",
       SESSION_MISSING: 'Oturum bulunamadı.',
@@ -437,6 +442,14 @@ export const tr = {
       advancedStats: 'Gelişmiş istatistikler',
     },
     cta: "Halkora Pro'ya geç",
+    working: 'İşleniyor…',
+    purchaseFailed: 'Satın alma tamamlanamadı',
+    restoreFailed: 'Geri yükleme başarısız',
+    restoreNoneTitle: 'Aktif abonelik bulunamadı',
+    restoreNoneBody: 'Bu Apple hesabında Halkora Pro aboneliği görünmüyor. Satın alırken kullandığın hesapla giriş yaptığından emin ol.',
+    thanksTitle: 'Halkora Pro açıldı',
+    thanksBody: 'Sınırsız halka ve gelişmiş istatistikler artık senin. Teşekkürler.',
+    renewalTerms: 'Otomatik yenilenen abonelik. İptal etmediğin sürece dönem sonunda yenilenir; Apple hesabından istediğin an iptal edebilirsin.',
     restore: 'Satın alımları geri yükle',
     legal: 'Kullanım Koşulları · Gizlilik',
     // Fiyat bloğu — Faz A'da placeholder (gerçek fiyatlar RevenueCat'ten, Faz B).
@@ -484,6 +497,43 @@ export const tr = {
     settingsRow: "Widget'lar",
   },
 
+  /** Guideline 1.2 — şikayet, engelleme, kullanım şartları. */
+  moderation: {
+    // Mesaja uzun basınca çıkan eylemler
+    report: 'Bildir',
+    block: 'Engelle',
+    // Şikayet sayfası
+    reportTitle: 'Bu mesajı bildir',
+    reportHint: 'Bildirimin 24 saat içinde incelenir. Bildirdiğin kişiye kim bildirdiği söylenmez.',
+    reasonSpam: 'Spam veya reklam',
+    reasonHarassment: 'Taciz veya zorbalık',
+    reasonHate: 'Nefret söylemi',
+    reasonSexual: 'Cinsel içerik',
+    reasonViolence: 'Şiddet veya tehdit',
+    reasonOther: 'Diğer',
+    reportSent: 'Bildirimin alındı',
+    reportSentBody: 'İçerik 24 saat içinde incelenecek. Bu kişiyi ayrıca engellemek ister misin?',
+    reportFailed: 'Bildirim gönderilemedi',
+    // Engelleme
+    blockTitle: (name: string) => `${name} engellensin mi?`,
+    blockBody:
+      'Onun mesajlarını görmezsin, senin mesajlarını o görmez ve sana dürtme gönderemez. İkiniz de halkada kalırsınız. Bunu Ayarlar’dan geri alabilirsin.',
+    blockConfirm: 'Engelle',
+    blocked: 'Engellendi',
+    blockFailed: 'Engellenemedi',
+    // Ayarlar
+    blockedRow: 'Engellenen kişiler',
+    blockedTitle: 'Engellenen kişiler',
+    blockedEmpty: 'Kimseyi engellemedin.',
+    unblock: 'Engeli kaldır',
+    unblockFailed: 'Engel kaldırılamadı',
+    // Kullanım şartları
+    termsAgree: 'Devam ederek Kullanım Şartları’nı ve Gizlilik Politikası’nı kabul etmiş olursun.',
+    termsLink: 'Kullanım Şartları',
+    privacyLink: 'Gizlilik Politikası',
+    zeroTolerance:
+      'Halkora’da taciz, nefret söylemi ve uygunsuz içeriğe sıfır tolerans vardır. Bildirilen içerik 24 saat içinde incelenir.',
+  },
   chat: {
     day: (n: number) => `Gün ${n}`,
     // Halka başlamadan atılan mesajlar 0. güne yazılıyor; "Gün 0" diye bir

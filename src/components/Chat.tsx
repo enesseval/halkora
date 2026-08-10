@@ -43,11 +43,18 @@ export function SystemEvent({ text }: { text: string }) {
 interface BubbleProps {
   message: Message;
   onReact: (emoji: string) => void;
+  /** Guideline 1.2 — every piece of someone else's content needs a way to be
+   * reported and its author blocked. Absent on my own messages: there is
+   * nothing to report about myself. */
+  onReport?: () => void;
+  onBlock?: () => void;
 }
 
-export function MessageBubble({ message, onReact }: BubbleProps) {
+export function MessageBubble({ message, onReact, onReport, onBlock }: BubbleProps) {
+  const { t } = useT();
   const [showPicker, setShowPicker] = useState(false);
   const mine = message.mine;
+  const canModerate = !mine && (onReport || onBlock);
 
   return (
     <View style={{ alignItems: mine ? 'flex-end' : 'flex-start', marginVertical: 5 }}>
@@ -136,6 +143,48 @@ export function MessageBubble({ message, onReact }: BubbleProps) {
               <AppText style={{ fontSize: 20 }}>{e}</AppText>
             </Pressable>
           ))}
+
+          {/* Same long-press that reacts also reports — one gesture, so
+              reporting is never harder to find than a thumbs-up. Divider and
+              muted colour keep it from competing with the reactions. */}
+          {canModerate ? (
+            <>
+              <View
+                style={{
+                  width: hairline,
+                  alignSelf: 'stretch',
+                  backgroundColor: colors.strokeSubtle,
+                  marginHorizontal: 4,
+                }}
+              />
+              {onReport ? (
+                <Pressable
+                  onPress={() => {
+                    setShowPicker(false);
+                    onReport();
+                  }}
+                  style={{ paddingHorizontal: 6, justifyContent: 'center' }}
+                >
+                  <AppText variant="meta" color={colors.textSecondary}>
+                    {t.moderation.report}
+                  </AppText>
+                </Pressable>
+              ) : null}
+              {onBlock ? (
+                <Pressable
+                  onPress={() => {
+                    setShowPicker(false);
+                    onBlock();
+                  }}
+                  style={{ paddingHorizontal: 6, justifyContent: 'center' }}
+                >
+                  <AppText variant="meta" color={colors.joker}>
+                    {t.moderation.block}
+                  </AppText>
+                </Pressable>
+              ) : null}
+            </>
+          ) : null}
         </Animated.View>
       ) : null}
     </View>

@@ -13,6 +13,7 @@ import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { NameSheet, UsernameSheet, WidgetHintSheet } from '@/components/Sheets';
+import { BlockedSheet } from '@/components/BlockedSheet';
 import { useT, type Locale } from '@/i18n';
 
 /** null while the initial permission check is in flight. Push is native-only —
@@ -124,6 +125,7 @@ export default function SettingsScreen() {
   const [editingUsername, setEditingUsername] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [showWidgetHint, setShowWidgetHint] = useState(false);
+  const [showBlocked, setShowBlocked] = useState(false);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -266,6 +268,14 @@ export default function SettingsScreen() {
               icon="smartphone"
               label={t.widgetHint.settingsRow}
               onPress={() => setShowWidgetHint(true)}
+            />
+            {/* Guideline 1.2 — blocking has to be undoable, and this is the
+                only place someone can find who they've blocked. */}
+            <Divider />
+            <Row
+              icon="slash"
+              label={t.moderation.blockedRow}
+              onPress={() => setShowBlocked(true)}
             />
             {configured ? (
               <>
@@ -415,6 +425,8 @@ export default function SettingsScreen() {
       />
 
       {showWidgetHint ? <WidgetHintSheet onClose={() => setShowWidgetHint(false)} /> : null}
+
+      {showBlocked ? <BlockedSheet onClose={() => setShowBlocked(false)} /> : null}
 
       <NameSheet
         visible={editingName}
