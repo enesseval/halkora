@@ -10,6 +10,7 @@ import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { useMockStore } from '@/stores/mockStore';
 import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
+import { purchasesDiagnostics } from '@/lib/purchases';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { NameSheet, UsernameSheet, WidgetHintSheet } from '@/components/Sheets';
@@ -120,6 +121,7 @@ export default function SettingsScreen() {
   const debugUserId = session?.user.id.slice(0, 8);
   const challenges = useMockStore((s) => s.challenges);
   const [widgetDebug, setWidgetDebug] = useState<string | null>(null);
+  const [purchasesDebug, setPurchasesDebug] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
@@ -391,6 +393,18 @@ export default function SettingsScreen() {
                     silent (see widgetDiagnostics) — this forces a write and
                     reads it straight back so a blank widget is diagnosable
                     on-device instead of guessed at. */}
+                {/* Same reasoning for the store chain: a dead paywall looks
+                    identical whether the key is missing, the native module
+                    isn't linked, the agreement isn't active, or the offering
+                    has no packages. This says which one it is. */}
+                <Row
+                  icon="credit-card"
+                  label={t.settings.purchasesDebug}
+                  onPress={() => {
+                    purchasesDiagnostics().then(setPurchasesDebug).catch(() => {});
+                  }}
+                />
+                <Divider />
                 <Row
                   icon="grid"
                   label={t.settings.widgetDebug}
@@ -404,6 +418,11 @@ export default function SettingsScreen() {
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }} tabular>
               uid: {debugUserId ?? '—'} · is_pro: {String(isPro)}
             </AppText>
+            {purchasesDebug ? (
+              <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
+                store: {purchasesDebug}
+              </AppText>
+            ) : null}
             {widgetDebug ? (
               <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
                 widget: {widgetDebug}

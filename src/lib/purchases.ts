@@ -24,6 +24,9 @@ export const DEFAULT_OFFERING = 'default';
 export const isPurchasesConfigured = Boolean(IOS_KEY) && Platform.OS === 'ios';
 
 let configured = false;
+/** Why configure() failed, kept for purchasesDiagnostics — swallowing this is
+ * what made "no packages" impossible to tell apart from "no key". */
+let configureError: string | null = null;
 
 /**
  * Call once the Supabase user id is known — NOT at app start.
@@ -47,9 +50,57 @@ export function configurePurchases(supabaseUserId: string): void {
     if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.WARN);
     Purchases.configure({ apiKey: IOS_KEY, appUserID: supabaseUserId });
     configured = true;
-  } catch {
+    configureError = null;
+  } catch (e) {
     // A paywall that can't reach the store is a degraded screen, never a
-    // crash on launch.
+    // crash on launch — but the reason is recorded rather than lost.
+    configureError = e instanceof Error ? e.message : String(e);
+  }
+}
+
+/**
+ * DEV-only readback, same idea as widgetDiagnostics: every failure in this
+ * chain is silent by design, so a dead paywall is indistinguishable from a
+ * missing key, an unlinked native module, an inactive Paid Applications
+ * agreement, or an offering with no packages attached. This says which.
+ *
+ * The key is never printed — only its prefix and length, which is enough to
+ * tell "missing" from "present but wrong shape".
+ */
+export async function purchasesDiagnostics(): Promise<string> {
+  if (Platform.OS !== 'ios') return 'iOS değil';
+
+  const keyShape = IOS_KEY
+    ? `${IOS_KEY.slice(0, 5)}…(${IOS_KEY.length})`
+    : 'YOK — .env içindeki EXPO_PUBLIC_REVENUECAT_IOS_KEY build alınırken okunmamış';
+  if (!IOS_KEY) return `anahtar ${keyShape}`;
+  if (!IOS_KEY.startsWith('appl_')) return `anahtar biçimi yanlış: ${keyShape} (appl_ ile başlamalı)`;
+
+  // The JS package can be installed while its native side isn't in the binary
+  // — that's a pod install/rebuild problem, and it looks exactly like a
+  // network failure from the outside.
+  if (!configured) {
+    return configureError
+      ? `configure başarısız: ${configureError}`
+      : `configure hiç çalışmadı (oturum yok?) · anahtar ${keyShape}`;
+  }
+
+  try {
+    const offerings = await Purchases.getOfferings();
+    const names = Object.keys(offerings.all);
+    const offering = offerings.all[DEFAULT_OFFERING] ?? offerings.current;
+    if (!offering) {
+      return `bağlandı ama offering yok · görünen: ${names.join(',') || 'hiç'} — RevenueCat'te "${DEFAULT_OFFERING}" Current mı?`;
+    }
+    const pkgs = offering.availablePackages.length;
+    if (pkgs === 0) {
+      return `offering "${offering.identifier}" var ama 0 paket — ürünler App Store Connect'te "Ready to Submit" mi, Paid Applications sözleşmesi aktif mi?`;
+    }
+    return `OK · offering "${offering.identifier}" · ${pkgs} paket · aylık:${
+      offering.monthly ? offering.monthly.product.priceString : 'yok'
+    } yıllık:${offering.annual ? offering.annual.product.priceString : 'yok'}`;
+  } catch (e) {
+    return `getOfferings hatası: ${e instanceof Error ? e.message : String(e)}`;
   }
 }
 
