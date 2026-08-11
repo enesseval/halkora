@@ -1854,9 +1854,30 @@ struct HalkoraListView: View {
         }
         Spacer(minLength: 0)
       } else {
-        VStack(spacing: 8) {
-          ForEach(shown, id: \.challengeId) { s in
+        // A ring that hasn't started belongs under its own heading. Listed
+        // under "Bugün" it claims to be part of today, which it isn't — the
+        // same stamp the header used to carry (saha testi bulgusu). Mirrors
+        // Home's own BUGÜN / YAKINDA split so the widget and the app read the
+        // same way.
+        let todayRows = shown.filter { $0.isActive }
+        let soonRows = shown.filter { !$0.isActive }
+        VStack(alignment: .leading, spacing: 8) {
+          ForEach(todayRows, id: \.challengeId) { s in
             TodayRow(snapshot: s, at: at, copy: c)
+          }
+          if !soonRows.isEmpty {
+            // Only worth a heading when something above it is actually
+            // today's; with nothing active the header already says "Yakında".
+            if !todayRows.isEmpty {
+              Text(c.soonTitle.uppercased())
+                .font(wMeta(9))
+                .kerning(1.4)
+                .foregroundStyle(halkoraTextTertiary)
+                .padding(.top, 4)
+            }
+            ForEach(soonRows, id: \.challengeId) { s in
+              TodayRow(snapshot: s, at: at, copy: c)
+            }
           }
         }
         Spacer(minLength: 0)
