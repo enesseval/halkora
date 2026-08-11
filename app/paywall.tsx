@@ -8,7 +8,14 @@ import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { AppText, Button } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useT } from '@/i18n';
-import { fetchPlans, isCancelled, purchase, restore, type Plans } from '@/lib/purchases';
+import {
+  fetchPlans,
+  hasProEntitlement,
+  isCancelled,
+  purchase,
+  restore,
+  type Plans,
+} from '@/lib/purchases';
 import { awaitProUnlock } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
@@ -189,7 +196,17 @@ export default function Paywall() {
       if (ok) await onEntitled();
     } catch (e) {
       // Backing out of Apple's sheet is a normal thing to do, not an error.
-      if (!isCancelled(e)) Alert.alert(t.pro.purchaseFailed, friendlyErrorMessage(e));
+      if (isCancelled(e)) return;
+      // Before calling it a failure, ask whether they're entitled anyway.
+      // "You already own this" is what Apple says to someone whose purchase
+      // went through but whose profiles.is_pro never got written — showing
+      // them an error would leave them stuck on a paywall for something they
+      // already paid for.
+      if (await hasProEntitlement().catch(() => false)) {
+        await onEntitled();
+        return;
+      }
+      Alert.alert(t.pro.purchaseFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(false);
     }
