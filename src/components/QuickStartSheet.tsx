@@ -94,7 +94,7 @@ export function QuickStartSheet({
   //
   // The field autofocuses, so opening this sheet is what triggers the paste
   // prompt — which is the moment someone is trying to join anyway.
-  const readClipboard = useClipboardCode((found) => {
+  const clipboard = useClipboardCode((found) => {
     setInput(found);
     setPasted(true);
   });
@@ -235,7 +235,7 @@ export function QuickStartSheet({
                 }}
                 placeholder={t.start.linkPlaceholder}
                 placeholderTextColor={colors.textTertiary}
-                onFocus={readClipboard}
+                onFocus={clipboard.check}
                 // Lowercase on purpose — invite codes are lowercase hex and
                 // the server compares them as-is. See app/(auth)/start.tsx.
                 autoCapitalize="none"
@@ -245,6 +245,12 @@ export function QuickStartSheet({
               />
             </View>
 
+
+            {clipboard.notCode && !input ? (
+              <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>
+                {t.start.clipboardNotCode}
+              </AppText>
+            ) : null}
 
             {problem ? (
               <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>

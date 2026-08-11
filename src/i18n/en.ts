@@ -168,6 +168,7 @@ export const en: Dictionary = {
     joinThisChallenge: 'Join this challenge',
     codeTooShort: (n: number) => `Code is short · ${n} characters so far`,
     codeTooLong: (n: number) => `Code is too long · ${n} characters`,
+    clipboardNotCode: "What's on your clipboard isn't an invite code. Copy the code or the invite link and try again.",
     codeInvalid: "That isn't an invite code or link.",
     wrongInvite: 'Wrong invite? Paste the link above.',
   },

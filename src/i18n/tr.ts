@@ -172,6 +172,7 @@ export const tr = {
     joinThisChallenge: "Bu challenge'a katıl",
     codeTooShort: (n: number) => `Kod eksik · ${n} karakter girdin`,
     codeTooLong: (n: number) => `Kod çok uzun · ${n} karakter girdin`,
+    clipboardNotCode: 'Panondaki içerik bir davet kodu değil. Kodu ya da davet bağlantısını kopyalayıp tekrar dene.',
     codeInvalid: 'Bu bir davet kodu ya da linki değil.',
     wrongInvite: 'Yanlış davet mi? Linki yukarıya yapıştır.',
   },
