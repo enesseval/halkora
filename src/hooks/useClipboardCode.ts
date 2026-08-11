@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { extractCode } from '@/lib/invite';
 
@@ -20,6 +20,11 @@ import { extractCode } from '@/lib/invite';
  */
 export function useClipboardCode(onFound: (code: string) => void) {
   const alreadyRead = useRef(false);
+  // Set when the clipboard held text that wasn't an invite code. Someone who
+  // just granted the paste permission and then saw nothing happen deserves to
+  // know why — silence there reads as the app being broken (saha testi
+  // bulgusu: "izin verdim ama yapıştırmadı").
+  const [notCode, setNotCode] = useState(false);
   // The callback is kept in a ref so the returned handler stays stable, but
   // the ref is written in an effect rather than during render — a render must
   // not mutate a ref (react-hooks/refs), and it doesn't need to here: the
@@ -29,7 +34,7 @@ export function useClipboardCode(onFound: (code: string) => void) {
     handler.current = onFound;
   }, [onFound]);
 
-  return useCallback(() => {
+  const check = useCallback(() => {
     // Once per mount: focus comes and goes as people tap in and out of the
     // field, and re-reading would mean re-prompting.
     if (alreadyRead.current) return;
@@ -39,9 +44,12 @@ export function useClipboardCode(onFound: (code: string) => void) {
       .then((text) => {
         const code = extractCode(text);
         if (code) handler.current(code);
+        else if (text && text.trim()) setNotCode(true);
       })
       // Declined permission, empty clipboard, anything else — the field is
       // left alone and typing still works.
       .catch(() => {});
   }, []);
+
+  return { check, notCode };
 }

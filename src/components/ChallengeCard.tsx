@@ -208,12 +208,21 @@ export function UpcomingRow({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         onPress();
       }}
+      // A surface behind it, like every other row on Home. Bare text on the
+      // background read as a disabled label rather than something you could
+      // tap or swipe (saha testi bulgusu: "çok belli belirsiz"), and the
+      // opacity that dimmed it made that worse.
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        paddingVertical: 6,
-        opacity: pressed ? 0.4 : 0.55,
+        backgroundColor: colors.bgSurface,
+        borderRadius: radius.card,
+        borderWidth: hairline,
+        borderColor: colors.strokeSubtle,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        opacity: pressed ? 0.85 : 1,
       })}
     >
       <View
@@ -224,7 +233,7 @@ export function UpcomingRow({
           backgroundColor: colors.waiting,
         }}
       />
-      <Text style={{ fontFamily: fonts.bodyRegular, fontSize: 15, color: colors.textSecondary }}>
+      <Text style={{ flex: 1, fontFamily: fonts.bodyRegular, fontSize: 15, color: colors.textPrimary }}>
         {challenge.title}
         <Text style={{ fontSize: 13, color: colors.textTertiary }}>
           {'  ·  '}

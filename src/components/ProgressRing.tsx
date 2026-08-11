@@ -34,6 +34,10 @@ interface Props {
   /** Called with the 1-based day number when a repairable segment is tapped.
    * Taps anywhere else on the ring are ignored. */
   onRepairDayPress?: (dayNumber: number) => void;
+  /** This ring shows no real progress — it's the boot animation. Suppresses
+   * the check-in celebration, which only makes sense when a person actually
+   * completed something. */
+  decorative?: boolean;
 }
 
 const DIM: Record<RingSize, { px: number; stroke: number }> = {
@@ -82,9 +86,10 @@ interface SegProps {
   isActive: boolean;
   stroke: number;
   repairable?: boolean;
+  decorative?: boolean;
 }
 
-function Segment({ d, length, state, isActive, stroke, repairable }: SegProps) {
+function Segment({ d, length, state, isActive, stroke, repairable, decorative }: SegProps) {
   const filled = state === 'done' || state === 'joker';
   // opacity of the colored overlay; dashoffset controls the "sweep" fill.
   const op = useSharedValue(filled ? 1 : state === 'today' ? 0.4 : 0);
@@ -115,11 +120,19 @@ function Segment({ d, length, state, isActive, stroke, repairable }: SegProps) {
       // check-in: sweep fill (400ms) then a short brightness pulse
       op.value = 1;
       offset.value = withTiming(0, { duration: 400, easing: Easing.out(Easing.cubic) });
-      op.value = withSequence(
-        withTiming(1, { duration: 400 }),
-        withTiming(0.7, { duration: 75 }),
-        withTiming(1, { duration: 75 }),
-      );
+      // The pulse celebrates a check-in someone just made. On a decorative
+      // ring every segment crosses today→done as the chase goes round, and
+      // the pulse runs 550ms against a 260ms step — so a segment is still
+      // dimming and brightening while two more fill behind it, which reads as
+      // random flicker (saha testi bulgusu: "3. halka dolarken 1. halkanın
+      // rengi kapanıp açılıyor"). Nothing to celebrate here, so no pulse.
+      if (!decorative) {
+        op.value = withSequence(
+          withTiming(1, { duration: 400 }),
+          withTiming(0.7, { duration: 75 }),
+          withTiming(1, { duration: 75 }),
+        );
+      }
       return;
     }
 
@@ -186,6 +199,7 @@ export function ProgressRing({
   strokeWidth,
   repairableDays,
   onRepairDayPress,
+  decorative,
 }: Props) {
   const base = DIM[size];
   const px = diameter ?? base.px;
@@ -249,6 +263,7 @@ export function ProgressRing({
           const state = days[i] ?? 'empty';
           return (
             <Segment
+              decorative={decorative}
               key={i}
               d={d}
               length={length}

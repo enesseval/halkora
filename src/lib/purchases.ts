@@ -146,6 +146,25 @@ export async function restore(): Promise<boolean> {
 }
 
 /**
+ * Does this Apple Account already hold the entitlement?
+ *
+ * Asked after a failed purchase rather than matched against an error code:
+ * "you already own this" arrives under different codes across SDK versions,
+ * and the question that actually matters isn't which error it was — it's
+ * whether the person is entitled. If they are, the purchase attempt was
+ * unnecessary rather than failed.
+ *
+ * This is the recovery path for a webhook that never landed: someone whose
+ * profiles.is_pro stayed false is otherwise stuck looking at a paywall for
+ * something they already bought, with no way out of it.
+ */
+export async function hasProEntitlement(): Promise<boolean> {
+  if (!isPurchasesConfigured) return false;
+  const info = await Purchases.getCustomerInfo();
+  return Boolean(info.entitlements.active[PRO_ENTITLEMENT]);
+}
+
+/**
  * Did the person cancel the App Store sheet? That is not a failure and must
  * not raise an error dialog — the flag RevenueCat sets is the only way to
  * tell it apart from a real problem.

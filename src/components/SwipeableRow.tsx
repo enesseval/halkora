@@ -15,11 +15,43 @@ export interface SwipeAction {
   onPress: () => void;
 }
 
+/** Full button size on a card row, and on a one-line row. */
+const SIZE = { full: 64, compact: 40 };
+/** Gap between buttons, and from the screen edge. */
+const GAP = 8;
 /**
- * iOS-standard swipe-from-the-right row actions (Home's challenge list —
- * saha testi bulgusu). A thin wrapper over react-native-gesture-handler's
- * Swipeable: renders `actions` as fixed-width buttons that slide in from the
- * right, closes itself once an action fires.
+ * How far the row has to travel before the NEXT button starts to appear.
+ * Apple's own rows bring actions in one at a time as the drag grows rather
+ * than sliding a finished strip into view, so each button gets its own
+ * entrance a little further along the drag.
+ */
+const REVEAL_STEP = 22;
+/** Where a button's growth starts, measured in drag pixels. */
+const FIRST_REVEAL = 10;
+/** Drag distance over which a button goes from a dot to full size. */
+const GROW_OVER = 34;
+/**
+ * Past this, letting go performs the destructive action outright instead of
+ * parking the row open — the "swipe all the way to delete" every iOS list has.
+ * Deliberately far: it must not be reachable by an ordinary swipe that meant
+ * to reveal the buttons.
+ */
+const FULL_SWIPE = 220;
+
+/**
+ * iOS-standard swipe-from-the-right row actions.
+ *
+ * The animation is driven by `dragX` (how far the finger has actually moved)
+ * rather than by Swipeable's `progress` (0→1 across the whole action strip).
+ * That difference is the whole point: progress makes every button appear
+ * together and finish together, which is what made this feel wrong. Keying off
+ * real distance lets each button start growing at its own threshold, the way
+ * Messages and Mail do it.
+ *
+ * The order matters too — the button nearest the screen edge is the one a
+ * short swipe reveals first, so the reveal order runs from the END of the
+ * array backwards. Destructive actions live last, so a small swipe surfaces
+ * exactly the one people are usually reaching for.
  */
 export function SwipeableRow({
   children,
@@ -29,79 +61,129 @@ export function SwipeableRow({
   children: ReactNode;
   actions: SwipeAction[];
   /**
-   * The row is a single line of text rather than a card. These buttons are
-   * sized for a card — 72pt wide with the label stacked under the icon — and
-   * in a ~30pt row that collapses into unreadable coloured pills (saha testi
-   * bulgusu on the "Yakında" list). Compact drops the label and narrows the
-   * button so the icon alone carries it, which is what fits at that height.
+   * The row is a single line of text rather than a card, so the buttons shrink
+   * to match its height instead of towering over it.
    */
   compact?: boolean;
 }) {
   const ref = useRef<Swipeable>(null);
+  /** Set while the drag is past FULL_SWIPE, read when the gesture ends. */
+  const armed = useRef(false);
+  /** renderRightActions runs on every render; the listener must not stack. */
+  const watching = useRef(false);
+  const size = compact ? SIZE.compact : SIZE.full;
 
-  const renderRightActions = (progress: RNAnimated.AnimatedInterpolation<number>) => (
-    <View
-      style={{
-        flexDirection: 'row',
-        height: '100%',
-        alignItems: 'center',
-        paddingVertical: compact ? 0 : 8,
-      }}
-    >
-      {actions.map((action, i) => {
-        const isLast = i === actions.length - 1;
-        // Each button's own [0,1] progress so they fan in slightly staggered
-        // instead of all snapping to full width at once.
-        const scale = progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.7, 1],
-          extrapolate: 'clamp',
-        });
-        return (
-          <RNAnimated.View
-            key={action.label}
-            style={{
-              transform: [{ scale }],
-              marginLeft: i === 0 ? 8 : 6,
-              marginRight: isLast ? 8 : 0,
-              height: '100%',
-            }}
-          >
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                ref.current?.close();
-                action.onPress();
-              }}
-              // A label needs the height to sit under the icon; without it the
-              // button just needs to be tappable, so it stays 44pt — Apple's
-              // minimum target — even though the row it belongs to is shorter.
-              accessibilityLabel={compact ? action.label : undefined}
-              style={{
-                width: compact ? 44 : 72,
-                height: compact ? 44 : '100%',
-                backgroundColor: action.color,
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 4,
-                borderRadius: radius.badge,
-              }}
-            >
-              <Feather name={action.icon} size={17} color={colors.bgBase} />
-              {compact ? null : (
-                <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.bgBase }}>
-                  {action.label}
-                </AppText>
-              )}
-            </Pressable>
-          </RNAnimated.View>
-        );
-      })}
-    </View>
-  );
+  const renderRightActions = (
+    _progress: RNAnimated.AnimatedInterpolation<number>,
+    dragX: RNAnimated.AnimatedInterpolation<number>,
+  ) => {
+    // Arm the full swipe from the same value the animation uses, so the
+    // threshold and the visuals can never disagree.
+    if (!watching.current) {
+      watching.current = true;
+      (dragX as unknown as RNAnimated.Value).addListener?.(({ value }) => {
+        armed.current = -value >= FULL_SWIPE;
+      });
+    }
+
+    // dragX is negative when swiping left; flip it so the thresholds below
+    // read as plain distances.
+    const drag = (dragX as unknown as RNAnimated.Value).interpolate({
+      inputRange: [-500, 0],
+      outputRange: [500, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingRight: GAP,
+          gap: GAP,
+        }}
+      >
+        {actions.map((action, i) => {
+          // Reveal order counts back from the edge: the last action appears
+          // first, the one before it next, and so on.
+          const order = actions.length - 1 - i;
+          const start = FIRST_REVEAL + order * REVEAL_STEP;
+          const end = start + GROW_OVER;
+
+          // A dot that grows into the button, exactly as a short swipe does in
+          // Messages. Not a fade: the size change is what reads as "appearing".
+          const scale = drag.interpolate({
+            inputRange: [0, start, end],
+            outputRange: [0.2, 0.2, 1],
+            extrapolate: 'clamp',
+          });
+          const opacity = drag.interpolate({
+            inputRange: [0, start, start + GROW_OVER * 0.6],
+            outputRange: [0, 0, 1],
+            extrapolate: 'clamp',
+          });
+
+          return (
+            <RNAnimated.View key={action.label} style={{ transform: [{ scale }], opacity }}>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  ref.current?.close();
+                  action.onPress();
+                }}
+                accessibilityLabel={action.label}
+                style={{
+                  width: size,
+                  height: size,
+                  // Round, like the controls Apple reveals on a swipe — and a
+                  // circle is what makes the scale-up read as a button
+                  // arriving rather than a rectangle stretching.
+                  borderRadius: size / 2,
+                  backgroundColor: action.color,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                }}
+              >
+                <Feather name={action.icon} size={compact ? 15 : 18} color={colors.bgBase} />
+                {/* Only the full-size button has room for a label under the
+                    icon; on a one-line row the icon carries it alone. */}
+                {compact ? null : (
+                  <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 9, color: colors.bgBase }}>
+                    {action.label}
+                  </AppText>
+                )}
+              </Pressable>
+            </RNAnimated.View>
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
-    <Swipeable ref={ref} renderRightActions={renderRightActions} overshootRight={false} friction={2}>
+    <Swipeable
+      ref={ref}
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      friction={1.6}
+      // The strip should be considered "open" while the buttons are visible,
+      // rather than only after a long pull.
+      rightThreshold={40}
+      onSwipeableWillOpen={() => {
+        // Dragged all the way: do the last (destructive) action instead of
+        // parking the row open, which is what every iOS list does.
+        if (!armed.current) return;
+        armed.current = false;
+        const last = actions[actions.length - 1];
+        ref.current?.close();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+        last?.onPress();
+      }}
+      onSwipeableClose={() => {
+        armed.current = false;
+      }}
+    >
       {children}
     </Swipeable>
   );

@@ -79,7 +79,7 @@ export default function StartScreen() {
   const [pasted, setPasted] = useState(false);
   // Focusing the field asks iOS for the clipboard; if it holds an invite code
   // it goes straight in. See useClipboardCode.
-  const readClipboard = useClipboardCode((code) => {
+  const clipboard = useClipboardCode((code) => {
     setInput(code);
     setPasted(true);
   });
@@ -124,7 +124,7 @@ export default function StartScreen() {
             }}
             placeholder={t.start.linkPlaceholder}
             placeholderTextColor={colors.textTertiary}
-            onFocus={readClipboard}
+            onFocus={clipboard.check}
             // Codes are substr(md5(...), 1, 10) — lowercase hex — and the
             // lookup is `where invite_code = p_code`, with no lower() on
             // either side. Upper-casing the field would break every join.
@@ -137,6 +137,12 @@ export default function StartScreen() {
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyRegular, fontSize: 15 }}
           />
         </View>
+
+        {clipboard.notCode && !input ? (
+          <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>
+            {t.start.clipboardNotCode}
+          </AppText>
+        ) : null}
 
         {problem ? (
           <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 10, marginLeft: 4 }}>

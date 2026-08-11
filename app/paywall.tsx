@@ -8,8 +8,15 @@ import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { AppText, Button } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useT } from '@/i18n';
-import { fetchPlans, isCancelled, purchase, restore, type Plans } from '@/lib/purchases';
-import { refreshProfile } from '@/hooks/useAuth';
+import {
+  fetchPlans,
+  hasProEntitlement,
+  isCancelled,
+  purchase,
+  restore,
+  type Plans,
+} from '@/lib/purchases';
+import { awaitProUnlock } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 import type { SegmentState } from '@/data/types';
@@ -189,7 +196,17 @@ export default function Paywall() {
       if (ok) await onEntitled();
     } catch (e) {
       // Backing out of Apple's sheet is a normal thing to do, not an error.
-      if (!isCancelled(e)) Alert.alert(t.pro.purchaseFailed, friendlyErrorMessage(e));
+      if (isCancelled(e)) return;
+      // Before calling it a failure, ask whether they're entitled anyway.
+      // "You already own this" is what Apple says to someone whose purchase
+      // went through but whose profiles.is_pro never got written — showing
+      // them an error would leave them stuck on a paywall for something they
+      // already paid for.
+      if (await hasProEntitlement().catch(() => false)) {
+        await onEntitled();
+        return;
+      }
+      Alert.alert(t.pro.purchaseFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -216,8 +233,15 @@ export default function Paywall() {
    * the source of truth.
    */
   const onEntitled = async () => {
-    await refreshProfile().catch(() => {});
-    Alert.alert(t.pro.thanksTitle, t.pro.thanksBody);
+    const unlocked = await awaitProUnlock();
+    // If the webhook still hasn't landed, say so plainly instead of
+    // congratulating someone whose ring limit is about to block them again.
+    // The purchase is safe either way — Apple has it, and the next profile
+    // refresh (any foreground resume) will pick it up.
+    Alert.alert(
+      unlocked ? t.pro.thanksTitle : t.pro.pendingTitle,
+      unlocked ? t.pro.thanksBody : t.pro.pendingBody,
+    );
     close();
   };
 

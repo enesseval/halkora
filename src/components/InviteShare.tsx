@@ -6,14 +6,32 @@ import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, type } from '@/theme/tokens';
 import { useT } from '@/i18n';
 import { AppText, Button } from './ui';
+import { ShareRingSheet } from './ShareRingSheet';
+import type { Challenge } from '@/data/types';
 
 /** "Daveti paylaş" button + a real, working copy-link row. Used by E4 (invite) and Detail (upcoming). */
-export function InviteShare({ inviteCode, title }: { inviteCode: string; title: string }) {
+export function InviteShare({
+  inviteCode,
+  title,
+  challenge,
+}: {
+  inviteCode: string;
+  title: string;
+  /** When given, the primary button opens the image share sheet instead of
+   * posting a bare link. A plain URL in a chat reads like something you
+   * shouldn't tap; a card says what the ring is before anyone taps anything. */
+  challenge?: Challenge;
+}) {
   const { t } = useT();
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const link = `halkora.app/j/${inviteCode}`;
 
   const share = () => {
+    if (challenge) {
+      setSharing(true);
+      return;
+    }
     Share.share({ message: t.invite.shareMessage(title, link) }).catch(() => {});
   };
 
@@ -53,6 +71,10 @@ export function InviteShare({ inviteCode, title }: { inviteCode: string; title: 
           {copied ? t.common.copied : t.common.copy}
         </AppText>
       </Pressable>
+
+      {sharing && challenge ? (
+        <ShareRingSheet challenge={challenge} onClose={() => setSharing(false)} />
+      ) : null}
     </View>
   );
 }
