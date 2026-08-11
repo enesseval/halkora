@@ -4,6 +4,45 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Halkora davet</title>
+
+<!--
+  Link preview. Without these, an invite pasted into Messages or WhatsApp
+  arrives as a bare blue URL and reads like something you shouldn't tap. These
+  turn it into a card with a title, a line of explanation and an image.
+
+  Static on purpose: the invite code is in the path, and rendering the
+  challenge's own title here would mean this page could read anyone's
+  challenge by code — a private ring's name leaking to whoever guesses a URL.
+  The preview says what Halkora is; the ring's name stays inside the app.
+
+  og:image must be an ABSOLUTE url, at least 200x200, and reachable without a
+  login — Messages and WhatsApp fetch it from their own servers, not the
+  phone. 1200x630 is the size both crop cleanly.
+-->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Halkora" />
+<meta property="og:title" content="Halkora'ya davet edildin" />
+<meta property="og:description" content="Bir halkaya katıl — her gün tek bir şey, birlikte." />
+<meta property="og:image" content="https://www.halkora.app/og-invite.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:locale" content="tr_TR" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Halkora'ya davet edildin" />
+<meta name="twitter:description" content="Bir halkaya katıl — her gün tek bir şey, birlikte." />
+<meta name="twitter:image" content="https://www.halkora.app/og-invite.png" />
+
+<!-- Shown by Safari and some chat apps under the title. -->
+<meta name="description" content="Bir halkaya katıl — her gün tek bir şey, birlikte." />
+<meta name="theme-color" content="#0D0E11" />
+
+<!--
+  Smart App Banner: Safari puts an "Open in app / Get" strip at the top of the
+  page for anyone who lands here without the app. Replace the numeric id with
+  the real App Store id once the app is live.
+-->
+<meta name="apple-itunes-app" content="app-id=XXXXXXXXXX" />
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }

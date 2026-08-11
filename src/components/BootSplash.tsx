@@ -39,7 +39,7 @@ export function BootSplash() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgBase, alignItems: 'center', justifyContent: 'center' }}>
-      <ProgressRing totalDays={TOTAL} days={days} size="L" />
+      <ProgressRing totalDays={TOTAL} days={days} size="L" decorative />
 
       <Animated.View entering={FadeIn.delay(280).duration(700)} style={{ marginTop: 30 }}>
         <AppText
