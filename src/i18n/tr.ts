@@ -448,6 +448,8 @@ export const tr = {
     restoreFailed: 'Geri yükleme başarısız',
     restoreNoneTitle: 'Aktif abonelik bulunamadı',
     restoreNoneBody: 'Bu Apple hesabında Halkora Pro aboneliği görünmüyor. Satın alırken kullandığın hesapla giriş yaptığından emin ol.',
+    pendingTitle: 'Satın alma alındı',
+    pendingBody: 'Aboneliğin Apple tarafında onaylandı, Pro birkaç saniye içinde açılacak. Açılmazsa uygulamayı kapatıp tekrar aç.',
     thanksTitle: 'Halkora Pro açıldı',
     thanksBody: 'Sınırsız halka ve gelişmiş istatistikler artık senin. Teşekkürler.',
     renewalTerms: 'Otomatik yenilenen abonelik. İptal etmediğin sürece dönem sonunda yenilenir; Apple hesabından istediğin an iptal edebilirsin.',

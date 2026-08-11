@@ -106,6 +106,28 @@ export async function refreshProfile(): Promise<void> {
 }
 
 /**
+ * Re-reads the profile until `is_pro` turns true, or gives up.
+ *
+ * A purchase completes at Apple, but `profiles.is_pro` is written by the
+ * RevenueCat webhook a moment later. Reading once, straight after the
+ * purchase, races that write and gets the old value — which is exactly what
+ * left the ring limit still blocking right after a successful purchase (saha
+ * testi bulgusu). The server is still the only thing that decides who is Pro;
+ * this just waits for it to answer.
+ *
+ * Returns whether it turned true, so the caller can say something honest when
+ * it didn't rather than claiming success.
+ */
+export async function awaitProUnlock(attempts = 6, gapMs = 1500): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    await refreshProfile().catch(() => {});
+    if (useAuthStore.getState().isPro) return true;
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, gapMs));
+  }
+  return useAuthStore.getState().isPro;
+}
+
+/**
  * Call once from the root layout. Restores the persisted session and keeps
  * the store in sync with Supabase auth changes.
  */

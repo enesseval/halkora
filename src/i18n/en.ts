@@ -430,6 +430,8 @@ export const en: Dictionary = {
     restoreFailed: 'Restore failed',
     restoreNoneTitle: 'No active subscription',
     restoreNoneBody: "This Apple Account doesn't have a Halkora Pro subscription. Make sure you're signed in with the account you bought it on.",
+    pendingTitle: 'Purchase received',
+    pendingBody: 'Apple has confirmed your subscription; Pro will unlock in a few seconds. If it doesn\u2019t, close and reopen the app.',
     thanksTitle: 'Halkora Pro is on',
     thanksBody: 'Unlimited rings and advanced stats are yours. Thank you.',
     renewalTerms: 'Auto-renewing subscription. It renews at the end of each period unless cancelled, and you can cancel any time from your Apple Account.',
