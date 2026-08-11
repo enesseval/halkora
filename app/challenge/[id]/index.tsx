@@ -536,7 +536,7 @@ export default function DetailScreen() {
       </View>
 
       <View style={{ marginTop: 24, alignSelf: 'stretch' }}>
-        <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+        <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} challenge={challenge} />
       </View>
 
       {challenge.isOwner ? (
@@ -713,7 +713,7 @@ export default function DetailScreen() {
       {/* upcoming: invite is still open — let the owner pull people in later too */}
       {isUpcoming ? (
         <View style={{ marginTop: 24 }}>
-          <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+          <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} challenge={challenge} />
         </View>
       ) : null}
 

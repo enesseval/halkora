@@ -1,0 +1,436 @@
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { View } from 'react-native';
+import { colors, fonts } from '@/theme/tokens';
+import { AppText } from './ui';
+import { useT } from '@/i18n';
+import type { Challenge } from '@/data/types';
+
+/**
+ * The invite/progress share card — the image that gets posted to a Story.
+ *
+ * Two variants, because the two moments are not the same card:
+ *   A (invitation) — a ring that hasn't started. There is no progress, and a
+ *     card reading "0/14" says "nothing has happened yet", which is useless as
+ *     an invitation. So the ring is an empty frame with the start date in it,
+ *     and the card is about who's already in and whether you'll join them.
+ *   B (progress) — a ring already running or finished. The number is the
+ *     GROUP's, never the sharer's own: this app has no individual score.
+ *
+ * Laid out at 360×640 logical points and captured at the device pixel ratio,
+ * so a 3x phone produces the 1080×1920 the design specifies. Every measurement
+ * below is the design's 1080-canvas number divided by three, kept as that
+ * arithmetic rather than a rounded guess so the two stay comparable.
+ */
+
+export const STORY_W = 360;
+export const STORY_H = 640;
+export const SQUARE = 360;
+
+/** 1080-canvas value → logical points. */
+const u = (px: number) => px / 3;
+
+const TYPE = {
+  title: u(92),
+  titleLine: u(101),
+  action: u(46),
+  invite: u(64),
+  whoIsIn: u(40),
+  meta: u(40),
+  wordmark: u(34),
+};
+
+const PAD = {
+  edge: u(90),
+  // Instagram's own UI covers the top and bottom ~250px of a story; these
+  // clear it with room to spare.
+  top: u(300),
+  bottom: u(290),
+};
+
+const RING = {
+  story: u(560),
+  square: u(440),
+  stroke: u(34),
+  /** Constant regardless of day count — at 30 segments the stroke thins
+   * instead, so the circle never breaks up (design note). */
+  gapDeg: 3,
+  /** The 12-o'clock mark on an unstarted ring: where it will begin. */
+  startDot: u(13),
+};
+
+function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): string {
+  const p = (a: number) => {
+    const rad = ((a - 90) * Math.PI) / 180;
+    return `${(cx + r * Math.cos(rad)).toFixed(2)} ${(cy + r * Math.sin(rad)).toFixed(2)}`;
+  };
+  const large = a1 - a0 > 180 ? 1 : 0;
+  return `M ${p(a0)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 ${large} 1 ${p(a1)}`;
+}
+
+/**
+ * The ring, drawn to the share spec rather than reused from ProgressRing —
+ * that one owns the in-app geometry (6° gaps, its own size presets) and is on
+ * every screen in the app. Giving it a second personality for one card would
+ * put every screen at risk for no gain.
+ */
+function ShareRing({
+  size,
+  totalDays,
+  filledDays,
+  empty,
+  children,
+}: {
+  size: number;
+  totalDays: number;
+  filledDays: number;
+  /** Variant A: no progress claim, just the frame and a start mark. */
+  empty?: boolean;
+  children: React.ReactNode;
+}) {
+  // Thinner as the day count climbs so 30 segments stay round.
+  const stroke = totalDays >= 21 ? RING.stroke * 0.72 : RING.stroke;
+  const r = size / 2 - stroke / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const step = 360 / totalDays;
+  const span = step - RING.gapDeg;
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+        {empty ? (
+          <>
+            <Circle cx={cx} cy={cy} r={r} stroke={colors.waiting} strokeWidth={stroke} fill="none" />
+            {/* Where day one will land. One dot of ember on an otherwise
+                unlit ring — the card's only colour, and the thing that makes
+                an empty circle read as "about to start" rather than blank. */}
+            <Circle cx={cx} cy={cy - r} r={RING.startDot / 2} fill={colors.ember} />
+          </>
+        ) : (
+          Array.from({ length: totalDays }, (_, i) => (
+            <Path
+              key={i}
+              d={arcPath(cx, cy, r, i * step + RING.gapDeg / 2, i * step + RING.gapDeg / 2 + span)}
+              stroke={i < filledDays ? colors.ember : colors.waiting}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              fill="none"
+            />
+          ))
+        )}
+      </Svg>
+      {children}
+    </View>
+  );
+}
+
+/** Small initial bubbles, capped, with a "+N" chip like the design's row. */
+function Faces({ challenge, max = 4 }: { challenge: Challenge; max?: number }) {
+  const people = challenge.participants.slice(0, max);
+  const extra = challenge.participants.length - people.length;
+  const D = u(56);
+  return (
+    <View style={{ flexDirection: 'row' }}>
+      {people.map((p, i) => (
+        <View
+          key={p.id ?? i}
+          style={{
+            width: D,
+            height: D,
+            borderRadius: D / 2,
+            backgroundColor: colors.bgElevated,
+            borderWidth: 1.5,
+            borderColor: colors.bgBase,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginLeft: i === 0 ? 0 : -u(18),
+          }}
+        >
+          <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: u(24), color: colors.textSecondary }}>
+            {p.initials}
+          </AppText>
+        </View>
+      ))}
+      {extra > 0 ? (
+        <View
+          style={{
+            width: D,
+            height: D,
+            borderRadius: D / 2,
+            backgroundColor: colors.emberSoft,
+            borderWidth: 1.5,
+            borderColor: colors.bgBase,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginLeft: -u(18),
+          }}
+        >
+          <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: u(22), color: colors.ember }}>
+            +{extra}
+          </AppText>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function Wordmark() {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(18) }}>
+      <Svg width={u(34)} height={u(34)}>
+        {Array.from({ length: 8 }, (_, i) => (
+          <Path
+            key={i}
+            d={arcPath(u(17), u(17), u(13), i * 45 + 6, i * 45 + 39)}
+            stroke={colors.ember}
+            strokeWidth={u(7)}
+            strokeLinecap="round"
+            fill="none"
+          />
+        ))}
+      </Svg>
+      <AppText style={{ fontFamily: fonts.displaySemibold, fontSize: TYPE.wordmark, color: colors.textPrimary }}>
+        halkora
+      </AppText>
+    </View>
+  );
+}
+
+/** The vertical background wash the design calls for (#101116 → #0D0E11). */
+function Backdrop({ w, h }: { w: number; h: number }) {
+  return (
+    <Svg width={w} height={h} style={{ position: 'absolute' }}>
+      <Defs>
+        <LinearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#101116" />
+          <Stop offset="1" stopColor={colors.bgBase} />
+        </LinearGradient>
+      </Defs>
+      <Rect x={0} y={0} width={w} height={h} fill="url(#bg)" />
+    </Svg>
+  );
+}
+
+export type InviteCardFormat = 'story' | 'square';
+
+/**
+ * `startsLabel` is passed in rather than derived here: the app already knows
+ * how to say "Yarın" / "15 Ağustos" in the viewer's language (src/lib/day.ts),
+ * and a second date formatter would be a second thing to keep in step.
+ */
+export function InviteCard({
+  challenge,
+  format,
+}: {
+  challenge: Challenge;
+  format: InviteCardFormat;
+}) {
+  const { t } = useT();
+  const w = format === 'story' ? STORY_W : SQUARE;
+  const h = format === 'story' ? STORY_H : SQUARE;
+
+  // Variant A whenever the ring hasn't begun — a lobby or a future start date.
+  const invite = challenge.status === 'lobby' || challenge.status === 'upcoming';
+  const done = challenge.days.filter((d) => d === 'done' || d === 'joker').length;
+  const finished = challenge.status === 'completed';
+  const alone = challenge.participants.length <= 1;
+  const owner = challenge.participants[0]?.name ?? '';
+
+  const ringSize = format === 'story' ? RING.story : RING.square;
+
+  const ring = (
+    <ShareRing size={ringSize} totalDays={challenge.totalDays} filledDays={done} empty={invite}>
+      {invite ? (
+        <View style={{ alignItems: 'center' }}>
+          <AppText
+            style={{
+              fontFamily: fonts.displaySemibold,
+              fontSize: u(72),
+              color: colors.textPrimary,
+              letterSpacing: -0.5,
+            }}
+          >
+            {challenge.startsLabel ?? challenge.startsWhen ?? ''}
+          </AppText>
+          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.meta, color: colors.textTertiary, marginTop: u(10) }}>
+            {t.shareCard.startsIn(challenge.totalDays)}
+          </AppText>
+        </View>
+      ) : (
+        <View style={{ alignItems: 'center' }}>
+          <AppText
+            style={{
+              fontFamily: fonts.displaySemibold,
+              fontSize: u(112),
+              color: finished ? colors.ember : colors.textPrimary,
+              letterSpacing: -1,
+            }}
+          >
+            {done}/{challenge.totalDays}
+          </AppText>
+          <AppText
+            numberOfLines={1}
+            style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.meta, color: colors.textTertiary, marginTop: u(6), maxWidth: ringSize * 0.8 }}
+          >
+            {finished ? challenge.title : t.shareCard.together}
+          </AppText>
+        </View>
+      )}
+    </ShareRing>
+  );
+
+  const head = (
+    <View style={{ alignItems: format === 'story' ? 'center' : 'flex-start' }}>
+      {invite ? (
+        alone ? (
+          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.whoIsIn, color: colors.textSecondary, marginBottom: u(14) }}>
+            {t.shareCard.startedAlone(owner)}
+          </AppText>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(20), marginBottom: u(14) }}>
+            <Faces challenge={challenge} />
+            <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.whoIsIn, color: colors.textSecondary }}>
+              {t.shareCard.peopleIn(challenge.participants.length)}
+            </AppText>
+          </View>
+        )
+      ) : null}
+
+      {finished ? (
+        <AppText
+          style={{
+            fontFamily: fonts.displaySemibold,
+            fontSize: TYPE.title,
+            lineHeight: TYPE.titleLine,
+            color: colors.textPrimary,
+            letterSpacing: -TYPE.title * 0.02,
+            textAlign: format === 'story' ? 'center' : 'left',
+          }}
+        >
+          {t.shareCard.finishedHeadline(challenge.totalDays)}
+        </AppText>
+      ) : (
+        <>
+          <AppText
+            numberOfLines={2}
+            style={{
+              fontFamily: fonts.displaySemibold,
+              fontSize: TYPE.title,
+              lineHeight: TYPE.titleLine,
+              color: colors.textPrimary,
+              letterSpacing: -TYPE.title * 0.02,
+              textAlign: format === 'story' ? 'center' : 'left',
+            }}
+          >
+            {challenge.title}
+          </AppText>
+          <AppText
+            numberOfLines={1}
+            style={{
+              fontFamily: fonts.bodyRegular,
+              fontSize: TYPE.action,
+              color: colors.textSecondary,
+              marginTop: u(12),
+              textAlign: format === 'story' ? 'center' : 'left',
+            }}
+          >
+            {challenge.dailyActionRaw ?? ''}
+          </AppText>
+        </>
+      )}
+    </View>
+  );
+
+  const foot = (
+    <View style={{ alignItems: format === 'story' ? 'center' : 'flex-start' }}>
+      {!invite && !finished ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(20), marginBottom: u(22) }}>
+          <Faces challenge={challenge} />
+          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.meta, color: colors.textSecondary }}>
+            {t.shareCard.groupMeta(challenge.participants.length, done)}
+          </AppText>
+        </View>
+      ) : null}
+
+      <AppText
+        style={{
+          fontFamily: fonts.displaySemibold,
+          fontSize: TYPE.invite,
+          color: colors.textPrimary,
+          textAlign: format === 'story' ? 'center' : 'left',
+        }}
+      >
+        {invite
+          ? alone
+            ? t.shareCard.askAlone
+            : t.shareCard.askGroup
+          : finished
+            ? t.shareCard.closed
+            : t.shareCard.stillOpen}
+      </AppText>
+
+      <AppText
+        style={{
+          fontFamily: fonts.bodyRegular,
+          fontSize: TYPE.meta,
+          color: colors.textTertiary,
+          marginTop: u(14),
+          textAlign: format === 'story' ? 'center' : 'left',
+        }}
+      >
+        {/* The code is never printed on the image — a story screenshot would
+            let anyone into a group that never invited them. The link travels
+            as text beside the image instead. */}
+        {t.shareCard.linkBeside}
+      </AppText>
+
+      <View style={{ marginTop: u(34) }}>
+        <Wordmark />
+      </View>
+    </View>
+  );
+
+  if (format === 'square') {
+    return (
+      <View style={{ width: w, height: h, overflow: 'hidden' }}>
+        <Backdrop w={w} h={h} />
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: u(50),
+            paddingHorizontal: PAD.edge,
+          }}
+        >
+          {ring}
+          <View style={{ flex: 1 }}>
+            {head}
+            <View style={{ height: u(40) }} />
+            {foot}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ width: w, height: h, overflow: 'hidden' }}>
+      <Backdrop w={w} h={h} />
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: PAD.edge,
+          paddingTop: PAD.top,
+          paddingBottom: PAD.bottom,
+        }}
+      >
+        {head}
+        {ring}
+        {foot}
+      </View>
+    </View>
+  );
+}

@@ -538,6 +538,31 @@ export const tr = {
     zeroTolerance:
       'Halkora’da taciz, nefret söylemi ve uygunsuz içeriğe sıfır tolerans vardır. Bildirilen içerik 24 saat içinde incelenir.',
   },
+  /** Paylaşım kartı (davet + ilerleme) — görselin üzerindeki metinler. */
+  shareCard: {
+    startedAlone: (name: string) => `${name} bir halka kurdu`,
+    peopleIn: (n: number) => (n === 2 ? '2 kişi bu halkada' : `${n} kişi bu halkada`),
+    startsIn: (days: number) => `başlıyor · ${days} gün`,
+    together: 'birlikte',
+    groupMeta: (people: number, days: number) => `${people} kişi, ${days} gündür her gün`,
+    askAlone: 'Benimle var mısın?',
+    askGroup: 'Bize katılır mısın?',
+    stillOpen: 'Halka hâlâ açık — katılabilirsin',
+    closed: 'Halka kapandı. Yenisi yakında.',
+    finishedHeadline: (days: number) => `${days} gün.\nBirlikte.`,
+    linkBeside: 'Davet bağlantısı bu hikâyenin yanında',
+    // Paylaşım sayfası
+    sheetTitle: 'Halkanı paylaş',
+    formatStory: 'Story',
+    formatSquare: 'Kare',
+    share: 'Paylaş',
+    saveImage: 'Görseli kaydet',
+    copyLink: 'Bağlantıyı kopyala',
+    linkNote: 'Davet bağlantısı görselin yanında metin olarak gider.',
+    saved: 'Görsel kaydedildi',
+    savedFailed: 'Görsel kaydedilemedi',
+    copied: 'Bağlantı kopyalandı',
+  },
   chat: {
     day: (n: number) => `Gün ${n}`,
     // Halka başlamadan atılan mesajlar 0. güne yazılıyor; "Gün 0" diye bir
