@@ -14,6 +14,38 @@ import type { Challenge } from '@/data/types';
 /** How wide the preview is allowed to be inside the sheet. */
 const PREVIEW_W = 150;
 
+/** The two outlined buttons under the primary one. */
+function SecondaryAction({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        flex: 1,
+        height: 46,
+        borderRadius: radius.pill,
+        borderWidth: hairline,
+        borderColor: colors.strokeSubtle,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed || disabled ? 0.6 : 1,
+      })}
+    >
+      <AppText variant="bodyMedium" style={{ fontSize: 14 }}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
 /**
  * "Halkanı paylaş" — the sheet that turns a ring into a postable image.
  *
@@ -189,30 +221,8 @@ export function ShareRingSheet({
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-              {[
-                { label: t.shareCard.saveImage, onPress: doSave },
-                { label: t.shareCard.copyLink, onPress: doCopy },
-              ].map((a) => (
-                <Pressable
-                  key={a.label}
-                  onPress={a.onPress}
-                  disabled={busy}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    height: 46,
-                    borderRadius: radius.pill,
-                    borderWidth: hairline,
-                    borderColor: colors.strokeSubtle,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed || busy ? 0.6 : 1,
-                  })}
-                >
-                  <AppText variant="bodyMedium" style={{ fontSize: 14 }}>
-                    {a.label}
-                  </AppText>
-                </Pressable>
-              ))}
+              <SecondaryAction label={t.shareCard.saveImage} onPress={doSave} disabled={busy} />
+              <SecondaryAction label={t.shareCard.copyLink} onPress={doCopy} disabled={busy} />
             </View>
 
             <AppText
