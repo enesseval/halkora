@@ -3,8 +3,7 @@ import { Animated as RNAnimated, Pressable, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, fonts, radius } from '@/theme/tokens';
-import { AppText } from './ui';
+import { colors, radius } from '@/theme/tokens';
 
 export interface SwipeAction {
   label: string;
@@ -16,11 +15,11 @@ export interface SwipeAction {
 }
 
 /** Full button size on a card row, and on a one-line row. */
-const SIZE = { full: 64, compact: 40 };
+const SIZE = { full: 52, compact: 40 };
 /** Gap between buttons, and from the screen edge. */
-const GAP = 8;
+const GAP = 4;
 /** Breathing room between the row itself and the first button. */
-const LEAD = 12;
+const LEAD = 8;
 /**
  * Past this, letting go performs the destructive action outright instead of
  * parking the row open — the "swipe all the way to delete" every iOS list has.
@@ -153,17 +152,14 @@ export function SwipeableRow({
                   backgroundColor: action.color,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 2,
                 }}
               >
-                <Feather name={action.icon} size={compact ? 15 : 18} color={colors.bgBase} />
-                {/* Only the full-size button has room for a label under the
-                    icon; on a one-line row the icon carries it alone. */}
-                {compact ? null : (
-                  <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 9, color: colors.bgBase }}>
-                    {action.label}
-                  </AppText>
-                )}
+                {/* Icon only, at both sizes. The label under the icon needed
+                    9pt to fit inside a circle and read as cramped noise next
+                    to the clean icon-only version (saha testi bulgusu). The
+                    icon carries the meaning; the label lives on as the
+                    accessibility name. */}
+                <Feather name={action.icon} size={compact ? 16 : 22} color={colors.bgBase} />
               </Pressable>
             </RNAnimated.View>
           );

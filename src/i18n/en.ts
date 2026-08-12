@@ -517,6 +517,7 @@ export const en: Dictionary = {
   shareCard: {
     startedAlone: (name: string) => `${name} started a ring`,
     peopleIn: (n: number) => `${n} people in this ring`,
+    dayCount: (n: number) => `${n} days`,
     startsIn: (days: number) => `starts · ${days} days`,
     together: 'together',
     groupMeta: (people: number, days: number) => `${people} people, ${days} days running`,

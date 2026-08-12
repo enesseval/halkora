@@ -116,7 +116,7 @@ export default function InviteScreen() {
           </AppText>
         ) : (
           <>
-            <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} />
+            <InviteShare inviteCode={challenge.inviteCode} title={challenge.title} challenge={challenge} />
             {/* Real-mode only: no username system in mock mode (Ek O). Same
                 reason it's hidden when joinClosed — sending one would only
                 point the recipient at a join flow that's about to reject

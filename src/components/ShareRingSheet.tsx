@@ -8,6 +8,7 @@ import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
 import { AppText, Button } from './ui';
 import { InviteCard, STORY_H, STORY_W, SQUARE, type InviteCardFormat } from './InviteCard';
+import { inviteUrl } from '@/lib/invite';
 import { useT } from '@/i18n';
 import type { Challenge } from '@/data/types';
 
@@ -66,7 +67,7 @@ export function ShareRingSheet({
   const [busy, setBusy] = useState(false);
   const shotRef = useRef<View>(null);
 
-  const link = `halkora.app/j/${challenge.inviteCode}`;
+  const link = inviteUrl(challenge.inviteCode);
   const scale = PREVIEW_W / (format === 'story' ? STORY_W : SQUARE);
 
   const capture = async (): Promise<string> =>

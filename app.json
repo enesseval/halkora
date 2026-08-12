@@ -11,7 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "associatedDomains": [
-        "applinks:halkora.app"
+        "applinks:halkora.app",
+        "applinks:www.halkora.app"
       ],
       "bundleIdentifier": "com.halkora.app",
       "appleTeamId": "82S9ART43D",

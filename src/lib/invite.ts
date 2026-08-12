@@ -11,6 +11,22 @@
  */
 export const INVITE_CODE_LENGTH = 10;
 
+/**
+ * The link people actually send. One place, because it has to satisfy three
+ * separate systems at once:
+ *
+ *  - Messages/WhatsApp only fetch a link preview from a real URL. A bare
+ *    "halkora.app/j/abc" is a string that some clients linkify and none fetch
+ *    Open Graph tags for, which is why an invite arrived as flat text however
+ *    many meta tags the page carried (saha testi bulgusu).
+ *  - Universal Links need the scheme and a host listed in app.json's
+ *    associatedDomains, or iOS opens Safari instead of the app.
+ *  - The host must match where web/j is actually served from.
+ */
+export function inviteUrl(code: string): string {
+  return `https://halkora.app/j/${code}`;
+}
+
 const MIN = 6;
 const MAX = 16;
 const CODE = `[A-Za-z0-9-]{${MIN},${MAX}}`;
