@@ -18,6 +18,7 @@ import {
   updateChallengeDetails,
   deleteChallenge as deleteChallengeRemote,
   leaveChallenge as leaveChallengeRemote,
+  closeChallenge as closeChallengeRemote,
   startChallenge as startChallengeRemote,
   settleStake,
 } from '@/data/challenges';
@@ -681,15 +682,35 @@ export function useChallengeActions(id: string) {
     }
   };
 
-  /** Non-owner participants only — the RPC itself also rejects the owner.
-   * Same immediate local removal as doDelete, same reason. */
-  const doLeave = async (): Promise<void> => {
+  /**
+   * Removes this device's user from the ring. The owner may do it too — the
+   * earliest-joined member takes over — unless they're the last one there,
+   * which the RPC rejects with LAST_MEMBER_MUST_CLOSE.
+   *
+   * `systemText` is the line the group sees in chat; composed by the caller
+   * because the database can't reach the dictionaries.
+   */
+  const doLeave = async (systemText?: string): Promise<void> => {
     if (isSupabaseConfigured) {
-      await leaveChallengeRemote(id);
+      await leaveChallengeRemote(id, systemText);
     }
     removeChallengeMock(id);
     if (isSupabaseConfigured) {
       queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    }
+  };
+
+  /**
+   * Closes the ring for everyone. Unlike delete, nothing is destroyed: it
+   * leaves the active list, nobody can check in again, and every member keeps
+   * their history. The system message it writes is what notifies them.
+   */
+  const doClose = async (systemText: string): Promise<void> => {
+    if (isSupabaseConfigured) {
+      await closeChallengeRemote(id, systemText);
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    } else {
+      removeChallengeMock(id);
     }
   };
 
@@ -715,6 +736,7 @@ export function useChallengeActions(id: string) {
     settleStake: doSettleStake,
     deleteChallenge: doDelete,
     leaveChallenge: doLeave,
+    closeChallenge: doClose,
     startChallenge: doStart,
   };
 }

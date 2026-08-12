@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { colors, spacing } from '@/theme/tokens';
 import { useTodayStatus, useCheckIn, useChallengeActions, useRefreshChallenges, useCompletedChallenges } from '@/hooks';
 import type { Challenge, SegmentState } from '@/hooks';
+import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
@@ -61,28 +62,53 @@ function PendingCardWithCheckIn({
 function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
   const { t } = useT();
   const router = useRouter();
+  const { name } = useAuth();
   const actions = useChallengeActions(challenge.id);
   const busy = useRef(false);
+  const myName = name?.trim() || t.common.person;
 
+  /**
+   * Same question the detail screen asks, for the same reason: an owner
+   * reaching for delete may mean "end this for everyone" or "get me out of
+   * it", and those are not the same. Asking here too keeps the two entry
+   * points behaving alike rather than one of them quietly destroying a group.
+   */
   const confirmDelete = () => {
     if (busy.current) return;
-    Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
+    const others = challenge.participants.length > 1;
+    const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
       { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.detail.deleteChallenge,
-        style: 'destructive',
+    ];
+    if (others) {
+      buttons.push({
+        text: t.detail.ownerLeave,
         onPress: async () => {
           busy.current = true;
           try {
-            await actions.deleteChallenge();
+            await actions.leaveChallenge(t.detail.systemLeft(myName));
           } catch (e) {
-            Alert.alert(t.detail.deleteChallengeFailed, friendlyErrorMessage(e));
+            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
           } finally {
             busy.current = false;
           }
         },
+      });
+    }
+    buttons.push({
+      text: t.detail.closeChallenge,
+      style: 'destructive',
+      onPress: async () => {
+        busy.current = true;
+        try {
+          await actions.closeChallenge(t.detail.systemClosed(myName));
+        } catch (e) {
+          Alert.alert(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
+        } finally {
+          busy.current = false;
+        }
       },
-    ]);
+    });
+    Alert.alert(t.detail.ownerExitTitle, t.detail.ownerExitBody, buttons);
   };
 
   const confirmLeave = () => {
@@ -95,7 +121,7 @@ function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
         onPress: async () => {
           busy.current = true;
           try {
-            await actions.leaveChallenge();
+            await actions.leaveChallenge(t.detail.systemLeft(myName));
           } catch (e) {
             Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
           } finally {

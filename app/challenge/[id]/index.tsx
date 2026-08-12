@@ -31,6 +31,7 @@ import {
   waitingLine,
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
+import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
 import { setActiveChallengeId } from '@/lib/push';
@@ -111,6 +112,7 @@ export default function DetailScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const router = useRouter();
   const { t } = useT();
+  const { name } = useAuth();
   const challenge = useChallenge(id);
 
   /**
@@ -124,6 +126,11 @@ export default function DetailScreen() {
    * Declared up here because the "still loading" branch below returns early
    * and needs it too.
    */
+  // Whose name goes in the system line. The dictionary's generic "person"
+  // stands in when the profile hasn't loaded — a line reading "undefined
+  // halkadan ayrıldı" would be worse than a vague one.
+  const myName = name?.trim() || t.common.person;
+
   const goHomeAfterExit = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/');
@@ -426,7 +433,7 @@ export default function DetailScreen() {
         onPress: async () => {
           setLeaving(true);
           try {
-            await actions.leaveChallenge();
+            await actions.leaveChallenge(t.detail.systemLeft(myName));
             goHomeAfterExit();
           } catch (e) {
             Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
@@ -437,10 +444,59 @@ export default function DetailScreen() {
     ]);
   };
 
+  /**
+   * The owner tapping "delete" is answering a question they haven't been
+   * asked: do they want the ring gone for everyone, or do they just want out
+   * of it? Those are different intentions and destroying a group someone
+   * else is ten days into is not reversible, so it gets asked.
+   *
+   * "Just leave" is only offered when there IS someone to hand it to — with
+   * nobody else there, leaving would orphan the ring and closing is the thing
+   * that was actually meant.
+   */
   const doDeleteChallenge = async () => {
-    await actions.deleteChallenge();
     setShowOwnerSettings(false);
-    goHomeAfterExit();
+    const others = (challenge?.participants.length ?? 1) > 1;
+    const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+      { text: t.common.cancel, style: 'cancel' },
+    ];
+    if (others) {
+      buttons.push({
+        text: t.detail.ownerLeave,
+        onPress: async () => {
+          try {
+            // Two lines, because two things happened: someone left, and the
+            // ring changed hands. The group needs both.
+            await actions.leaveChallenge(t.detail.systemLeft(myName));
+            goHomeAfterExit();
+          } catch (e) {
+            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+          }
+        },
+      });
+    }
+    buttons.push({
+      text: t.detail.closeChallenge,
+      style: 'destructive',
+      onPress: () => {
+        Alert.alert(t.detail.closeChallengeConfirmTitle, t.detail.closeChallengeConfirmBody, [
+          { text: t.common.cancel, style: 'cancel' },
+          {
+            text: t.detail.closeChallenge,
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await actions.closeChallenge(t.detail.systemClosed(myName));
+                goHomeAfterExit();
+              } catch (e) {
+                Alert.alert(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
+              }
+            },
+          },
+        ]);
+      },
+    });
+    Alert.alert(t.detail.ownerExitTitle, t.detail.ownerExitBody, buttons);
   };
 
   const topBar = (

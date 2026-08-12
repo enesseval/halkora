@@ -92,6 +92,7 @@ export const tr = {
       USERNAME_INVALID: 'Kullanıcı adı 3-20 karakter olmalı; yalnızca küçük harf, rakam ve alt çizgi kullanabilirsin.',
       USERNAME_RESERVED: 'Bu kullanıcı adı kullanılamaz.',
       USERNAME_TAKEN: 'Bu kullanıcı adı zaten alınmış.',
+      LAST_MEMBER_MUST_CLOSE: 'Halkada başka kimse yok — çıkmak yerine halkayı kapatabilirsin.',
       NOT_THE_OWNER: "Bu halkanın kurucusu değilsin.",
       TITLE_REQUIRED: 'Başlık boş olamaz.',
       DAILY_ACTION_REQUIRED: 'Günlük eylem boş olamaz.',
@@ -331,6 +332,21 @@ export const tr = {
     changedTitle: (from: string, to: string) => `📝 Halka adı değişti: "${from}" → "${to}"`,
     changedDailyAction: (action: string) => `📝 Günlük hedef değişti: ${action}`,
     changedStake: (stake: string) => `📝 Bahis güncellendi: ${stake}`,
+    // Kurucu silmeye bastığında: kapat / çık / gerçekten sil
+    ownerExitTitle: 'Bu halkadan çıkmak mı istiyorsun?',
+    ownerExitBody:
+      'Halkayı kapatırsan herkes için biter — kimse yeni check-in yapamaz, ama geçmiş ve istatistikler herkeste kalır. Sadece sen çıkarsan halka devam eder ve kurucu en eski üyeye geçer.',
+    closeChallenge: 'Halkayı kapat',
+    closeChallengeConfirmTitle: 'Halka kapatılsın mı?',
+    closeChallengeConfirmBody:
+      'Herkes için biter ve geri alınamaz. Geçmiş herkeste kalır, gruba haber verilir.',
+    closeChallengeFailed: 'Halka kapatılamadı',
+    ownerLeave: 'Sadece ben çıkayım',
+    lastMemberMustClose: 'Halkada başka kimse yok — çıkmak yerine halkayı kapatabilirsin.',
+    // Sohbete düşen sistem satırları
+    systemClosed: (name: string) => `${name} halkayı kapattı.`,
+    systemLeft: (name: string) => `${name} halkadan ayrıldı.`,
+    systemNewOwner: (name: string) => `Halkanın kurucusu artık ${name}.`,
     deleteChallenge: 'Halkayı sil',
     deletingChallenge: 'Siliniyor…',
     deleteChallengeConfirmTitle: 'Bu halkayı sil?',
