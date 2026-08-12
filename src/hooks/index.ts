@@ -219,6 +219,10 @@ export interface JoinPreview {
   participants: { id: string; initials: string; name: string }[];
   /** Ek M — kurucu daveti "yalnızca ilk gün" ile sınırlamışsa ve o gün geçtiyse true. */
   joinClosed: boolean;
+  /** The ring itself is over — closed by its owner or finished. Its invite
+   * link outlives it, so the screen has to say so rather than let someone
+   * walk into a ring nobody is checking into. */
+  ringClosed: boolean;
   /** Already a member — including the owner opening their own invite link.
    * Nothing stopped that before, so a founder could walk their own join flow. */
   alreadyJoined: boolean;
@@ -268,6 +272,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
         startsWhen: '',
         participants: [],
         joinClosed: false,
+        ringClosed: false,
       };
     }
     return {
@@ -290,6 +295,9 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
         initials: name.slice(0, 2).toUpperCase(),
       })),
       joinClosed: data.joinClosed,
+      // Same set the join RPC rejects on, so the screen and the server agree
+      // on what "over" means.
+      ringClosed: data.status === 'completed' || data.status === 'closed',
     };
   }
 
@@ -306,6 +314,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       startsWhen: '',
       participants: [],
       joinClosed: false,
+      ringClosed: false,
     };
   }
   return {
@@ -324,6 +333,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       .filter((p) => !p.isMe)
       .map((p) => ({ id: p.id, name: p.name, initials: p.initials })),
     joinClosed: mock.joinClosed,
+    ringClosed: mock.status === 'completed',
   };
 }
 

@@ -125,6 +125,25 @@ export default function JoinScreen() {
     );
   }
 
+  // The ring is over. Checked after alreadyJoined so a member of a closed ring
+  // still gets a way back into it, and before joinClosed because "it closed"
+  // is the truer reason of the two.
+  if (preview.ringClosed) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        {closeButton}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <AppText variant="screenTitle" style={{ fontSize: 22, textAlign: 'center' }}>
+            {t.join.ringClosedTitle}
+          </AppText>
+          <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
+            {t.join.ringClosedSubtitle(preview.title)}
+          </AppText>
+        </View>
+      </Screen>
+    );
+  }
+
   if (preview.joinClosed) {
     return (
       <Screen edges={['top', 'bottom']}>
