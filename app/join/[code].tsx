@@ -45,7 +45,7 @@ export default function JoinScreen() {
   const people = preview.participants.map((p) => ({ id: p.id, initials: p.initials }));
 
   const submit = async () => {
-    if (joining || preview.notFound || preview.joinClosed) return;
+    if (joining || preview.notFound || preview.joinClosed || preview.alreadyJoined) return;
     setJoining(true);
     setErr(null);
     try {
@@ -92,6 +92,34 @@ export default function JoinScreen() {
           <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
             {t.join.notFoundSubtitle}
           </AppText>
+        </View>
+      </Screen>
+    );
+  }
+
+  // Checked before joinClosed: someone who is already in shouldn't be told the
+  // invite expired. It didn't expire for them — they're past it.
+  if (preview.alreadyJoined) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        {closeButton}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <AppText variant="screenTitle" style={{ fontSize: 22, textAlign: 'center' }}>
+            {t.join.alreadyInTitle}
+          </AppText>
+          <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
+            {t.join.alreadyInSubtitle(preview.title)}
+          </AppText>
+        </View>
+        <View style={{ paddingBottom: spacing.section }}>
+          <Button
+            label={t.join.goToRing}
+            onPress={() =>
+              preview.challengeId
+                ? router.replace(`/challenge/${preview.challengeId}`)
+                : router.replace('/')
+            }
+          />
         </View>
       </Screen>
     );

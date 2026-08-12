@@ -23,7 +23,7 @@ import {
   settleStake,
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
-import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
+import { amIParticipant, fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
 import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
@@ -219,6 +219,11 @@ export interface JoinPreview {
   participants: { id: string; initials: string; name: string }[];
   /** Ek M — kurucu daveti "yalnızca ilk gün" ile sınırlamışsa ve o gün geçtiyse true. */
   joinClosed: boolean;
+  /** Already a member — including the owner opening their own invite link.
+   * Nothing stopped that before, so a founder could walk their own join flow. */
+  alreadyJoined: boolean;
+  /** The previewed ring, so "you're already in" can offer a way into it. */
+  challengeId?: string;
 }
 
 /**
@@ -236,10 +241,21 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     enabled: isSupabaseConfigured && !!code,
   });
 
+  // Membership is a separate question from the preview, and stays separate:
+  // the preview RPC is a deliberately public read of a few safe fields, while
+  // this one depends on who is looking. It can only start once the preview has
+  // resolved to an id.
+  const { data: joined, isLoading: joinedLoading } = useQuery({
+    queryKey: ['challenge-membership', data?.id],
+    queryFn: () => amIParticipant(data!.id),
+    enabled: isSupabaseConfigured && !!data?.id,
+  });
+
   if (isSupabaseConfigured) {
     if (!data) {
       return {
         loading: isLoading,
+        alreadyJoined: false,
         // Only a genuinely-empty successful response counts as "not found" —
         // a thrown error must never be presented as "this invite doesn't exist".
         notFound: !isLoading && !isError,
@@ -255,7 +271,11 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       };
     }
     return {
-      loading: false,
+      // Membership decides which call-to-action this screen shows, so the
+      // screen waits for it rather than flashing "Join" and swapping it out.
+      loading: joinedLoading,
+      alreadyJoined: joined === true,
+      challengeId: data.id,
       notFound: false,
       isError: false,
       retry: refetch,
@@ -277,6 +297,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     return {
       loading: false,
       notFound: true,
+      alreadyJoined: false,
       isError: false,
       retry: () => {},
       title: '',
@@ -290,6 +311,8 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
   return {
     loading: false,
     notFound: false,
+    alreadyJoined: mock.participants.some((p) => p.isMe),
+    challengeId: mock.id,
     isError: false,
     retry: () => {},
     title: mock.title,
