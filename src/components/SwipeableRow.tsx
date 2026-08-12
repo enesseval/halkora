@@ -19,17 +19,8 @@ export interface SwipeAction {
 const SIZE = { full: 64, compact: 40 };
 /** Gap between buttons, and from the screen edge. */
 const GAP = 8;
-/**
- * How far the row has to travel before the NEXT button starts to appear.
- * Apple's own rows bring actions in one at a time as the drag grows rather
- * than sliding a finished strip into view, so each button gets its own
- * entrance a little further along the drag.
- */
-const REVEAL_STEP = 22;
-/** Where a button's growth starts, measured in drag pixels. */
-const FIRST_REVEAL = 10;
-/** Drag distance over which a button goes from a dot to full size. */
-const GROW_OVER = 34;
+/** Breathing room between the row itself and the first button. */
+const LEAD = 12;
 /**
  * Past this, letting go performs the destructive action outright instead of
  * parking the row open — the "swipe all the way to delete" every iOS list has.
@@ -37,6 +28,8 @@ const GROW_OVER = 34;
  * to reveal the buttons.
  */
 const FULL_SWIPE = 220;
+/** Extra travel past the last slot before a release counts as "delete it". */
+const FULL_SWIPE_MARGIN = 90;
 
 /**
  * iOS-standard swipe-from-the-right row actions.
@@ -81,8 +74,15 @@ export function SwipeableRow({
     // threshold and the visuals can never disagree.
     if (!watching.current) {
       watching.current = true;
+      // Measured from where the buttons END, so the threshold scales with how
+      // many actions the row has instead of being a number that happens to
+      // work for two.
+      const fullSwipeAt = Math.max(
+        FULL_SWIPE,
+        LEAD + actions.length * (size + GAP) + FULL_SWIPE_MARGIN,
+      );
       (dragX as unknown as RNAnimated.Value).addListener?.(({ value }) => {
-        armed.current = -value >= FULL_SWIPE;
+        armed.current = -value >= fullSwipeAt;
       });
     }
 
@@ -99,26 +99,37 @@ export function SwipeableRow({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
+          paddingLeft: LEAD,
           paddingRight: GAP,
           gap: GAP,
+          // Nothing may be drawn outside the strip the drag has actually
+          // opened — without this a half-scaled button still paints over the
+          // row behind it.
+          overflow: 'hidden',
         }}
       >
         {actions.map((action, i) => {
           // Reveal order counts back from the edge: the last action appears
           // first, the one before it next, and so on.
           const order = actions.length - 1 - i;
-          const start = FIRST_REVEAL + order * REVEAL_STEP;
-          const end = start + GROW_OVER;
+          // A button's entrance is tied to ITS OWN slot opening, not to a
+          // fixed number of pixels. Keying it to distance meant a 64pt button
+          // was already drawing at 10pt of drag, spilling over the row and
+          // clipping at the screen edge (saha testi bulgusu). Now it starts
+          // as a dot when its slot begins to open and is full size exactly
+          // when the slot fits it — it can never be wider than the space it
+          // has.
+          const slot = size + GAP;
+          const start = LEAD + order * slot;
+          const end = start + slot;
 
-          // A dot that grows into the button, exactly as a short swipe does in
-          // Messages. Not a fade: the size change is what reads as "appearing".
           const scale = drag.interpolate({
             inputRange: [0, start, end],
-            outputRange: [0.2, 0.2, 1],
+            outputRange: [0.25, 0.25, 1],
             extrapolate: 'clamp',
           });
           const opacity = drag.interpolate({
-            inputRange: [0, start, start + GROW_OVER * 0.6],
+            inputRange: [0, start, start + slot * 0.45],
             outputRange: [0, 0, 1],
             extrapolate: 'clamp',
           });

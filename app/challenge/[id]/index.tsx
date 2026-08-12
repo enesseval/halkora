@@ -112,6 +112,23 @@ export default function DetailScreen() {
   const router = useRouter();
   const { t } = useT();
   const challenge = useChallenge(id);
+
+  /**
+   * Back, from a screen that may have nothing behind it.
+   *
+   * A widget tap on a cold app deep-links straight here, so the stack has one
+   * entry and router.back() is a silent no-op — the back button simply did
+   * nothing and there was no way home (saha testi bulgusu). Falling back to
+   * Home gives the button the meaning it looks like it has.
+   *
+   * Declared up here because the "still loading" branch below returns early
+   * and needs it too.
+   */
+  const goHomeAfterExit = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const { checkIn, undo, meCheckedInToday, myOrder, myCheckinTime } = useCheckIn(id ?? '');
   const actions = useChallengeActions(id ?? '');
@@ -285,7 +302,7 @@ export default function DetailScreen() {
     // screen has fetched the challenge list yet).
     const backButton = (
       <View style={{ paddingTop: 6, paddingHorizontal: spacing.screenX }}>
-        <IconButton size={38} onPress={() => router.back()}>
+        <IconButton size={38} onPress={goHomeAfterExit}>
           <Feather name="chevron-left" size={20} color={colors.textPrimary} />
         </IconButton>
       </View>
@@ -343,10 +360,6 @@ export default function DetailScreen() {
           .filter((day) => day > 0)
       : [];
 
-  const goHomeAfterExit = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/');
-  };
 
   /**
    * Blocking is two-way and undoable, but it still removes someone from your
@@ -440,7 +453,7 @@ export default function DetailScreen() {
         paddingBottom: 16,
       }}
     >
-      <IconButton size={40} onPress={() => router.back()}>
+      <IconButton size={40} onPress={goHomeAfterExit}>
         <Feather name="chevron-left" size={20} color={colors.textPrimary} />
       </IconButton>
       <AppText
