@@ -39,6 +39,22 @@ const TYPE = {
   wordmark: u(34),
 };
 
+/**
+ * The square puts the ring and the text side by side, so the text column is
+ * roughly a third of the width the story gives it. Story sizes wrapped into
+ * unreadable stacks there; these are the same hierarchy at a scale the column
+ * can actually hold.
+ */
+const TYPE_SQUARE = {
+  ...TYPE,
+  title: u(64),
+  titleLine: u(72),
+  action: u(38),
+  invite: u(46),
+  whoIsIn: u(34),
+  meta: u(34),
+};
+
 const PAD = {
   edge: u(90),
   // Instagram's own UI covers the top and bottom ~250px of a story; these
@@ -228,6 +244,7 @@ export function InviteCard({
   const { t } = useT();
   const w = format === 'story' ? STORY_W : SQUARE;
   const h = format === 'story' ? STORY_H : SQUARE;
+  const type = format === 'story' ? TYPE : TYPE_SQUARE;
 
   // Variant A whenever the ring hasn't begun — a lobby or a future start date.
   const invite = challenge.status === 'lobby' || challenge.status === 'upcoming';
@@ -245,14 +262,15 @@ export function InviteCard({
           <AppText
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: u(72),
+              fontSize: format === 'square' ? u(52) : u(72),
               color: colors.textPrimary,
               letterSpacing: -0.5,
+              textAlign: 'center',
             }}
           >
             {challenge.startsLabel ?? challenge.startsWhen ?? ''}
           </AppText>
-          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.meta, color: colors.textTertiary, marginTop: u(10) }}>
+          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: type.meta, color: colors.textTertiary, marginTop: u(10) }}>
             {t.shareCard.startsIn(challenge.totalDays)}
           </AppText>
         </View>
@@ -261,7 +279,7 @@ export function InviteCard({
           <AppText
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: u(112),
+              fontSize: format === 'square' ? u(84) : u(112),
               color: finished ? colors.ember : colors.textPrimary,
               letterSpacing: -1,
             }}
@@ -270,7 +288,7 @@ export function InviteCard({
           </AppText>
           <AppText
             numberOfLines={1}
-            style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.meta, color: colors.textTertiary, marginTop: u(6), maxWidth: ringSize * 0.8 }}
+            style={{ fontFamily: fonts.bodyRegular, fontSize: type.meta, color: colors.textTertiary, marginTop: u(6), maxWidth: ringSize * 0.8 }}
           >
             {finished ? challenge.title : t.shareCard.together}
           </AppText>
@@ -283,13 +301,13 @@ export function InviteCard({
     <View style={{ alignItems: format === 'story' ? 'center' : 'flex-start' }}>
       {invite ? (
         alone ? (
-          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.whoIsIn, color: colors.textSecondary, marginBottom: u(14) }}>
+          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: type.whoIsIn, color: colors.textSecondary, marginBottom: u(14) }}>
             {t.shareCard.startedAlone(owner)}
           </AppText>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(20), marginBottom: u(14) }}>
             <Faces challenge={challenge} />
-            <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.whoIsIn, color: colors.textSecondary }}>
+            <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: type.whoIsIn, color: colors.textSecondary }}>
               {t.shareCard.peopleIn(challenge.participants.length)}
             </AppText>
           </View>
@@ -300,10 +318,10 @@ export function InviteCard({
         <AppText
           style={{
             fontFamily: fonts.displaySemibold,
-            fontSize: TYPE.title,
-            lineHeight: TYPE.titleLine,
+            fontSize: type.title,
+            lineHeight: type.titleLine,
             color: colors.textPrimary,
-            letterSpacing: -TYPE.title * 0.02,
+            letterSpacing: -type.title * 0.02,
             textAlign: format === 'story' ? 'center' : 'left',
           }}
         >
@@ -315,10 +333,10 @@ export function InviteCard({
             numberOfLines={2}
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: TYPE.title,
-              lineHeight: TYPE.titleLine,
+              fontSize: type.title,
+              lineHeight: type.titleLine,
               color: colors.textPrimary,
-              letterSpacing: -TYPE.title * 0.02,
+              letterSpacing: -type.title * 0.02,
               textAlign: format === 'story' ? 'center' : 'left',
             }}
           >
@@ -328,7 +346,7 @@ export function InviteCard({
             numberOfLines={1}
             style={{
               fontFamily: fonts.bodyRegular,
-              fontSize: TYPE.action,
+              fontSize: type.action,
               color: colors.textSecondary,
               marginTop: u(12),
               textAlign: format === 'story' ? 'center' : 'left',
@@ -346,7 +364,7 @@ export function InviteCard({
       {!invite && !finished ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(20), marginBottom: u(22) }}>
           <Faces challenge={challenge} />
-          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: TYPE.meta, color: colors.textSecondary }}>
+          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: type.meta, color: colors.textSecondary }}>
             {t.shareCard.groupMeta(challenge.participants.length, done)}
           </AppText>
         </View>
@@ -355,7 +373,7 @@ export function InviteCard({
       <AppText
         style={{
           fontFamily: fonts.displaySemibold,
-          fontSize: TYPE.invite,
+          fontSize: type.invite,
           color: colors.textPrimary,
           textAlign: format === 'story' ? 'center' : 'left',
         }}
@@ -372,7 +390,7 @@ export function InviteCard({
       <AppText
         style={{
           fontFamily: fonts.bodyRegular,
-          fontSize: TYPE.meta,
+          fontSize: type.meta,
           color: colors.textTertiary,
           marginTop: u(14),
           textAlign: format === 'story' ? 'center' : 'left',
