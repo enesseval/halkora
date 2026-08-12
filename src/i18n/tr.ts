@@ -542,6 +542,7 @@ export const tr = {
   shareCard: {
     startedAlone: (name: string) => `${name} bir halka kurdu`,
     peopleIn: (n: number) => (n === 2 ? '2 kişi bu halkada' : `${n} kişi bu halkada`),
+    dayCount: (n: number) => `${n} gün`,
     startsIn: (days: number) => `başlıyor · ${days} gün`,
     together: 'birlikte',
     groupMeta: (people: number, days: number) => `${people} kişi, ${days} gündür her gün`,

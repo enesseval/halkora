@@ -109,31 +109,33 @@ function ShareRing({
   const cx = size / 2;
   const cy = size / 2;
   const step = 360 / totalDays;
-  const span = step - RING.gapDeg;
+  // Unfilled segments are all one colour, so the gap is the ONLY thing
+  // separating them; 3° disappears at this stroke. A filled ring doesn't need
+  // the help — the colour change already draws the line.
+  const gap = empty ? Math.min(8, 90 / totalDays) : RING.gapDeg;
+  const span = step - gap;
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={{ position: 'absolute' }}>
-        {empty ? (
-          <>
-            <Circle cx={cx} cy={cy} r={r} stroke={colors.waiting} strokeWidth={stroke} fill="none" />
-            {/* Where day one will land. One dot of ember on an otherwise
-                unlit ring — the card's only colour, and the thing that makes
-                an empty circle read as "about to start" rather than blank. */}
-            <Circle cx={cx} cy={cy - r} r={RING.startDot / 2} fill={colors.ember} />
-          </>
-        ) : (
-          Array.from({ length: totalDays }, (_, i) => (
-            <Path
-              key={i}
-              d={arcPath(cx, cy, r, i * step + RING.gapDeg / 2, i * step + RING.gapDeg / 2 + span)}
-              stroke={i < filledDays ? colors.ember : colors.waiting}
-              strokeWidth={stroke}
-              strokeLinecap="round"
-              fill="none"
-            />
-          ))
-        )}
+        {/* Always segmented, even with nothing filled. A plain circle hides
+            what the ring MEANS — one arc per day — and the whole point of an
+            invitation card is that you can count the days you're being asked
+            for (saha testi bulgusu: "gün ayrımı olduğu belli olsun"). */}
+        {Array.from({ length: totalDays }, (_, i) => (
+          <Path
+            key={i}
+            d={arcPath(cx, cy, r, i * step + gap / 2, i * step + gap / 2 + span)}
+            stroke={!empty && i < filledDays ? colors.ember : colors.waiting}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            fill="none"
+          />
+        ))}
+        {/* Where day one will land. One dot of ember on an otherwise unlit
+            ring — the card's only colour, and what makes an unstarted ring
+            read as "about to begin" rather than blank. */}
+        {empty ? <Circle cx={cx} cy={cy - r} r={RING.startDot / 2} fill={colors.ember} /> : null}
       </Svg>
       {children}
     </View>
@@ -255,9 +257,15 @@ export function InviteCard({
 
   const ringSize = format === 'story' ? RING.story : RING.square;
 
+  // In the square the ring is only 147pt across with the text beside it, and
+  // "15 Ağustos'ta başlıyor" simply does not fit inside that circle — it spilled
+  // out over the ring's own stroke. There the line moves up into the text
+  // column instead, where it has the width it needs.
+  const dateInsideRing = format === 'story';
+
   const ring = (
     <ShareRing size={ringSize} totalDays={challenge.totalDays} filledDays={done} empty={invite}>
-      {invite ? (
+      {invite && !dateInsideRing ? null : invite ? (
         <View style={{ alignItems: 'center' }}>
           <AppText
             style={{
@@ -312,6 +320,19 @@ export function InviteCard({
             </AppText>
           </View>
         )
+      ) : null}
+
+      {invite && !dateInsideRing ? (
+        <AppText
+          style={{
+            fontFamily: fonts.bodyMedium,
+            fontSize: type.meta,
+            color: colors.ember,
+            marginBottom: u(10),
+          }}
+        >
+          {challenge.startsLabel ?? challenge.startsWhen ?? ''} · {t.shareCard.dayCount(challenge.totalDays)}
+        </AppText>
       ) : null}
 
       {finished ? (
