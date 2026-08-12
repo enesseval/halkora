@@ -259,7 +259,10 @@ export default function HomeScreen() {
               {upcoming.length > 0 ? (
                 <View style={{ marginTop: spacing.section }}>
                   <SectionLabel>{t.home.upcoming}</SectionLabel>
-                  <View style={{ marginTop: 4 }}>
+                  {/* gap, not marginTop on the rows — a swiped row's actions
+                      sit inside its own bounds and touching rows made the
+                      buttons look like they belonged to the neighbour. */}
+                  <View style={{ marginTop: 4, gap: 10 }}>
                     {upcoming.map((c) => (
                       <SwipeableUpcomingRow key={c.id} challenge={c} onPress={() => goDetail(c.id)} />
                     ))}

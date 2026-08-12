@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, type } from '@/theme/tokens';
+import { inviteUrl } from '@/lib/invite';
 import { useT } from '@/i18n';
 import { AppText, Button } from './ui';
 import { ShareRingSheet } from './ShareRingSheet';
@@ -25,7 +26,7 @@ export function InviteShare({
   const { t } = useT();
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const link = `halkora.app/j/${inviteCode}`;
+  const link = inviteUrl(inviteCode);
 
   const share = () => {
     if (challenge) {
