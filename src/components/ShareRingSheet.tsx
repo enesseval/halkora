@@ -12,7 +12,7 @@ import { useT } from '@/i18n';
 import type { Challenge } from '@/data/types';
 
 /** How wide the preview is allowed to be inside the sheet. */
-const PREVIEW_W = 150;
+const PREVIEW_W = 156;
 
 /** The two outlined buttons under the primary one. */
 function SecondaryAction({
@@ -196,20 +196,30 @@ export function ShareRingSheet({
               </View>
             </View>
 
-            {/* Preview: the real card, scaled. The height is reserved by the
-                wrapper because a scale transform doesn't change layout size. */}
+            {/* Preview: the real card, scaled down.
+                A scale transform does NOT change layout size — the card still
+                occupies its full 360×640 and, scaled about its own centre,
+                spilled over the buttons below it. So the wrapper is sized to
+                the SCALED dimensions and clips, and the card scales from its
+                top-left corner so the visible result lands exactly inside. */}
             <View
               style={{
-                alignItems: 'center',
+                alignSelf: 'center',
                 marginTop: 18,
+                width: (format === 'story' ? STORY_W : SQUARE) * scale,
                 height: (format === 'story' ? STORY_H : SQUARE) * scale,
+                borderRadius: 14,
+                overflow: 'hidden',
+                borderWidth: hairline,
+                borderColor: colors.strokeSubtle,
               }}
             >
               <View
                 style={{
+                  width: format === 'story' ? STORY_W : SQUARE,
+                  height: format === 'story' ? STORY_H : SQUARE,
                   transform: [{ scale }],
-                  borderRadius: radius.card / scale,
-                  overflow: 'hidden',
+                  transformOrigin: 'top left',
                 }}
               >
                 <InviteCard challenge={challenge} format={format} />
