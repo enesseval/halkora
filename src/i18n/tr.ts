@@ -580,6 +580,16 @@ export const tr = {
     savedFailed: 'Görsel kaydedilemedi',
     copied: 'Bağlantı kopyalandı',
   },
+  /** Gelen davetler — başlıktaki zil. */
+  invites: {
+    title: 'Seni davet ettiler',
+    empty: 'Bekleyen davetin yok.',
+    inviteFrom: (name: string) => `${name} davet etti`,
+    rematchFrom: (name: string) => `${name} tekrar çağırıyor`,
+    view: 'Bak',
+    decline: 'Kaldır',
+    declineFailed: 'Davet kaldırılamadı',
+  },
   chat: {
     day: (n: number) => `Gün ${n}`,
     // Halka başlamadan atılan mesajlar 0. güne yazılıyor; "Gün 0" diye bir

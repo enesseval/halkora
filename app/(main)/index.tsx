@@ -15,6 +15,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { InvitesBell, InvitesSheet, useReceivedInvites } from '@/components/InvitesSheet';
 import { useT } from '@/i18n';
 
 const EMPTY_RING_DAYS: SegmentState[] = Array(12).fill('empty');
@@ -185,6 +186,10 @@ export default function HomeScreen() {
   // finishes has no section it belongs to on Home at all — it just quietly
   // stops appearing anywhere, even though its data/history is still there.
   const finished = useCompletedChallenges();
+  // Invites used to arrive only as a push, and a push that never lands takes
+  // the invite with it. The bell is the record; see InvitesSheet.
+  const { invites, reload: reloadInvites } = useReceivedInvites();
+  const [showInvites, setShowInvites] = useState(false);
   const { refreshing, refresh } = useRefreshChallenges();
   const [showStart, setShowStart] = useState(false);
 
@@ -223,6 +228,9 @@ export default function HomeScreen() {
             </AppText>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
+            {/* Only when there's something waiting — an empty bell that's
+                always there is furniture, not information. */}
+            <InvitesBell count={invites.length} onPress={() => setShowInvites(true)} />
             <IconButton onPress={() => setShowStart(true)}>
               <Feather name="plus" size={20} color={colors.textPrimary} />
             </IconButton>
@@ -316,6 +324,14 @@ export default function HomeScreen() {
       </Screen>
 
       <QuickStartSheet visible={showStart} onClose={() => setShowStart(false)} />
+
+      {showInvites ? (
+        <InvitesSheet
+          invites={invites}
+          onClose={() => setShowInvites(false)}
+          onChanged={reloadInvites}
+        />
+      ) : null}
     </View>
   );
 }

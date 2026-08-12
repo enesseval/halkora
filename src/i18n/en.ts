@@ -552,6 +552,16 @@ export const en: Dictionary = {
     savedFailed: "Couldn't save the image",
     copied: 'Link copied',
   },
+  /** Received invites — the header bell. */
+  invites: {
+    title: "You've been invited",
+    empty: 'No invites waiting.',
+    inviteFrom: (name: string) => `${name} invited you`,
+    rematchFrom: (name: string) => `${name} wants a rematch`,
+    view: 'Look',
+    decline: 'Dismiss',
+    declineFailed: "Couldn't dismiss the invite",
+  },
   chat: {
     day: (n: number) => `Day ${n}`,
     beforeStart: 'Before it starts',
