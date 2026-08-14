@@ -176,8 +176,8 @@ Her adımın sonunda `npx tsc --noEmit` + web bundle + commit.
 - [ ] `check_ins`: `UNIQUE(participant_id, day_number)` **kaldırılır**;
       `(participant_id, day_number)` index'i kalır
 - [ ] `increment_checkin` **yazılmıyor** — mantık zaten `check-in` Edge
-      Function'ında ve orada kalmalı: gün hesabı, joker izni, FAST_DAYS, üyelik
-      kontrolü hepsi orada. Yeni bir RPC ikinci bir doğruluk kaynağı olurdu.
+      Function'ında ve orada kalmalı: gün hesabı, joker izni, katılım günü,
+      üyelik kontrolü hepsi orada. Yeni bir RPC ikinci bir doğruluk kaynağı olurdu.
       Bunun yerine Edge Function `amount` (+1 / −1) kabul edecek ve
       `{ current_count, target_count, completed }` döndürecek şekilde genişletilir.
       Widget App Intent'i de aynı Edge Function'ı çağırıyor (zaten öyle yapıyor).

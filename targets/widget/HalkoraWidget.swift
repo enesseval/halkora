@@ -160,7 +160,7 @@ private func wButton(_ size: CGFloat = 12) -> Font { .custom("Satoshi-Bold", siz
 /// ExtensionStorage.set — keep field names/types in sync with that file.
 ///
 /// Deliberately carries the RAW day-math inputs (timezone/startDate/
-/// createdAt) instead of a precomputed day + checked-in boolean: the app
+/// deadlineTime) instead of a precomputed day + checked-in boolean: the app
 /// can't push an update at midnight while it isn't running, so a
 /// precomputed snapshot silently claimed the old day well into the next one.
 private struct HalkoraSnapshot: Codable {
@@ -174,10 +174,6 @@ private struct HalkoraSnapshot: Codable {
   /// midnight, i.e. the plain calendar day.
   var deadlineTime: String?
   var startDate: String  // "YYYY-MM-DD" ("" for a lobby challenge)
-  var createdAt: String  // ISO — FAST_DAYS anchors its 1-minute days here
-  // ExtensionStorage.set only allows string/number values inside an object
-  // (no booleans) — 0/1 on the JS side.
-  var fastDays: Int
   /// Which day the check-in belongs to; empty when not checked in.
   var checkedInDayKey: String
   /// One char per day: 'd' done, 'j' joker, '-' everything else (missed and
@@ -224,16 +220,6 @@ private func loadActiveChallenges() -> [HalkoraSnapshot] {
   return list
 }
 
-private let isoFormatter: ISO8601DateFormatter = {
-  let f = ISO8601DateFormatter()
-  f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-  return f
-}()
-
-private func parseISO(_ s: String) -> Date? {
-  isoFormatter.date(from: s) ?? ISO8601DateFormatter().date(from: s)
-}
-
 /// "YYYY-MM-DD" as seen in `timezone` — the same value
 /// Intl.DateTimeFormat('en-CA', { timeZone }) produces on the JS side.
 private func dateString(_ date: Date, in timezone: String) -> String {
@@ -270,7 +256,6 @@ extension HalkoraSnapshot {
 
   /// Mirrors dayKeyFor() in src/lib/widget.ts — keep both in sync.
   func todayKey(at now: Date) -> String {
-    if fastDays != 0 { return String(currentDay(at: now)) }
     return cycleStart(at: now)
   }
 
@@ -306,14 +291,6 @@ extension HalkoraSnapshot {
   func rawDay(at now: Date) -> Int {
     guard !startDate.isEmpty else { return 0 }
     let cycle = cycleStart(at: now)
-    // Fast mode accelerates a ring that has BEGUN; it must not begin one.
-    // Anchored to createdAt it used to report day 1 immediately, so a ring
-    // scheduled weeks out read as running here too. Mirrors the same gate in
-    // daysSinceStart() (src/data/challenges.ts) and the check-in function.
-    if fastDays != 0 && cycle >= startDate {
-      guard let created = parseISO(createdAt) else { return 1 }
-      return max(Int(now.timeIntervalSince(created) / 60) + 1, 1)
-    }
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US_POSIX")
     f.timeZone = TimeZone(identifier: "UTC")
@@ -446,15 +423,6 @@ extension HalkoraSnapshot {
   /// on its own — one per day boundary. Pre-building an entry for each is
   /// what keeps the widget correct without spending reloads.
   func upcomingRollovers(after now: Date, count: Int) -> [Date] {
-    if fastDays != 0 {
-      // Test mode: a "day" is 60s, so this is also the only way fast-day
-      // rollover is observable at all — a reload-based approach would be
-      // throttled long before the first flip.
-      guard let created = parseISO(createdAt) else { return [] }
-      let elapsed = now.timeIntervalSince(created)
-      let nextIndex = floor(elapsed / 60) + 1
-      return (0..<count).map { created.addingTimeInterval((nextIndex + Double($0)) * 60) }
-    }
     let tz = TimeZone(identifier: timezone) ?? .current
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
@@ -795,10 +763,7 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     for snapshot: HalkoraSnapshot, rotationCount: Int = 1, rotationIndex: Int = 0
   ) -> Timeline<HalkoraEntry> {
     let now = Date()
-    // Fast mode burns a "day" every 60s, so it needs many more points to
-    // cover a useful test window; real days only need a few.
-    let count = snapshot.fastDays != 0 ? 30 : 4
-    let dates = [now] + snapshot.upcomingRollovers(after: now, count: count)
+    let dates = [now] + snapshot.upcomingRollovers(after: now, count: 4)
     let entries = dates.map {
       HalkoraEntry(
         date: $0, snapshot: snapshot,
@@ -825,7 +790,7 @@ private let samplePreview = HalkoraSnapshot(
   challengeId: "", title: "Sabah 06:30 Kulübü", dailyAction: "06:30'da kalk",
   totalDays: 14, timezone: TimeZone.current.identifier,
   startDate: dateString(Date().addingTimeInterval(-6 * 86_400), in: TimeZone.current.identifier),
-  createdAt: "", fastDays: 0, checkedInDayKey: "",
+  checkedInDayKey: "",
   segments: "dddddd--------", syncedDayKey: "", participantsTotal: 8,
   participantsDoneToday: 4,
   roster: "EK:1,SA:1,MY:1,DT:1,BÖ:0,CN:0,AR:0,ZG:0",
@@ -1718,7 +1683,7 @@ struct HalkoraListProvider: TimelineProvider {
     // the single-halka timeline: pre-built entries cost no reload budget.
     var moments = Set<Date>()
     for s in all {
-      for d in s.upcomingRollovers(after: now, count: s.fastDays != 0 ? 30 : 4) {
+      for d in s.upcomingRollovers(after: now, count: 4) {
         moments.insert(d)
       }
     }

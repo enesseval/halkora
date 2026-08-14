@@ -161,8 +161,6 @@ Kodla ilgisi yok, ama gönderimden önce hazır olmalı:
 - [ ] `npm run typecheck` temiz
 - [ ] `npm run lint` — mevcut 25 hata için karar verilmeli (hepsi çalışan kodda,
       bkz. AGENTS.md)
-- [ ] `FAST_DAYS` **kapalı** olarak build alındı (açık kalırsa günler dakikada
-      bir ilerler — inceleyici bunu bozuk davranış olarak görür)
 - [ ] Debug/geliştirici satırları (Ayarlar'daki `widgetDebug`, uid/is_pro
       satırı) prod build'de görünmüyor
 - [ ] Test verisi temizlendi, uygulama boş durumdan açılıyor

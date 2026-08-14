@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     const { data: challenge, error: chErr } = await admin
       .from('challenges')
       .select(
-        'id, start_date, timezone, total_days, status, joker_allowance, created_at, deadline_time',
+        'id, start_date, timezone, total_days, status, joker_allowance, deadline_time',
       )
       .eq('id', challengeId)
       .single();
@@ -117,19 +117,8 @@ Deno.serve(async (req) => {
     // "Today" in the CHALLENGE's own timezone — not the caller's device
     // clock — so every participant shares the same day boundary.
     //
-    // FAST_DAYS (test-only): 1 day == 1 minute, anchored to created_at —
-    // must mirror the client's src/lib/fastDays.ts exactly, and both sides
-    // must be toggled together (supabase secrets set FAST_DAYS=1 + redeploy
-    // here, EXPO_PUBLIC_FAST_DAYS=1 on the client). Never in production.
-    // The start date gates BOTH modes, and is checked before the day math
-    // rather than through it. FAST_DAYS anchors its 1-minute days to
-    // created_at, so its currentDay is >= 1 the instant a challenge exists —
-    // which meant the CHALLENGE_NOT_STARTED check below could never fire in
-    // test mode, and a ring starting three weeks from now accepted check-ins
-    // on the day it was created (found in production data: day_number tracked
-    // minutes-since-creation on a ring whose start_date was 21 days out).
-    // Test mode may accelerate a running ring; it must not start an unstarted
-    // one.
+    // The start date is checked before the day math rather than through it,
+    // so a ring that hasn't begun is refused outright.
     // A "day" runs deadline → deadline, not midnight → midnight (Faz 1). The
     // cycle is labelled by the moment it OPENS, which makes deadline 00:00
     // collapse to the plain calendar day with no special case — see the
@@ -142,15 +131,9 @@ Deno.serve(async (req) => {
       return fail('CHALLENGE_NOT_STARTED');
     }
 
-    let currentDay: number;
-    if (Deno.env.get('FAST_DAYS') === '1') {
-      currentDay =
-        Math.floor((Date.now() - new Date(challenge.created_at as string).getTime()) / 60_000) + 1;
-    } else {
-      const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
-      const cycle = new Date(`${cycleStart}T00:00:00Z`);
-      currentDay = Math.round((cycle.getTime() - startDate.getTime()) / 86_400_000) + 1;
-    }
+    const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
+    const cycle = new Date(`${cycleStart}T00:00:00Z`);
+    const currentDay = Math.round((cycle.getTime() - startDate.getTime()) / 86_400_000) + 1;
 
     if (currentDay < 1) return fail('CHALLENGE_NOT_STARTED');
     if (currentDay > challenge.total_days) return fail('CHALLENGE_ENDED');
@@ -163,24 +146,17 @@ Deno.serve(async (req) => {
     // wrongly take days away from someone.
     let joinDay = 1;
     if (participant.joined_at) {
-      const joinedAt = new Date(participant.joined_at as string);
-      if (Deno.env.get('FAST_DAYS') === '1') {
-        joinDay =
-          Math.floor(
-            (joinedAt.getTime() - new Date(challenge.created_at as string).getTime()) / 60_000,
-          ) + 1;
-      } else {
-        const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
-        const joinCycle = new Date(
-          `${cycleStartFor(
-            challenge.timezone as string,
-            (challenge.deadline_time as string | null) ?? '00:00',
-            joinedAt,
-          )}T00:00:00Z`,
-        );
-        joinDay = Math.round((joinCycle.getTime() - startDate.getTime()) / 86_400_000) + 1;
-      }
-      if (joinDay < 1) joinDay = 1;
+      const joinCycle = new Date(
+        `${cycleStartFor(
+          challenge.timezone as string,
+          (challenge.deadline_time as string | null) ?? '00:00',
+          new Date(participant.joined_at as string),
+        )}T00:00:00Z`,
+      );
+      joinDay = Math.max(
+        Math.round((joinCycle.getTime() - startDate.getTime()) / 86_400_000) + 1,
+        1,
+      );
     }
 
     let dayNumber = currentDay;

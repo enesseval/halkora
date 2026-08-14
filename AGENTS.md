@@ -134,13 +134,19 @@ Sütun zaten `joined_at` adıyla vardı. Neredeyse yinelenen bir sütun ekliyord
 `dailyAction` koşulsuz `"Bugün: "` ile öneklenmişti; henüz başlamamış halkada
 "bugün" yoktur. Önek yalnızca `status === 'active'` iken eklenir.
 
-### 3.6 FAST_DAYS başlangıç tarihi kapısını atlıyordu
+### 3.6 FAST_DAYS başlangıç tarihi kapısını atlıyordu (özellik kaldırıldı)
 
 Test modundaki dal, günü `created_at`'ten dakika bazlı türetiyordu; bu yüzden
 `currentDay` halka var olur olmaz ≥1 oluyor ve `CHALLENGE_NOT_STARTED` hiç
 tetiklenmiyordu. Canlı veriden doğrulandı. Ayrıca RLS'teki `insert own check-in`
 politikası her katılımcının istediği `day_number`'ı yazmasına izin veriyordu —
 yani Edge Function'daki tüm kontroller tavsiye niteliğindeydi.
+
+FAST_DAYS'in kendisi sonradan tamamen kaldırıldı (istemci, Edge Function ve
+widget'tan). Ders duruyor: bir test kısayolu, ürün mantığının kapılarından
+birini atlamak zorunda kalıyorsa o kısayol kendi bug sınıfını üretir. Çok
+günlü senaryolar artık `challenges.start_date` geriye alınarak kuruluyor —
+üretim kod yolunun aynısını kullanır, atlanan kapı olmaz.
 
 ---
 

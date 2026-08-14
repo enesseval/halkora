@@ -27,7 +27,6 @@ import { amIParticipant, fetchChallengePreview, joinChallengeByCode } from '@/da
 import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
 import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
-import { FAST_DAYS } from '@/lib/fastDays';
 import {
   ME_ID,
   ME_NAME,
@@ -94,9 +93,7 @@ export function useChallengesQuery() {
     // if the websocket silently drops (network switch, background/foreground)
     // or Ek D's publication step isn't actually enabled. 60s is fine for
     // "catch up eventually"; it's not the primary way data gets fresh anymore.
-    // In FAST_DAYS test mode a "day" is 60s, so a 60s poll can lag a whole
-    // day — tighten it so day rollovers show up on screen as they happen.
-    refetchInterval: isSupabaseConfigured ? (FAST_DAYS ? 10_000 : 60_000) : false,
+    refetchInterval: isSupabaseConfigured ? 60_000 : false,
   });
 
   useEffect(() => {

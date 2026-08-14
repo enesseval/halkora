@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabase';
 import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
 import { buildDays, formatShortDate } from '@/lib/day';
-import { FAST_DAYS, fastDaysAt, fastDaysSince } from '@/lib/fastDays';
 import { DEFAULT_DEADLINE, cycleStart, daysBetween } from '@/lib/cycle';
 import { computeStakeOutcome } from './stakeOutcome';
 import { getDict, getLocale } from '@/i18n';
@@ -176,50 +175,28 @@ function todayInTimezone(timezone: string): string {
  * Function's day math (docs/PHASE2-SUPABASE.md "Ek F") exactly, or a
  * participant in a different timezone than the challenge can see "bugün
  * işaretlenebilir" on screen and get rejected server-side. 0 === starts today. */
-function daysSinceStart(
-  startISO: string,
-  timezone: string,
-  createdAtISO: string,
-  deadline: string,
-): number {
+function daysSinceStart(startISO: string, timezone: string, deadline: string): number {
   // Which cycle we're in, not which calendar date it is (Faz 1). With the
   // default 00:00 deadline the two are the same thing.
-  const cycle = cycleStart(timezone, deadline);
-  // Test-only acceleration: 1 day == 1 minute, anchored to created_at
-  // because start_date has no time-of-day (see src/lib/fastDays.ts).
-  //
-  // The start date still gates it. Fast mode used to return a positive day
-  // straight away, so a ring scheduled weeks out showed as running and took
-  // check-ins the moment it was created. Acceleration applies to a ring that
-  // has begun; it doesn't begin one.
-  //
-  // Before the start date it falls through to the real cycle math below, so
-  // "3 gün sonra başlıyor" stays truthful instead of collapsing to a flat
-  // "not started".
-  if (FAST_DAYS && cycle >= startISO) return fastDaysSince(createdAtISO);
-  return daysBetween(startISO, cycle);
+  return daysBetween(startISO, cycleStart(timezone, deadline));
 }
 
 /**
  * The 1-based day someone became eligible — the day they joined.
  *
- * Deliberately NOT daysSinceStart(): that one answers "how far along is the
- * ring right now" and only reads its `createdAtISO` argument in FAST_DAYS
- * mode, so passing a join timestamp to it returned today's day number for
- * everyone. Here the instant is the whole question, so it goes into the cycle
- * math instead of past it.
+ * Deliberately NOT daysSinceStart(): that one asks which cycle is open NOW.
+ * Here the instant is the whole question, so it goes into the cycle math
+ * rather than being read off the clock.
  */
 function joinDayFor(
   startISO: string,
   timezone: string,
   deadline: string,
-  createdAtISO: string,
   joinedAtISO: string | null,
 ): number {
   // No timestamp means the row predates the column — day 1 is the only
   // answer that can't wrongly take days away from someone.
   if (!joinedAtISO) return 1;
-  if (FAST_DAYS) return Math.max(fastDaysAt(createdAtISO, joinedAtISO) + 1, 1);
   return Math.max(daysBetween(startISO, cycleStart(timezone, deadline, new Date(joinedAtISO))) + 1, 1);
 }
 
@@ -323,7 +300,7 @@ function mapRow(
   // Captured once: the guard above proves it's set, but TypeScript loses that
   // narrowing inside the callbacks further down.
   const startDate = row.start_date;
-  const diff = daysSinceStart(startDate, row.timezone, row.created_at, deadline);
+  const diff = daysSinceStart(startDate, row.timezone, deadline);
   const rawDay = diff + 1; // day 1 == start day
   const dateBasedStatus: Challenge['status'] =
     rawDay <= 0 ? 'upcoming' : rawDay > row.total_days ? 'completed' : 'active';
@@ -363,7 +340,7 @@ function mapRow(
   // nothing to repair, nothing to answer for — which is the same rule the
   // stake outcome already counts by.
   const myJoinDay = myParticipant
-    ? joinDayFor(startDate, row.timezone, deadline, row.created_at, myParticipant.joined_at)
+    ? joinDayFor(startDate, row.timezone, deadline, myParticipant.joined_at)
     : 1;
 
   // days[] reflects MY personal progress on this challenge's ring.
@@ -428,12 +405,7 @@ function mapRow(
       // Reflects the DB's real "one nudge per person per day" state (Ek K) —
       // not just an ephemeral optimistic flag — so it survives a refetch and
       // the UI can tell a genuine re-attempt apart from a fresh nudge.
-      // Under FAST_DAYS this always reads false: the DB limit counts a real
-      // calendar day, not a fast-day, and insertNudge already clears today's
-      // row before every test-mode insert — showing the stale "already
-      // nudged" state here would just make ParticipantRow block the retry
-      // before that clear-then-insert ever runs.
-      nudged: !FAST_DAYS && nudgedToday.has(p.user_id),
+      nudged: nudgedToday.has(p.user_id),
     };
   });
 
@@ -451,7 +423,7 @@ function mapRow(
           joinDayByParticipant: new Map(
             parts.map((p) => [
               p.user_id,
-              joinDayFor(startDate, row.timezone, deadline, row.created_at, p.joined_at),
+              joinDayFor(startDate, row.timezone, deadline, p.joined_at),
             ]),
           ),
           totalCheckIns: checkIns.length,
