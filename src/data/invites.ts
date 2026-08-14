@@ -49,3 +49,49 @@ export async function sendInvite(
     .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId, kind });
   if (error) throw error;
 }
+
+export interface ReceivedInvite {
+  id: string;
+  challengeId: string;
+  inviteCode: string;
+  title: string;
+  dailyAction: string;
+  totalDays: number;
+  fromName: string;
+  kind: 'invite' | 'rematch';
+}
+
+/**
+ * Invites waiting for this device's user (docs/db-invites-inbox.sql).
+ *
+ * Until this existed the table was write-only: nothing read it, and nothing
+ * could — the recipient had no SELECT policy, and showing the ring's name
+ * needs `challenges`, which RLS blocks for someone who hasn't joined yet. So
+ * the push was the only channel, and a push that never arrives or gets
+ * swiped away took the invite with it (saha testi bulgusu: "sessizce
+ * kayboluyor, erişemiyorum").
+ *
+ * The RPC drops invites to rings that ended and to rings you've already
+ * joined, so what comes back is only what you can still act on.
+ */
+export async function fetchReceivedInvites(): Promise<ReceivedInvite[]> {
+  const { data, error } = await supabase.rpc('my_invites');
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: r.id as string,
+    challengeId: r.challenge_id as string,
+    inviteCode: r.invite_code as string,
+    title: (r.title as string) ?? '',
+    dailyAction: (r.daily_action as string) ?? '',
+    totalDays: (r.total_days as number) ?? 0,
+    fromName: (r.from_name as string) || getDict().common.person,
+    kind: (r.kind as 'invite' | 'rematch') ?? 'invite',
+  }));
+}
+
+/** Turns down an invite. Only the recipient can, and it only removes the
+ * invite — nothing about the ring changes. */
+export async function dismissInvite(inviteId: string): Promise<void> {
+  const { error } = await supabase.from('invites').delete().eq('id', inviteId);
+  if (error) throw error;
+}

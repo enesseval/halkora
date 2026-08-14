@@ -47,6 +47,30 @@ export async function fetchChallengePreview(code: string): Promise<ChallengePrev
   };
 }
 
+/**
+ * Am I already in this ring?
+ *
+ * Reads my OWN participant row and nothing else — `fetchMyChallenges` opens
+ * with the same query, so RLS is known to allow it. A non-member simply gets
+ * an empty result, which is exactly the answer we want, so one query answers
+ * both directions without needing to see anyone else's row.
+ */
+export async function amIParticipant(challengeId: string): Promise<boolean> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (!user) return false;
+  const { data, error } = await supabase
+    .from('participants')
+    .select('id')
+    .eq('challenge_id', challengeId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
 /** Adds the current user as a participant. Returns the challenge id. */
 export async function joinChallengeByCode(code: string): Promise<string> {
   const { data, error } = await supabase.rpc('join_challenge_by_code', { p_code: code });

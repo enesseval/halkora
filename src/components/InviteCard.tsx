@@ -67,12 +67,25 @@ const RING = {
   story: u(560),
   square: u(440),
   stroke: u(34),
-  /** Constant regardless of day count — at 30 segments the stroke thins
-   * instead, so the circle never breaks up (design note). */
-  gapDeg: 3,
   /** The 12-o'clock mark on an unstarted ring: where it will begin. */
   startDot: u(13),
 };
+
+/**
+ * The card's ring is the LOGO, not a day chart.
+ *
+ * One arc per day looked right at 7 and fell apart past 21 — at 30 the arcs
+ * were thinner than the gaps between them and the circle read as noise (saha
+ * testi bulgusu). And a share image doesn't need to be countable: nobody
+ * squints at a Story to tally segments, the number in the middle already says
+ * it. So the ring keeps the mark's own eight-segment geometry at every length,
+ * exactly as the app icon and the boot animation draw it, and progress is
+ * mapped onto those eight.
+ */
+const LOGO_SEGMENTS = 8;
+/** Straight from the wordmark below: 33° of arc, 12° of gap. */
+const LOGO_SPAN = 33;
+const LOGO_GAP = 12;
 
 function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): string {
   const p = (a: number) => {
@@ -103,30 +116,29 @@ function ShareRing({
   empty?: boolean;
   children: React.ReactNode;
 }) {
-  // Thinner as the day count climbs so 30 segments stay round.
-  const stroke = totalDays >= 21 ? RING.stroke * 0.72 : RING.stroke;
+  const stroke = RING.stroke;
   const r = size / 2 - stroke / 2;
   const cx = size / 2;
   const cy = size / 2;
-  const step = 360 / totalDays;
-  // Unfilled segments are all one colour, so the gap is the ONLY thing
-  // separating them; 3° disappears at this stroke. A filled ring doesn't need
-  // the help — the colour change already draws the line.
-  const gap = empty ? Math.min(8, 90 / totalDays) : RING.gapDeg;
-  const span = step - gap;
+  const step = 360 / LOGO_SEGMENTS;
+
+  // Days mapped onto the eight. Ceil rather than round so a single day in
+  // shows as one lit segment instead of rounding away to an untouched ring —
+  // the difference between "we've begun" and "nothing yet".
+  const lit = empty
+    ? 0
+    : filledDays <= 0
+      ? 0
+      : Math.min(LOGO_SEGMENTS, Math.max(1, Math.ceil((filledDays / totalDays) * LOGO_SEGMENTS)));
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={{ position: 'absolute' }}>
-        {/* Always segmented, even with nothing filled. A plain circle hides
-            what the ring MEANS — one arc per day — and the whole point of an
-            invitation card is that you can count the days you're being asked
-            for (saha testi bulgusu: "gün ayrımı olduğu belli olsun"). */}
-        {Array.from({ length: totalDays }, (_, i) => (
+        {Array.from({ length: LOGO_SEGMENTS }, (_, i) => (
           <Path
             key={i}
-            d={arcPath(cx, cy, r, i * step + gap / 2, i * step + gap / 2 + span)}
-            stroke={!empty && i < filledDays ? colors.ember : colors.waiting}
+            d={arcPath(cx, cy, r, i * step + LOGO_GAP / 2, i * step + LOGO_GAP / 2 + LOGO_SPAN)}
+            stroke={i < lit ? colors.ember : colors.waiting}
             strokeWidth={stroke}
             strokeLinecap="round"
             fill="none"
@@ -196,10 +208,10 @@ function Wordmark() {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(18) }}>
       <Svg width={u(34)} height={u(34)}>
-        {Array.from({ length: 8 }, (_, i) => (
+        {Array.from({ length: LOGO_SEGMENTS }, (_, i) => (
           <Path
             key={i}
-            d={arcPath(u(17), u(17), u(13), i * 45 + 6, i * 45 + 39)}
+            d={arcPath(u(17), u(17), u(13), i * 45 + LOGO_GAP / 2, i * 45 + LOGO_GAP / 2 + LOGO_SPAN)}
             stroke={colors.ember}
             strokeWidth={u(7)}
             strokeLinecap="round"

@@ -305,8 +305,15 @@ function mapRow(
   // the DB *before* the days have naturally run out — that's the entire
   // point of ending early. Date math alone would never see it as completed,
   // so the DB's own status is authoritative whenever it says 'completed'.
+  // 'closed' (the owner ended it for everyone, docs/db-close-and-handover.sql)
+  // is read as completed rather than given its own client status. A closed
+  // ring behaves identically everywhere it matters — no check-ins, out of the
+  // active list, into history with its stats intact — and adding a fourth
+  // status would mean revisiting every screen that switches on this one for a
+  // distinction the UI never actually draws. Who closed it, and when, is in
+  // the chat where it belongs.
   const status: Challenge['status'] =
-    row.status === 'completed' ? 'completed' : dateBasedStatus;
+    row.status === 'completed' || row.status === 'closed' ? 'completed' : dateBasedStatus;
   const currentDay = status === 'upcoming' ? 0 : Math.min(rawDay, row.total_days);
 
   const t = getDict();
@@ -652,9 +659,40 @@ export async function deleteChallenge(challengeId: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Non-owner participant removes themselves; the RPC rejects the owner. */
-export async function leaveChallenge(challengeId: string): Promise<void> {
-  const { error } = await supabase.rpc('leave_challenge', { p_challenge_id: challengeId });
+/**
+ * Closes the ring for everyone without destroying it (docs/db-close-and-handover.sql).
+ *
+ * Deliberately not a delete: members keep their history and their stats, and
+ * someone who put ten days in doesn't lose them because the owner moved on.
+ * The system message is written by the RPC so it lands in the same
+ * transaction, and it pushes — that's how everyone finds out.
+ */
+export async function closeChallenge(challengeId: string, systemText: string): Promise<void> {
+  const { error } = await supabase.rpc('close_challenge', {
+    p_challenge_id: challengeId,
+    p_system_text: systemText,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Removes the caller from the ring.
+ *
+ * The owner may leave too now; the earliest-joined member takes over so the
+ * ring is never left without one. If nobody else is there the RPC raises
+ * LAST_MEMBER_MUST_CLOSE, because leaving would orphan it — closing is the
+ * thing that was actually meant.
+ *
+ * `systemText` is passed in rather than composed server-side: the database has
+ * no access to the translation dictionaries, same as every other system
+ * message in this app. The RPC writes it BEFORE removing the row, since RLS
+ * requires membership to post.
+ */
+export async function leaveChallenge(challengeId: string, systemText?: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_challenge', {
+    p_challenge_id: challengeId,
+    p_system_text: systemText ?? null,
+  });
   if (error) throw error;
 }
 

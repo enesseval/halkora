@@ -119,6 +119,21 @@ export function ShareRingSheet({
     }
   };
 
+  /**
+   * The plain text-and-link share, kept alongside the image rather than
+   * replaced by it. An image is what Instagram and X want; Messages and
+   * WhatsApp want a link they can unfurl into a preview card, and forcing the
+   * image path there meant the link arrived as a separate paste or not at all.
+   */
+  const doShareLink = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      await Share.share({ message: t.invite.shareMessage(challenge.title, link) });
+    } catch {
+      // Cancelling lands here too — nothing to report.
+    }
+  };
+
   const doCopy = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     await Clipboard.setStringAsync(link);
@@ -229,6 +244,12 @@ export function ShareRingSheet({
 
             <View style={{ marginTop: 22 }}>
               <Button label={t.shareCard.share} onPress={doShare} disabled={busy} />
+            </View>
+
+            {/* A row so SecondaryAction's flex:1 fills the width — the same
+                outlined pill as below, just on its own line. */}
+            <View style={{ flexDirection: 'row', marginTop: 10 }}>
+              <SecondaryAction label={t.shareCard.shareLink} onPress={doShareLink} disabled={busy} />
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>

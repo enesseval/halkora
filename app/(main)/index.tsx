@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { colors, spacing } from '@/theme/tokens';
 import { useTodayStatus, useCheckIn, useChallengeActions, useRefreshChallenges, useCompletedChallenges } from '@/hooks';
 import type { Challenge, SegmentState } from '@/hooks';
+import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
@@ -14,6 +15,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { InvitesBell, InvitesSheet, useReceivedInvites } from '@/components/InvitesSheet';
 import { useT } from '@/i18n';
 
 const EMPTY_RING_DAYS: SegmentState[] = Array(12).fill('empty');
@@ -61,28 +63,53 @@ function PendingCardWithCheckIn({
 function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
   const { t } = useT();
   const router = useRouter();
+  const { name } = useAuth();
   const actions = useChallengeActions(challenge.id);
   const busy = useRef(false);
+  const myName = name?.trim() || t.common.person;
 
+  /**
+   * Same question the detail screen asks, for the same reason: an owner
+   * reaching for delete may mean "end this for everyone" or "get me out of
+   * it", and those are not the same. Asking here too keeps the two entry
+   * points behaving alike rather than one of them quietly destroying a group.
+   */
   const confirmDelete = () => {
     if (busy.current) return;
-    Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
+    const others = challenge.participants.length > 1;
+    const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
       { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.detail.deleteChallenge,
-        style: 'destructive',
+    ];
+    if (others) {
+      buttons.push({
+        text: t.detail.ownerLeave,
         onPress: async () => {
           busy.current = true;
           try {
-            await actions.deleteChallenge();
+            await actions.leaveChallenge(t.detail.systemLeft(myName));
           } catch (e) {
-            Alert.alert(t.detail.deleteChallengeFailed, friendlyErrorMessage(e));
+            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
           } finally {
             busy.current = false;
           }
         },
+      });
+    }
+    buttons.push({
+      text: t.detail.closeChallenge,
+      style: 'destructive',
+      onPress: async () => {
+        busy.current = true;
+        try {
+          await actions.closeChallenge(t.detail.systemClosed(myName));
+        } catch (e) {
+          Alert.alert(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
+        } finally {
+          busy.current = false;
+        }
       },
-    ]);
+    });
+    Alert.alert(t.detail.ownerExitTitle, t.detail.ownerExitBody, buttons);
   };
 
   const confirmLeave = () => {
@@ -95,7 +122,7 @@ function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
         onPress: async () => {
           busy.current = true;
           try {
-            await actions.leaveChallenge();
+            await actions.leaveChallenge(t.detail.systemLeft(myName));
           } catch (e) {
             Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
           } finally {
@@ -159,6 +186,10 @@ export default function HomeScreen() {
   // finishes has no section it belongs to on Home at all — it just quietly
   // stops appearing anywhere, even though its data/history is still there.
   const finished = useCompletedChallenges();
+  // Invites used to arrive only as a push, and a push that never lands takes
+  // the invite with it. The bell is the record; see InvitesSheet.
+  const { invites, reload: reloadInvites } = useReceivedInvites();
+  const [showInvites, setShowInvites] = useState(false);
   const { refreshing, refresh } = useRefreshChallenges();
   const [showStart, setShowStart] = useState(false);
 
@@ -197,6 +228,9 @@ export default function HomeScreen() {
             </AppText>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
+            {/* Only when there's something waiting — an empty bell that's
+                always there is furniture, not information. */}
+            <InvitesBell count={invites.length} onPress={() => setShowInvites(true)} />
             <IconButton onPress={() => setShowStart(true)}>
               <Feather name="plus" size={20} color={colors.textPrimary} />
             </IconButton>
@@ -290,6 +324,14 @@ export default function HomeScreen() {
       </Screen>
 
       <QuickStartSheet visible={showStart} onClose={() => setShowStart(false)} />
+
+      {showInvites ? (
+        <InvitesSheet
+          invites={invites}
+          onClose={() => setShowInvites(false)}
+          onChanged={reloadInvites}
+        />
+      ) : null}
     </View>
   );
 }

@@ -18,11 +18,12 @@ import {
   updateChallengeDetails,
   deleteChallenge as deleteChallengeRemote,
   leaveChallenge as leaveChallengeRemote,
+  closeChallenge as closeChallengeRemote,
   startChallenge as startChallengeRemote,
   settleStake,
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
-import { fetchChallengePreview, joinChallengeByCode } from '@/data/join';
+import { amIParticipant, fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
 import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
@@ -218,6 +219,15 @@ export interface JoinPreview {
   participants: { id: string; initials: string; name: string }[];
   /** Ek M — kurucu daveti "yalnızca ilk gün" ile sınırlamışsa ve o gün geçtiyse true. */
   joinClosed: boolean;
+  /** The ring itself is over — closed by its owner or finished. Its invite
+   * link outlives it, so the screen has to say so rather than let someone
+   * walk into a ring nobody is checking into. */
+  ringClosed: boolean;
+  /** Already a member — including the owner opening their own invite link.
+   * Nothing stopped that before, so a founder could walk their own join flow. */
+  alreadyJoined: boolean;
+  /** The previewed ring, so "you're already in" can offer a way into it. */
+  challengeId?: string;
 }
 
 /**
@@ -235,10 +245,21 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     enabled: isSupabaseConfigured && !!code,
   });
 
+  // Membership is a separate question from the preview, and stays separate:
+  // the preview RPC is a deliberately public read of a few safe fields, while
+  // this one depends on who is looking. It can only start once the preview has
+  // resolved to an id.
+  const { data: joined, isLoading: joinedLoading } = useQuery({
+    queryKey: ['challenge-membership', data?.id],
+    queryFn: () => amIParticipant(data!.id),
+    enabled: isSupabaseConfigured && !!data?.id,
+  });
+
   if (isSupabaseConfigured) {
     if (!data) {
       return {
         loading: isLoading,
+        alreadyJoined: false,
         // Only a genuinely-empty successful response counts as "not found" —
         // a thrown error must never be presented as "this invite doesn't exist".
         notFound: !isLoading && !isError,
@@ -251,10 +272,15 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
         startsWhen: '',
         participants: [],
         joinClosed: false,
+        ringClosed: false,
       };
     }
     return {
-      loading: false,
+      // Membership decides which call-to-action this screen shows, so the
+      // screen waits for it rather than flashing "Join" and swapping it out.
+      loading: joinedLoading,
+      alreadyJoined: joined === true,
+      challengeId: data.id,
       notFound: false,
       isError: false,
       retry: refetch,
@@ -269,6 +295,9 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
         initials: name.slice(0, 2).toUpperCase(),
       })),
       joinClosed: data.joinClosed,
+      // Same set the join RPC rejects on, so the screen and the server agree
+      // on what "over" means.
+      ringClosed: data.status === 'completed' || data.status === 'closed',
     };
   }
 
@@ -276,6 +305,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
     return {
       loading: false,
       notFound: true,
+      alreadyJoined: false,
       isError: false,
       retry: () => {},
       title: '',
@@ -284,11 +314,14 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       startsWhen: '',
       participants: [],
       joinClosed: false,
+      ringClosed: false,
     };
   }
   return {
     loading: false,
     notFound: false,
+    alreadyJoined: mock.participants.some((p) => p.isMe),
+    challengeId: mock.id,
     isError: false,
     retry: () => {},
     title: mock.title,
@@ -300,6 +333,7 @@ export function useJoinPreview(code: string | undefined): JoinPreview {
       .filter((p) => !p.isMe)
       .map((p) => ({ id: p.id, name: p.name, initials: p.initials })),
     joinClosed: mock.joinClosed,
+    ringClosed: mock.status === 'completed',
   };
 }
 
@@ -681,15 +715,35 @@ export function useChallengeActions(id: string) {
     }
   };
 
-  /** Non-owner participants only — the RPC itself also rejects the owner.
-   * Same immediate local removal as doDelete, same reason. */
-  const doLeave = async (): Promise<void> => {
+  /**
+   * Removes this device's user from the ring. The owner may do it too — the
+   * earliest-joined member takes over — unless they're the last one there,
+   * which the RPC rejects with LAST_MEMBER_MUST_CLOSE.
+   *
+   * `systemText` is the line the group sees in chat; composed by the caller
+   * because the database can't reach the dictionaries.
+   */
+  const doLeave = async (systemText?: string): Promise<void> => {
     if (isSupabaseConfigured) {
-      await leaveChallengeRemote(id);
+      await leaveChallengeRemote(id, systemText);
     }
     removeChallengeMock(id);
     if (isSupabaseConfigured) {
       queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    }
+  };
+
+  /**
+   * Closes the ring for everyone. Unlike delete, nothing is destroyed: it
+   * leaves the active list, nobody can check in again, and every member keeps
+   * their history. The system message it writes is what notifies them.
+   */
+  const doClose = async (systemText: string): Promise<void> => {
+    if (isSupabaseConfigured) {
+      await closeChallengeRemote(id, systemText);
+      queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+    } else {
+      removeChallengeMock(id);
     }
   };
 
@@ -715,6 +769,7 @@ export function useChallengeActions(id: string) {
     settleStake: doSettleStake,
     deleteChallenge: doDelete,
     leaveChallenge: doLeave,
+    closeChallenge: doClose,
     startChallenge: doStart,
   };
 }
