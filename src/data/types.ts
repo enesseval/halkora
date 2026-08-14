@@ -109,7 +109,7 @@ export interface Challenge {
    * the plain calendar day, which is what every ring had before deadlines. */
   deadlineTime: string;
   startDate: string | null; // "YYYY-MM-DD"
-  createdAt: string; // ISO — FAST_DAYS test mode anchors its 1-minute days here
+  createdAt: string; // ISO
   /** Set when the challenge was ended EARLY — the day it actually stopped on.
    * The stake threshold counts against this, not `totalDays`, or every
    * unelapsed day would read as "missed" and the whole group would lose

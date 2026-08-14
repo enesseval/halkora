@@ -9,7 +9,8 @@
 > değilse aşağıdaki her şey yanıltıcı sonuç verir.
 >
 > **İşaretler:** 🔴 prod'a çıkmadan MUTLAKA geçmeli · 🟡 önemli ama bloklayıcı
-> değil · 📱 iki cihaz/hesap gerekir · ⏱️ FAST_DAYS ile hızlandırılabilir
+> değil · 📱 iki cihaz/hesap gerekir · ⏱️ birden fazla gün gerekir (start_date
+> geriye alınarak kurulur — bkz. docs/TEST-CHECKLIST.md)
 
 ---
 
@@ -28,11 +29,8 @@ Bunlar yanlışsa aşağıdaki tüm sonuçlar şüphelidir.
       onu no-op'luyor; dursa da zararsız.)
 - [ ] Test için **iki ayrı Apple hesabı / iki cihaz** hazır (📱 işaretli
       maddelerin çoğu tek cihazla doğrulanamaz).
-- [ ] FAST_DAYS durumu bilinçli: `.env`'de `EXPO_PUBLIC_FAST_DAYS` ve
-      `supabase secrets` tarafındaki `FAST_DAYS` **birlikte** açık ya da
-      **birlikte** kapalı. Yalnız biri açıksa istemci sunucunun reddettiği
-      bir gün gösterir.
-- [ ] 🔴 **Prod build öncesi FAST_DAYS her iki tarafta da KAPALI.**
+- [ ] Çok günlü senaryolar `challenges.start_date` geriye alınarak kurulur;
+      zaman hızlandırma modu kaldırıldı.
 
 ---
 
@@ -308,7 +306,6 @@ Her hata için:
 
 ## Prod çıkış öncesi son kontrol
 
-- [ ] 🔴 FAST_DAYS her iki tarafta kapalı, `check-in` yeniden deploy edildi.
 - [ ] 🔴 Yukarıdaki tüm 🔴 maddeler geçti.
 - [ ] 🔴 Hesap silme akışı gerçek cihazda doğrulandı (App Store incelemesi
       bunu test ediyor).

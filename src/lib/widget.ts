@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { ExtensionStorage } from '@bacons/apple-targets';
 import type { Challenge } from '@/data/types';
-import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
 import { cycleStart } from '@/lib/cycle';
 import { byUrgency, urgencyOf } from '@/lib/widgetUrgency';
 import { getLocale } from '@/i18n';
@@ -12,7 +11,6 @@ import { getLocale } from '@/i18n';
  * Mirrors HalkoraWidget.swift's todayKey() — keep both in sync.
  */
 function dayKeyFor(c: Challenge): string {
-  if (FAST_DAYS) return String(fastDaysSince(c.createdAt) + 1);
   // The CYCLE it belongs to, not the calendar date — with a 21:00 deadline a
   // check-in made at 22:00 belongs to the cycle that opened then, and keying
   // it by the calendar date would make it look stale to the widget five
@@ -170,13 +168,10 @@ export function syncWidgetSnapshot(challenges: Challenge[]): void {
         // the cycle itself for the same reason it re-derives the day.
         deadlineTime: c.deadlineTime,
         startDate: c.startDate ?? '',
-        createdAt: c.createdAt,
-        fastDays: FAST_DAYS ? 1 : 0,
         // The day this check-in belongs to, not a boolean — a stale `true`
         // is exactly what made the widget claim "Yapıldı ✓" into the next
         // day. Empty when not checked in. Key format matches the widget's
-        // own todayKey(): the challenge-timezone date, or the fast-day
-        // number under FAST_DAYS.
+        // own todayKey(): the challenge-timezone date.
         checkedInDayKey: c.meCheckedInToday ? dayKeyFor(c) : '',
         segments: segmentsOf(c),
         // Group progress ("4/8 tamamladı"). Only meaningful for the day it
