@@ -25,5 +25,11 @@ export const FAST_DAY_MS = 60_000;
 
 /** 0 on the creation minute (== "starts today"), 1 a minute later, ... */
 export function fastDaysSince(createdAtISO: string): number {
-  return Math.floor((Date.now() - new Date(createdAtISO).getTime()) / FAST_DAY_MS);
+  return fastDaysAt(createdAtISO, new Date().toISOString());
+}
+
+/** The same count at an arbitrary instant rather than now — which fast-day
+ * someone joined on, for instance. */
+export function fastDaysAt(createdAtISO: string, atISO: string): number {
+  return Math.floor((new Date(atISO).getTime() - new Date(createdAtISO).getTime()) / FAST_DAY_MS);
 }

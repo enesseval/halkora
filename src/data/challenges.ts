@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type { CreateChallengeInput } from '@/stores/mockStore';
 import type { Challenge, Participant, SegmentState } from './types';
 import { buildDays, formatShortDate } from '@/lib/day';
-import { FAST_DAYS, fastDaysSince } from '@/lib/fastDays';
+import { FAST_DAYS, fastDaysAt, fastDaysSince } from '@/lib/fastDays';
 import { DEFAULT_DEADLINE, cycleStart, daysBetween } from '@/lib/cycle';
 import { computeStakeOutcome } from './stakeOutcome';
 import { getDict, getLocale } from '@/i18n';
@@ -200,6 +200,29 @@ function daysSinceStart(
   return daysBetween(startISO, cycle);
 }
 
+/**
+ * The 1-based day someone became eligible — the day they joined.
+ *
+ * Deliberately NOT daysSinceStart(): that one answers "how far along is the
+ * ring right now" and only reads its `createdAtISO` argument in FAST_DAYS
+ * mode, so passing a join timestamp to it returned today's day number for
+ * everyone. Here the instant is the whole question, so it goes into the cycle
+ * math instead of past it.
+ */
+function joinDayFor(
+  startISO: string,
+  timezone: string,
+  deadline: string,
+  createdAtISO: string,
+  joinedAtISO: string | null,
+): number {
+  // No timestamp means the row predates the column — day 1 is the only
+  // answer that can't wrongly take days away from someone.
+  if (!joinedAtISO) return 1;
+  if (FAST_DAYS) return Math.max(fastDaysAt(createdAtISO, joinedAtISO) + 1, 1);
+  return Math.max(daysBetween(startISO, cycleStart(timezone, deadline, new Date(joinedAtISO))) + 1, 1);
+}
+
 function hhmm(iso: string): string {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -297,7 +320,10 @@ function mapRow(
     return mapLobbyRow(row, parts, profMap, myUserId, stake);
   }
   const deadline = row.deadline_time ?? DEFAULT_DEADLINE;
-  const diff = daysSinceStart(row.start_date, row.timezone, row.created_at, deadline);
+  // Captured once: the guard above proves it's set, but TypeScript loses that
+  // narrowing inside the callbacks further down.
+  const startDate = row.start_date;
+  const diff = daysSinceStart(startDate, row.timezone, row.created_at, deadline);
   const rawDay = diff + 1; // day 1 == start day
   const dateBasedStatus: Challenge['status'] =
     rawDay <= 0 ? 'upcoming' : rawDay > row.total_days ? 'completed' : 'active';
@@ -333,6 +359,13 @@ function mapRow(
     : [];
   const myByDay = new Map(myCheckIns.map((c) => [c.day_number, c]));
 
+  // The days before I joined were never mine to miss. They stay 'empty' —
+  // nothing to repair, nothing to answer for — which is the same rule the
+  // stake outcome already counts by.
+  const myJoinDay = myParticipant
+    ? joinDayFor(startDate, row.timezone, deadline, row.created_at, myParticipant.joined_at)
+    : 1;
+
   // days[] reflects MY personal progress on this challenge's ring.
   const explicit: SegmentState[] = [];
   if (status !== 'upcoming') {
@@ -349,7 +382,9 @@ function mapRow(
     const lastSettled = status === 'completed' ? elapsed : currentDay - 1;
     for (let i = 1; i <= lastSettled; i++) {
       const c = myByDay.get(i);
-      explicit.push(c ? (c.type === 'joker' ? 'joker' : 'done') : 'missed');
+      // A check-in still wins if one somehow exists before the join day —
+      // showing a real day as blank would be the worse error of the two.
+      explicit.push(c ? (c.type === 'joker' ? 'joker' : 'done') : i < myJoinDay ? 'empty' : 'missed');
     }
     if (status !== 'completed') {
       const todayCheckIn = myByDay.get(currentDay);
@@ -359,8 +394,13 @@ function mapRow(
 
   const meCheckedInToday = myByDay.has(currentDay);
   const myTodayCheckIn = myByDay.get(currentDay);
+  // Yesterday can only be missed if it was mine — someone who joined today
+  // was greeted by the missed-day gate for a day the ring ran without them.
   const hasMissedYesterday =
-    status === 'active' && currentDay > 1 && !myByDay.has(currentDay - 1);
+    status === 'active' &&
+    currentDay > 1 &&
+    currentDay - 1 >= myJoinDay &&
+    !myByDay.has(currentDay - 1);
   const jokerUsed = myCheckIns.filter((c) => c.type === 'joker').length;
 
   // "Sen N. tamamlayansın" — rank among everyone's check-ins for today, by time.
@@ -411,12 +451,7 @@ function mapRow(
           joinDayByParticipant: new Map(
             parts.map((p) => [
               p.user_id,
-              row.start_date && p.joined_at
-                ? Math.max(
-                    daysSinceStart(row.start_date, row.timezone, p.joined_at, deadline) + 1,
-                    1,
-                  )
-                : 1,
+              joinDayFor(startDate, row.timezone, deadline, row.created_at, p.joined_at),
             ]),
           ),
           totalCheckIns: checkIns.length,

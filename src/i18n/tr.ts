@@ -77,6 +77,7 @@ export const tr = {
       BLOCKED_USER: 'Bu kişiyi engellemişsin. Mesaj göndermek için Ayarlar\u2019dan engeli kaldırman gerekiyor.',
       JOIN_WINDOW_CLOSED: "Bu challenge'a katılım süresi doldu — yalnızca ilk gün katılım açıktı.",
       CHALLENGE_CLOSED: 'Bu halka kapandı. Davet bağlantısı artık geçerli değil.',
+      BEFORE_YOU_JOINED: 'O gün sen halkada değildin — joker sadece katıldıktan sonraki günler için kullanılabilir.',
       NOT_A_MEMBER: "Bu challenge'in üyesi değilsin.",
       SESSION_MISSING: 'Oturum bulunamadı.',
       CHALLENGE_ID_REQUIRED: 'challenge_id gerekli.',
