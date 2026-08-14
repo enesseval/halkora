@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
 
     const { data: participant, error: pErr } = await admin
       .from('participants')
-      .select('id')
+      .select('id, joined_at')
       .eq('challenge_id', challengeId)
       .eq('user_id', userId)
       .single();
@@ -155,6 +155,34 @@ Deno.serve(async (req) => {
     if (currentDay < 1) return fail('CHALLENGE_NOT_STARTED');
     if (currentDay > challenge.total_days) return fail('CHALLENGE_ENDED');
 
+    // The first day this person was on the hook for. Days before it belong to
+    // a ring that ran without them — they were never missed, so there is
+    // nothing there for a joker to repair. Same formula as currentDay above,
+    // asked at the moment they joined instead of now; a missing joined_at
+    // (rows predating the column) means day 1, the only answer that can't
+    // wrongly take days away from someone.
+    let joinDay = 1;
+    if (participant.joined_at) {
+      const joinedAt = new Date(participant.joined_at as string);
+      if (Deno.env.get('FAST_DAYS') === '1') {
+        joinDay =
+          Math.floor(
+            (joinedAt.getTime() - new Date(challenge.created_at as string).getTime()) / 60_000,
+          ) + 1;
+      } else {
+        const startDate = new Date(`${challenge.start_date}T00:00:00Z`);
+        const joinCycle = new Date(
+          `${cycleStartFor(
+            challenge.timezone as string,
+            (challenge.deadline_time as string | null) ?? '00:00',
+            joinedAt,
+          )}T00:00:00Z`,
+        );
+        joinDay = Math.round((joinCycle.getTime() - startDate.getTime()) / 86_400_000) + 1;
+      }
+      if (joinDay < 1) joinDay = 1;
+    }
+
     let dayNumber = currentDay;
 
     if (checkInType === 'joker') {
@@ -168,6 +196,8 @@ Deno.serve(async (req) => {
       // days ahead of time. This is enforced here and not just in the UI
       // because day_number now comes from the client.
       if (dayNumber >= currentDay) return fail('INVALID_DAY');
+      // Joined on day 3 → days 1 and 2 aren't yours to repair.
+      if (dayNumber < joinDay) return fail('BEFORE_YOU_JOINED');
 
       const { data: existingForDay } = await admin
         .from('check_ins')

@@ -130,14 +130,20 @@ function SheetCard({ children }: { children: ReactNode }) {
 export function MissedDaySheet({
   challenge,
   onUseJoker,
+  onCheckInToday,
   onDismiss,
 }: {
   challenge: Challenge;
   onUseJoker: () => void;
+  /** Actually checks today in. The button used to only close this screen,
+   * which dropped you on Detail to press check-in a second time — the press
+   * here already said what you wanted. */
+  onCheckInToday: () => void;
   onDismiss: () => void;
 }) {
   const { t } = useT();
   const [usedJoker, setUsedJoker] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
 
   useEffect(() => {
     if (!usedJoker) return;
@@ -183,7 +189,19 @@ export function MissedDaySheet({
       <View style={{ height: 40 }} />
 
       <View style={{ width: '100%', gap: 12 }}>
-        <Button label={t.detail.todayCheckIn} onPress={onDismiss} />
+        <Button
+          label={t.detail.todayCheckIn}
+          disabled={checkingIn}
+          onPress={() => {
+            // Guarded because the check-in makes this whole screen go away —
+            // a second tap in that gap would be a duplicate write the server
+            // answers with ALREADY_CHECKED_IN.
+            if (checkingIn) return;
+            setCheckingIn(true);
+            onCheckInToday();
+            onDismiss();
+          }}
+        />
         {challenge.jokerRemaining > 0 && !usedJoker ? (
           <Button
             label={t.detail.useJoker(challenge.jokerRemaining)}

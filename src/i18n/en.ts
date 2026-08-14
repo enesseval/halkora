@@ -73,6 +73,7 @@ export const en: Dictionary = {
       INVITE_NOT_FOUND: 'Invite code not found.',
       JOIN_WINDOW_CLOSED: 'Joining this challenge has closed — it only allowed joins on day one.',
       CHALLENGE_CLOSED: 'This ring has closed. The invite link no longer works.',
+      BEFORE_YOU_JOINED: "You weren't in the ring that day — a joker only covers days after you joined.",
       NOT_A_MEMBER: "You're not a member of this challenge.",
       SESSION_MISSING: 'No session found.',
       CHALLENGE_ID_REQUIRED: 'challenge_id is required.',
