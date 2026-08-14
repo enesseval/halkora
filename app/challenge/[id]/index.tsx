@@ -1015,6 +1015,7 @@ export default function DetailScreen() {
         <MissedDaySheet
           challenge={challenge}
           onUseJoker={actions.useJoker}
+          onCheckInToday={checkIn}
           onDismiss={actions.ackMissed}
         />
       ) : null}
