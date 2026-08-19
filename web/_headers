@@ -1,8 +1,0 @@
-# Cloudflare Pages / Netlify başlık kuralları.
-#
-# apple-app-site-association UZANTISIZ bir dosya, dolayısıyla statik sunucu
-# içeriğe göre bir tip tahmin edemiyor ve application/octet-stream veriyor.
-# Apple bunu okumaz — Universal Link sessizce çalışmaz, hata da göstermez.
-/.well-known/apple-app-site-association
-  Content-Type: application/json
-  Cache-Control: public, max-age=3600
