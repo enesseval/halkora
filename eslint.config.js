@@ -13,7 +13,6 @@ module.exports = [
       'android/**',
       '.expo/**',
       'dist/**',
-      'web/**',
       'supabase/functions/**', // Deno, not this project's TS config
     ],
   },
