@@ -264,6 +264,7 @@ export const en: Dictionary = {
     usernameNotSet: 'not set',
     usernameEditTitle: 'Edit username',
     usernameEditHint: '3-20 characters · lowercase, numbers, underscore',
+    usernameCharDropped: 'Only lowercase letters, numbers and underscores — other characters are not accepted.',
     usernamePlaceholder: 'username',
     usernameSave: 'Save',
     usernameSaving: 'Saving…',

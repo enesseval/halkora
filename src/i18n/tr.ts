@@ -268,6 +268,7 @@ export const tr = {
     usernameNotSet: 'ayarlanmadı',
     usernameEditTitle: 'Kullanıcı adını düzenle',
     usernameEditHint: '3-20 karakter · küçük harf, rakam, alt çizgi',
+    usernameCharDropped: 'Sadece küçük harf, rakam ve alt çizgi kullanılabilir — diğer karakterler yazılmıyor.',
     usernamePlaceholder: 'kullaniciadi',
     usernameSave: 'Kaydet',
     usernameSaving: 'Kaydediliyor…',
