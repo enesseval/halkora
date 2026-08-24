@@ -113,9 +113,14 @@ export function useChallengesQuery() {
       // Applying it wholesale would stomp whatever the chat poll had just
       // populated back to empty every 5s, which is exactly what made a
       // just-sent message flash and then vanish for BOTH sides of the chat.
+      //
+      // missedAckDay is the same shape of problem: it lives only on the
+      // client, so every poll handed back a row without it and the
+      // missed-day gate reappeared over whatever you were doing, about once
+      // a minute, with no way to get past it except checking in.
       const refreshed = current.map((c) => {
         const fresh = byId.get(c.id);
-        return fresh ? { ...fresh, messages: c.messages } : c;
+        return fresh ? { ...fresh, messages: c.messages, missedAckDay: c.missedAckDay } : c;
       });
       const brandNew = query.data.filter((c) => !currentIds.has(c.id));
       const merged = [...refreshed, ...brandNew];
@@ -166,6 +171,7 @@ export function useTodayStatus() {
  * check-ins / new joiners without leaving and re-entering the screen.
  */
 export function useRefreshChallenges() {
+  const { t } = useT();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -173,7 +179,18 @@ export function useRefreshChallenges() {
     if (!isSupabaseConfigured) return;
     setRefreshing(true);
     try {
-      await queryClient.refetchQueries({ queryKey: MY_CHALLENGES_KEY });
+      // `throwOnError` because refetchQueries resolves successfully even when
+      // the fetch failed — react-query considers "I ran the query" the job
+      // done. Without it a refresh with no network looked identical to one
+      // that worked: the spinner retracted and nothing said why nothing
+      // changed. It also means the retries below are awaited rather than
+      // left running under a spinner that already went away.
+      await queryClient.refetchQueries({ queryKey: MY_CHALLENGES_KEY }, { throwOnError: true });
+    } catch (e) {
+      Alert.alert(
+        isNetworkError(e) ? t.errors.offlineTitle : t.errors.loadFailed,
+        friendlyErrorMessage(e),
+      );
     } finally {
       setRefreshing(false);
     }

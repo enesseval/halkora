@@ -117,7 +117,10 @@ export interface Challenge {
    * natural course. */
   endedOnDay?: number;
   hasMissedYesterday: boolean;
-  missedAcknowledged?: boolean;
+  /** The day number this ring's missed-day gate was last dismissed on. Keyed
+   * by day rather than a bare boolean so dismissing it today doesn't also
+   * dismiss it for a day missed next week. */
+  missedAckDay?: number;
   inviteCode: string;
   scheduleSummary: string; // "Her gün 20 sayfa · 14 gün"
   startsWhen: string; // "Yarın başlıyor"

@@ -296,6 +296,7 @@ export const tr = {
     loadFailed: 'Challenge yüklenemedi.',
     notStarted: 'Dün olmadı.\nBugün buradasın.',
     upcomingRing: 'Henüz başlamadı',
+    missedNotNow: 'Şimdi değil',
     todayCheckIn: "Bugünün check-in'i",
     useJoker: (n: number) => `Dün için joker kullan · ${n} hakkın var`,
     jokerInfo: (remaining: number, allowance: number) => `${remaining}/${allowance} joker hakkı`,

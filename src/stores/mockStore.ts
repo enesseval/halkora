@@ -170,7 +170,7 @@ export const useMockStore = create<MockState>((set, get) => ({
           days,
           jokerRemaining: c.jokerRemaining - 1,
           hasMissedYesterday: closesGate ? false : c.hasMissedYesterday,
-          missedAcknowledged: closesGate ? true : c.missedAcknowledged,
+          missedAckDay: closesGate ? c.currentDay : c.missedAckDay,
         };
       }),
     })),
@@ -178,7 +178,7 @@ export const useMockStore = create<MockState>((set, get) => ({
   ackMissed: (id) =>
     set((s) => ({
       challenges: s.challenges.map((c) =>
-        c.id === id ? { ...c, missedAcknowledged: true } : c,
+        c.id === id ? { ...c, missedAckDay: c.currentDay } : c,
       ),
     })),
 
@@ -356,7 +356,7 @@ export const useMockStore = create<MockState>((set, get) => ({
           myCheckinTime: undefined,
           myOrder: undefined,
           hasMissedYesterday: false,
-          missedAcknowledged: true,
+          missedAckDay: 1,
           participants: c.participants.map((p) => ({
             ...p,
             checkedInToday: false,

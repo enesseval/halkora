@@ -292,6 +292,7 @@ export const en: Dictionary = {
     loadFailed: "Couldn't load challenge.",
     notStarted: "Yesterday didn't happen.\nYou're here today.",
     upcomingRing: "Hasn't started yet",
+    missedNotNow: 'Not now',
     todayCheckIn: "Today's check-in",
     useJoker: (n: number) => `Use a joker for yesterday · ${n} left`,
     jokerInfo: (remaining: number, allowance: number) => `${remaining}/${allowance} jokers left`,

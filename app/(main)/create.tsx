@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -421,6 +423,11 @@ export default function CreateScreen() {
   // (docs/BAHIS-V2-VE-ROVANS.md §7). Still switchable.
   const [lobby, setLobby] = useState(!!rematchOf);
 
+  // The footer lifts by the measured keyboard height (see the footer's own
+  // note); the inset comes off it because Screen already applies one.
+  const keyboardHeight = useKeyboardHeight();
+  const insets = useSafeAreaInsets();
+
   const isToday = isSameDay(startDate, today);
   const isTomorrow = isSameDay(startDate, tomorrow);
   const isCustom = !isToday && !isTomorrow;
@@ -523,10 +530,6 @@ export default function CreateScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
       {/* header */}
       <View
         style={{
@@ -549,7 +552,13 @@ export default function CreateScreen() {
         )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        // Otherwise the first tap while the keyboard is up only dismisses it,
+        // and every option on the stake step needs a second tap.
+        keyboardShouldPersistTaps="handled"
+      >
         <AppText variant="screenTitle" style={{ marginTop: 20 }}>
           {titles[step]}
         </AppText>
@@ -905,7 +914,13 @@ export default function CreateScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={{ paddingBottom: spacing.section }}>
+      {/* The footer lifts itself rather than relying on KeyboardAvoidingView,
+          which measured its own frame against a Screen that has already eaten
+          the bottom inset and left the button under the keyboard on the stake
+          step — the one step with text fields near the bottom. The inset is
+          subtracted because Screen already applies it and the keyboard height
+          is measured from the true screen edge. */}
+      <View style={{ paddingBottom: spacing.section + Math.max(keyboardHeight - insets.bottom, 0) }}>
         <Button
           label={
             step === 3
@@ -918,7 +933,6 @@ export default function CreateScreen() {
           disabled={creating || (step === 0 && (!title.trim() || !action.trim()))}
         />
       </View>
-      </KeyboardAvoidingView>
 
       <DayPickerSheet
         visible={showDayPicker}

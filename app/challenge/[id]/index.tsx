@@ -40,6 +40,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
 import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
+import { ShareRingSheet } from '@/components/ShareRingSheet';
 import { ParticipantRow } from '@/components/ParticipantRow';
 import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
 import {
@@ -168,6 +169,11 @@ export default function DetailScreen() {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   /** Day whose gap the user tapped on the ring — null when no sheet is open. */
   const [jokerDay, setJokerDay] = useState<number | null>(null);
+  /** The share card, reachable from the header at any point in a ring's life.
+   * It used to exist only on the lobby and upcoming screens, so the moment a
+   * ring started there was no second way back to it — you got one chance to
+   * share, on the screen right after creating it. */
+  const [sharing, setSharing] = useState(false);
   /** Faz 2 §2.6 — offer the widget once the habit is real, never before. */
   const [widgetHintReady, setWidgetHintReady] = useState(false);
   const [showWidgetHint, setShowWidgetHint] = useState(false);
@@ -348,13 +354,17 @@ export default function DetailScreen() {
   const doneAvatars = challenge.participants
     .filter((p) => p.checkedInToday)
     .map((p) => ({ id: p.id, initials: p.initials }));
-  // `missedAcknowledged` isn't persisted server-side (mapRow never sets it
-  // for real challenges — see src/data/challenges.ts) so it resets to falsy
-  // on every poll-driven refetch; without the meCheckedInToday check this
-  // gate kept reappearing on every visit even after actually checking in
-  // for today, which makes no sense — there's nothing left to acknowledge
-  // once today is done.
-  const showMissed = challenge.hasMissedYesterday && !challenge.missedAcknowledged && !meCheckedInToday;
+  // The gate is an interruption, so it has to be dismissable and the
+  // dismissal has to hold. `missedAckDay` lives only on the client
+  // (mapRow never sets it — see src/data/challenges.ts), which is why the
+  // poll merge in useChallengesQuery carries it across explicitly. Keyed by
+  // day, so saying "not now" today doesn't also waive a day missed next week.
+  // Checking in settles it too — there's nothing left to acknowledge once
+  // today is done.
+  const showMissed =
+    challenge.hasMissedYesterday &&
+    challenge.missedAckDay !== challenge.currentDay &&
+    !meCheckedInToday;
   const showMomentum = momentumDemoId === challenge.id;
 
   // Gaps a joker could still fill. Only while the ring is running and only if
@@ -524,6 +534,9 @@ export default function DetailScreen() {
       >
         {challenge.title}
       </AppText>
+      <IconButton size={40} onPress={() => setSharing(true)}>
+        <Feather name="share" size={18} color={colors.textSecondary} />
+      </IconButton>
       {challenge.isOwner ? (
         <IconButton size={40} onPress={() => setShowOwnerSettings(true)}>
           <Feather name="settings" size={18} color={colors.textSecondary} />
@@ -994,6 +1007,10 @@ export default function DetailScreen() {
             setShowWidgetHint(false);
           }}
         />
+      ) : null}
+
+      {sharing ? (
+        <ShareRingSheet challenge={challenge} onClose={() => setSharing(false)} />
       ) : null}
 
       {/* tapped a gap on the ring — confirm before spending a joker */}

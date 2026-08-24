@@ -212,6 +212,19 @@ export function MissedDaySheet({
             }}
           />
         ) : null}
+        {/* The way past this. It covers the whole screen, so without it the
+            only exits were checking in or spending a joker — and someone who
+            opened the app to read the chat was held here until they did one
+            of the two. Saying "not now" is a legitimate answer to having
+            missed a day. */}
+        <AppText
+          variant="secondary"
+          color={colors.textTertiary}
+          style={{ textAlign: 'center', paddingVertical: 10 }}
+          onPress={onDismiss}
+        >
+          {t.detail.missedNotNow}
+        </AppText>
       </View>
     </Animated.View>
   );
