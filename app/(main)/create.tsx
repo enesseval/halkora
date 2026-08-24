@@ -437,6 +437,17 @@ export default function CreateScreen() {
   // the threshold pays; collective = the group hits a shared target or
   // nobody does.
   const [stakeKind, setStakeKind] = useState<StakeKind>(rematchSource?.stake?.kind ?? 'individual');
+  /**
+   * Whether this ring has a stake at all.
+   *
+   * This used to be expressed by leaving the step alone and pressing "Skip" in
+   * the header — which meant someone who started building a stake and then
+   * changed their mind had no way to say so, and the individual/collective
+   * pair read as a question they had already failed to answer. "No stake" is
+   * one of the three answers now, and it starts as the selected one: nothing
+   * is quietly switched on for you.
+   */
+  const [stakeOn, setStakeOn] = useState(!!rematchSource?.stake?.text);
   const [showCollectiveHelp, setShowCollectiveHelp] = useState(false);
   const [collectivePct, setCollectivePct] = useState(
     () => rematchSource?.stake?.collectiveTargetPct ?? 80,
@@ -480,7 +491,9 @@ export default function CreateScreen() {
       joker,
       deadlineTime: deadline,
       startsLabel: isToday ? undefined : startsLabel,
-      stake: stakeText
+      // stakeOn is the answer to "is there a stake"; stakeText can still hold
+      // something typed before backing out, and that must not sneak through.
+      stake: stakeOn && stakeText
         ? {
             mode: stakeMode,
             kind: stakeKind,
@@ -543,13 +556,7 @@ export default function CreateScreen() {
           <Feather name={step === 0 ? 'x' : 'chevron-left'} size={18} color={colors.textPrimary} />
         </IconButton>
         <Dots step={step} />
-        {step === 3 ? (
-          <AppText variant="secondary" color={colors.textSecondary} onPress={finish}>
-            {t.common.skip}
-          </AppText>
-        ) : (
-          <View style={{ width: 38 }} />
-        )}
+        <View style={{ width: 38 }} />
       </View>
 
       <ScrollView
@@ -768,31 +775,46 @@ export default function CreateScreen() {
             <AppText variant="secondary" style={{ marginTop: 12 }}>
               {t.create.stakeIntro}
             </AppText>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <View style={{ flex: 1 }}>
+                <Chip
+                  label={t.create.stakeKindNone}
+                  selected={!stakeOn}
+                  onPress={() => setStakeOn(false)}
+                />
+              </View>
               <View style={{ flex: 1 }}>
                 <Chip
                   label={t.create.stakeKindIndividual}
-                  selected={stakeKind === 'individual'}
-                  onPress={() => setStakeKind('individual')}
+                  selected={stakeOn && stakeKind === 'individual'}
+                  onPress={() => {
+                    setStakeOn(true);
+                    setStakeKind('individual');
+                  }}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <Chip
                   label={t.create.stakeKindCollective}
-                  selected={stakeKind === 'collective'}
-                  onPress={() => setStakeKind('collective')}
+                  selected={stakeOn && stakeKind === 'collective'}
+                  onPress={() => {
+                    setStakeOn(true);
+                    setStakeKind('collective');
+                  }}
                 />
               </View>
             </View>
             {/* only the chosen kind's explanation — showing both made the
                 selection read as if it didn't matter */}
             <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }}>
-              {stakeKind === 'individual'
-                ? t.create.stakeKindHintIndividual
-                : t.create.stakeKindHintCollective}
+              {!stakeOn
+                ? t.create.stakeKindHintNone
+                : stakeKind === 'individual'
+                  ? t.create.stakeKindHintIndividual
+                  : t.create.stakeKindHintCollective}
             </AppText>
 
-            {stakeKind === 'individual' ? (
+            {!stakeOn ? null : stakeKind === 'individual' ? (
               <>
                 <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 24, marginBottom: 10 }}>
                   {t.create.stakeThresholdLabel}

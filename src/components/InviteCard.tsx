@@ -265,6 +265,12 @@ export function InviteCard({
   const done = challenge.days.filter((d) => d === 'done' || d === 'joker').length;
   const finished = challenge.status === 'completed';
   const alone = challenge.participants.length <= 1;
+  // A lobby ring has no start date yet, so the ring's centre showed the
+  // words "Kurucu başlatacak" at headline size — a long phrase crammed into
+  // a circle, with the one fact a stranger actually needs (how long this
+  // runs) pushed into the small line under it. For these the day count is
+  // the headline and the missing date is stated plainly instead.
+  const undated = challenge.status === 'lobby';
   const owner = challenge.participants[0]?.name ?? '';
 
   const ringSize = format === 'story' ? RING.story : RING.square;
@@ -272,8 +278,9 @@ export function InviteCard({
   // In the square the ring is only 147pt across with the text beside it, and
   // "15 Ağustos'ta başlıyor" simply does not fit inside that circle — it spilled
   // out over the ring's own stroke. There the line moves up into the text
-  // column instead, where it has the width it needs.
-  const dateInsideRing = format === 'story';
+  // column instead, where it has the width it needs. An undated ring says
+  // "7 gün", which does fit, so it stays in the middle where the eye is.
+  const dateInsideRing = format === 'story' || undated;
 
   const ring = (
     <ShareRing size={ringSize} totalDays={challenge.totalDays} filledDays={done} empty={invite}>
@@ -282,16 +289,34 @@ export function InviteCard({
           <AppText
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: format === 'square' ? u(52) : u(72),
+              fontSize: undated
+                ? format === 'square'
+                  ? u(84)
+                  : u(112)
+                : format === 'square'
+                  ? u(52)
+                  : u(72),
               color: colors.textPrimary,
-              letterSpacing: -0.5,
+              letterSpacing: undated ? -1 : -0.5,
               textAlign: 'center',
             }}
           >
-            {challenge.startsLabel ?? challenge.startsWhen ?? ''}
+            {undated
+              ? t.shareCard.dayCount(challenge.totalDays)
+              : (challenge.startsLabel ?? challenge.startsWhen ?? '')}
           </AppText>
-          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: type.meta, color: colors.textTertiary, marginTop: u(10) }}>
-            {t.shareCard.startsIn(challenge.totalDays)}
+          <AppText
+            numberOfLines={2}
+            style={{
+              fontFamily: fonts.bodyRegular,
+              fontSize: type.meta,
+              color: colors.textTertiary,
+              marginTop: u(10),
+              maxWidth: ringSize * 0.72,
+              textAlign: 'center',
+            }}
+          >
+            {undated ? t.shareCard.startSoon : t.shareCard.startsIn(challenge.totalDays)}
           </AppText>
         </View>
       ) : (

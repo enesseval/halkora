@@ -217,6 +217,8 @@ export const tr = {
     deadlineHint: "Check-in'ler her gün bu saate kadar yapılabilir.",
     deadlineMidnight: 'Gece yarısı',
     deadlineCustom: 'Özel saat',
+    stakeKindNone: 'Bahis yok',
+    stakeKindHintNone: 'Bahissiz de olur. Halka yine aynı şekilde işler.',
     stakeKindIndividual: 'Bireysel',
     stakeKindCollective: 'Kolektif',
     stakeKindHintIndividual: 'Eşiğin üstünde gün kaçıran öder. Herkes kendi hesabını verir.',
@@ -232,7 +234,7 @@ export const tr = {
     stakeCollectiveHelpNote:
       'Halka erken bitirilirse yalnızca geçen günler sayılır; katılımcı sayısı değişirse hedef de değişir.',
     stakeCollectivePlaceholder: 'Tutturursak hep beraber kahvaltı',
-    lobbyOption: 'Grup dolunca başlat',
+    lobbyOption: 'Başlangıcı sonra belirle',
     lobbyOptionHint: 'Tarih vermeden kur — istediğin an ya da ileri bir tarih seçerek halka içinden başlatırsın.',
     lobbyOptionHintOff: 'Yerine tarih vermeden kurup daha sonra başlatmak istersen seç.',
     joinFirstDayOnlyHint: 'İlk gün bitince davet kapanır — sonradan katılınamaz.',
@@ -576,6 +578,7 @@ export const tr = {
     stillOpen: 'Halka hâlâ açık — katılabilirsin',
     closed: 'Halka kapandı. Yenisi yakında.',
     finishedHeadline: (days: number) => `${days} gün.\nBirlikte.`,
+    startSoon: 'başlangıç yakında',
     linkBeside: 'Davet bağlantısı bu hikâyenin yanında',
     // Paylaşım sayfası
     sheetTitle: 'Halkanı paylaş',
