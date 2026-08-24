@@ -52,7 +52,6 @@ function buildC1(m: MockDict): Challenge {
     startDate: DEMO_START,
     createdAt: DEMO_CREATED_AT,
     hasMissedYesterday: true,
-    missedAcknowledged: false,
     inviteCode: 'kitap-14',
     scheduleSummary: m.c1.scheduleSummary,
     startsWhen: m.c1.startsWhen,

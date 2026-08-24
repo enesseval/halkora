@@ -21,7 +21,7 @@ export const INVITE_CODE_LENGTH = 10;
  *    many meta tags the page carried (saha testi bulgusu).
  *  - Universal Links need the scheme and a host listed in app.json's
  *    associatedDomains, or iOS opens Safari instead of the app.
- *  - The host must match where web/j is actually served from.
+ *  - The host must match where the /j/ route is actually served from.
  */
 export function inviteUrl(code: string): string {
   return `https://halkora.app/j/${code}`;
