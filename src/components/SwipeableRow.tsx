@@ -29,6 +29,8 @@ const LEAD = 8;
 const FULL_SWIPE = 220;
 /** Extra travel past the last slot before a release counts as "delete it". */
 const FULL_SWIPE_MARGIN = 90;
+/** How far the edge button stretches once the full swipe is armed. */
+const FULL_SWIPE_GROWTH = 190;
 
 /**
  * iOS-standard swipe-from-the-right row actions.
@@ -69,19 +71,27 @@ export function SwipeableRow({
     _progress: RNAnimated.AnimatedInterpolation<number>,
     dragX: RNAnimated.AnimatedInterpolation<number>,
   ) => {
+    // Measured from where the buttons END, so the threshold scales with how
+    // many actions the row has instead of being a number that happens to
+    // work for two.
+    const fullSwipeAt = Math.max(
+      FULL_SWIPE,
+      LEAD + actions.length * (size + GAP) + FULL_SWIPE_MARGIN,
+    );
+
     // Arm the full swipe from the same value the animation uses, so the
     // threshold and the visuals can never disagree.
     if (!watching.current) {
       watching.current = true;
-      // Measured from where the buttons END, so the threshold scales with how
-      // many actions the row has instead of being a number that happens to
-      // work for two.
-      const fullSwipeAt = Math.max(
-        FULL_SWIPE,
-        LEAD + actions.length * (size + GAP) + FULL_SWIPE_MARGIN,
-      );
       (dragX as unknown as RNAnimated.Value).addListener?.(({ value }) => {
-        armed.current = -value >= fullSwipeAt;
+        const past = -value >= fullSwipeAt;
+        // A tap on the shoulder at the moment letting go would fire the
+        // action, which is the whole reason Apple's version feels safe to
+        // pull into rather than something you fall off.
+        if (past && !armed.current) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => {});
+        }
+        armed.current = past;
       });
     }
 
@@ -111,6 +121,11 @@ export function SwipeableRow({
           // Reveal order counts back from the edge: the last action appears
           // first, the one before it next, and so on.
           const order = actions.length - 1 - i;
+          // The one at the edge is also the one a full swipe fires, so past
+          // the threshold it takes the strip over — growing into a pill while
+          // the others fade out. Apple does this to say, before you let go,
+          // which action is about to happen.
+          const takesOver = i === actions.length - 1;
           // A button's entrance is tied to ITS OWN slot opening, not to a
           // fixed number of pixels. Keying it to distance meant a 64pt button
           // was already drawing at 10pt of drag, spilling over the row and
@@ -128,13 +143,20 @@ export function SwipeableRow({
             extrapolate: 'clamp',
           });
           const opacity = drag.interpolate({
-            inputRange: [0, start, start + slot * 0.45],
-            outputRange: [0, 0, 1],
+            inputRange: [0, start, start + slot * 0.45, fullSwipeAt, fullSwipeAt + 50],
+            outputRange: [0, 0, 1, 1, takesOver ? 1 : 0],
             extrapolate: 'clamp',
           });
+          const width = takesOver
+            ? drag.interpolate({
+                inputRange: [0, fullSwipeAt, fullSwipeAt + 130],
+                outputRange: [size, size, size + FULL_SWIPE_GROWTH],
+                extrapolate: 'clamp',
+              })
+            : size;
 
           return (
-            <RNAnimated.View key={action.label} style={{ transform: [{ scale }], opacity }}>
+            <RNAnimated.View key={action.label} style={{ transform: [{ scale }], opacity, width }}>
               <Pressable
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -143,7 +165,7 @@ export function SwipeableRow({
                 }}
                 accessibilityLabel={action.label}
                 style={{
-                  width: size,
+                  width: '100%',
                   height: size,
                   // Round, like the controls Apple reveals on a swipe — and a
                   // circle is what makes the scale-up read as a button

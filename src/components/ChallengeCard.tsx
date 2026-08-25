@@ -186,7 +186,10 @@ export function CompletedCard({
             fontVariant: ['tabular-nums'],
           }}
         >
-          <Text style={{ color: colors.ember }}>✓</Text> {t.home.completedOn(challenge.currentDay, challenge.totalDays)}
+          <Text style={{ color: colors.ember }}>{challenge.wasClosed ? '⏹' : '✓'}</Text>{' '}
+          {challenge.wasClosed
+            ? t.home.closedOn(challenge.currentDay, challenge.totalDays)
+            : t.home.completedOn(challenge.currentDay, challenge.totalDays)}
         </Text>
       </View>
     </Pressable>

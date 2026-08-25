@@ -50,7 +50,7 @@ export default function JoinScreen() {
     setErr(null);
     try {
       const id = await join(code ?? '', name.trim());
-      router.replace(`/challenge/${id}`);
+      router.navigate(`/challenge/${id}`);
     } catch (e) {
       setErr(friendlyErrorMessage(e) || t.errors.messageFailedGeneric);
       setJoining(false);
@@ -115,8 +115,12 @@ export default function JoinScreen() {
           <Button
             label={t.join.goToRing}
             onPress={() =>
+              // navigate, not replace: tapping your own invite from inside
+              // that ring's own screen used to stack a second copy of it, so
+              // getting out took two backs. navigate pops to the screen if
+              // it's already in the stack and pushes only if it isn't.
               preview.challengeId
-                ? router.replace(`/challenge/${preview.challengeId}`)
+                ? router.navigate(`/challenge/${preview.challengeId}`)
                 : router.replace('/')
             }
           />

@@ -509,6 +509,32 @@ export default function DetailScreen() {
     Alert.alert(t.detail.ownerExitTitle, t.detail.ownerExitBody, buttons);
   };
 
+  /**
+   * One menu instead of a row of icons.
+   *
+   * Inviting by username existed only on the screen shown right after
+   * creating a ring, so once you left it there was no way to add anyone by
+   * name again — and sharing had just taken the header's spare slot, which
+   * would have made three icons beside a title. A single "…" holds all of it
+   * and leaves room for the ring's name.
+   */
+  const openMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const options: { text: string; onPress: () => void; style?: 'destructive' }[] = [
+      { text: t.detail.menuShare, onPress: () => setSharing(true) },
+      { text: t.detail.menuInvite, onPress: () => router.push(`/challenge/${challenge.id}/invite`) },
+    ];
+    if (challenge.isOwner) {
+      options.push({ text: t.detail.menuSettings, onPress: () => setShowOwnerSettings(true) });
+    } else {
+      options.push({ text: t.detail.menuLeave, onPress: confirmLeave, style: 'destructive' });
+    }
+    Alert.alert(challenge.title, undefined, [
+      ...options.map((o) => ({ text: o.text, onPress: o.onPress, style: o.style })),
+      { text: t.common.cancel, style: 'cancel' as const },
+    ]);
+  };
+
   const topBar = (
     <View
       style={{
@@ -534,18 +560,9 @@ export default function DetailScreen() {
       >
         {challenge.title}
       </AppText>
-      <IconButton size={40} onPress={() => setSharing(true)}>
-        <Feather name="share" size={18} color={colors.textSecondary} />
+      <IconButton size={40} onPress={openMenu}>
+        <Feather name="more-horizontal" size={20} color={colors.textSecondary} />
       </IconButton>
-      {challenge.isOwner ? (
-        <IconButton size={40} onPress={() => setShowOwnerSettings(true)}>
-          <Feather name="settings" size={18} color={colors.textSecondary} />
-        </IconButton>
-      ) : (
-        <IconButton size={40} onPress={confirmLeave}>
-          <Feather name="log-out" size={18} color={colors.textSecondary} />
-        </IconButton>
-      )}
     </View>
   );
 

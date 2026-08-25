@@ -79,44 +79,71 @@ export function ShareRingSheet({
       result: 'tmpfile',
     });
 
+  /**
+   * Image and link together.
+   *
+   * It used to send the image through expo-sharing and drop the link on the
+   * clipboard, which left the recipient with a picture and nothing to tap —
+   * the card even had to explain that the link was "beside this story". React
+   * Native's own Share takes both a `url` and a `message`, so Messages and
+   * WhatsApp get the picture with the invite under it, in one go. Instagram
+   * and X ignore the text, which is the right trade: they were never going to
+   * carry a tappable link anyway.
+   *
+   * The sheet closes BEFORE the system sheet opens. iOS presents the activity
+   * controller from the root view controller, which sits behind this Modal, so
+   * dismissing it by tapping outside left the app with a presentation it
+   * thought was still up and nothing on screen responding.
+   */
   const doShare = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBusy(true);
+    let uri: string;
     try {
-      const uri = await capture();
-      // The link goes as text beside the image — never printed on it, so a
-      // screenshot of the story can't let a stranger into the group.
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: challenge.title });
-        // The iOS share sheet carries one item; the link follows so it can be
-        // pasted wherever the image lands.
-        await Clipboard.setStringAsync(link);
-      } else {
-        await Share.share({ message: t.invite.shareMessage(challenge.title, link) });
-      }
+      uri = await capture();
     } catch {
-      // Cancelling the share sheet lands here too — nothing to report.
-    } finally {
       setBusy(false);
+      return;
     }
+    setBusy(false);
+    onClose();
+    // A frame for the Modal to actually come down before the system sheet
+    // takes over — presenting into a window still being dismissed is the
+    // other half of the same freeze.
+    setTimeout(() => {
+      Share.share({ message: t.invite.shareMessage(challenge.title, link), url: uri }).catch(() => {
+        // Cancelling is a normal thing to do, not an error.
+      });
+    }, 250);
   };
 
+  /**
+   * Saving to the camera roll needs a permission this app asks for nowhere
+   * else, so the system sheet stands in for it — it offers "Save Image"
+   * using a permission iOS already manages.
+   *
+   * UTI is what makes that row appear. Without it iOS only knows it has been
+   * handed a file, and the image-specific actions (Save Image, Assign to
+   * Contact) are missing from an otherwise normal-looking sheet.
+   */
   const doSave = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBusy(true);
+    let uri: string;
     try {
-      const uri = await capture();
-      // Saving to the camera roll needs a permission this app doesn't ask for
-      // anywhere else, so the share sheet stands in for it: it offers "Save
-      // Image" itself, using a permission iOS already manages.
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png' });
-      }
+      uri = await capture();
     } catch {
-      Alert.alert(t.shareCard.savedFailed);
-    } finally {
       setBusy(false);
+      Alert.alert(t.shareCard.savedFailed);
+      return;
     }
+    setBusy(false);
+    onClose();
+    setTimeout(() => {
+      Sharing.isAvailableAsync()
+        .then((ok) => (ok ? Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png' }) : null))
+        .catch(() => {});
+    }, 250);
   };
 
   /**

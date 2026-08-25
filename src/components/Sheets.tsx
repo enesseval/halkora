@@ -461,28 +461,36 @@ export function UsernameSheet({
   const [value, setValue] = useState(current ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** A keystroke was swallowed by sanitize() — say why, once. */
-  const [dropped, setDropped] = useState(false);
+
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (visible) {
       setValue(current ?? '');
       setError(null);
-      setDropped(false);
     }
   }, [visible, current]);
 
   if (!visible) return null;
 
-  // Strip anything the server would reject anyway, live — friendlier than
-  // letting an invalid character through and rejecting it after Save. But
-  // stripping in silence is its own problem: you press a key, nothing appears,
-  // and the field looks broken rather than strict. So when a character is
-  // actually dropped the rule is said out loud.
-  const sanitize = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
+  /**
+   * Nothing typed here is rewritten.
+   *
+   * This field used to strip disallowed characters as you typed. That is
+   * correct about what the server accepts and wrong about how a text field
+   * behaves: React Native's TextInput is controlled, so the native view shows
+   * the character for a frame before our value is written back over it, and
+   * every rejected keystroke flickered. The rule is stated instead — the text
+   * stays exactly as typed, the field marks itself invalid, and Save is closed
+   * until it isn't. maxLength is the one exception, because the native input
+   * enforces it without ever rewriting anything.
+   */
+  const VALID = /^[a-z0-9_]+$/;
+  const badChars = value.length > 0 && !VALID.test(value);
+  const tooShort = value.length > 0 && !badChars && value.length < 3;
+  const invalid = badChars || tooShort;
 
-  const canSave = value.length >= 3 && value !== current && !saving;
+  const canSave = value.length >= 3 && !invalid && value !== current && !saving;
 
   const submit = async () => {
     if (!canSave) return;
@@ -517,7 +525,7 @@ export function UsernameSheet({
             backgroundColor: colors.bgElevated,
             borderRadius: radius.pill,
             borderWidth: hairline,
-            borderColor: error ? colors.joker : colors.strokeSubtle,
+            borderColor: error || invalid ? colors.joker : colors.strokeSubtle,
             paddingHorizontal: 16,
             height: 52,
           }}
@@ -528,12 +536,7 @@ export function UsernameSheet({
           <TextInput
             ref={inputRef}
             value={value}
-            onChangeText={(raw) => {
-              const clean = sanitize(raw);
-              // Lowercasing isn't a rejection, so only a shortened string counts.
-              setDropped(clean.length < raw.length);
-              setValue(clean);
-            }}
+            onChangeText={setValue}
             placeholder={t.settings.usernamePlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
@@ -545,9 +548,9 @@ export function UsernameSheet({
           />
         </View>
 
-        {dropped && !error ? (
+        {invalid && !error ? (
           <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
-            {t.settings.usernameCharDropped}
+            {badChars ? t.settings.usernameCharInvalid : t.settings.usernameTooShort}
           </AppText>
         ) : null}
 
