@@ -1,4 +1,4 @@
-import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { View } from 'react-native';
 import { colors, fonts } from '@/theme/tokens';
 import { AppText } from './ui';
@@ -55,6 +55,12 @@ const TYPE_SQUARE = {
   meta: u(34),
 };
 
+/**
+ * Line-height factor for the ring's big numerals. Not a guess at Satoshi's
+ * metrics — a margin wide enough that it doesn't matter what they are.
+ */
+const RING_LINE = 1.3;
+
 const PAD = {
   edge: u(90),
   // Instagram's own UI covers the top and bottom ~250px of a story; these
@@ -67,8 +73,6 @@ const RING = {
   story: u(560),
   square: u(440),
   stroke: u(34),
-  /** The 12-o'clock mark on an unstarted ring: where it will begin. */
-  startDot: u(13),
 };
 
 /**
@@ -144,10 +148,6 @@ function ShareRing({
             fill="none"
           />
         ))}
-        {/* Where day one will land. One dot of ember on an otherwise unlit
-            ring — the card's only colour, and what makes an unstarted ring
-            read as "about to begin" rather than blank. */}
-        {empty ? <Circle cx={cx} cy={cy - r} r={RING.startDot / 2} fill={colors.ember} /> : null}
       </Svg>
       {children}
     </View>
@@ -271,6 +271,9 @@ export function InviteCard({
   // runs) pushed into the small line under it. For these the day count is
   // the headline and the missing date is stated plainly instead.
   const undated = challenge.status === 'lobby';
+  /** The ring's big line, and the day counter that shares its slot. */
+  const counter = format === 'square' ? u(84) : u(112);
+  const headline = undated ? counter : format === 'square' ? u(52) : u(72);
   const owner = challenge.participants[0]?.name ?? '';
 
   const ringSize = format === 'story' ? RING.story : RING.square;
@@ -289,13 +292,14 @@ export function InviteCard({
           <AppText
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: undated
-                ? format === 'square'
-                  ? u(84)
-                  : u(112)
-                : format === 'square'
-                  ? u(52)
-                  : u(72),
+              fontSize: headline,
+              // Explicit, because Satoshi's ascenders are taller than the
+              // line box React Native derives on its own — the top of "0/14"
+              // was sliced off in both formats, obviously in the story where
+              // the type is largest and subtly in the square. RING_LINE is
+              // deliberately generous: the ring has vertical room to spare,
+              // and a clipped glyph is a far worse error than a loose line.
+              lineHeight: headline * RING_LINE,
               color: colors.textPrimary,
               letterSpacing: undated ? -1 : -0.5,
               textAlign: 'center',
@@ -324,9 +328,11 @@ export function InviteCard({
           <AppText
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: format === 'square' ? u(84) : u(112),
+              fontSize: counter,
+              lineHeight: counter * RING_LINE,
               color: finished ? colors.ember : colors.textPrimary,
               letterSpacing: -1,
+              textAlign: 'center',
             }}
           >
             {done}/{challenge.totalDays}

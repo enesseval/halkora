@@ -317,6 +317,7 @@ function mapRow(
   // the chat where it belongs.
   const status: Challenge['status'] =
     row.status === 'completed' || row.status === 'closed' ? 'completed' : dateBasedStatus;
+  const wasClosed = row.status === 'closed';
   const currentDay = status === 'upcoming' ? 0 : Math.min(rawDay, row.total_days);
 
   const t = getDict();
@@ -497,6 +498,7 @@ function mapRow(
     deadlineTime: (row.deadline_time ?? DEFAULT_DEADLINE).slice(0, 5),
     startDate: row.start_date,
     createdAt: row.created_at,
+    wasClosed,
     hasMissedYesterday,
     inviteCode: row.invite_code,
     scheduleSummary: t.common.scheduleSummary(row.daily_action, row.total_days),

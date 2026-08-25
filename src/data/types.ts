@@ -116,6 +116,10 @@ export interface Challenge {
    * (docs/db-stake-v2.sql §2). `undefined` for a challenge that ran its
    * natural course. */
   endedOnDay?: number;
+  /** The owner ended this ring for everyone instead of it running its course.
+   * It behaves like a completed ring everywhere that matters, but calling it
+   * "completed" on a card claims something that didn't happen. */
+  wasClosed?: boolean;
   hasMissedYesterday: boolean;
   /** The day number this ring's missed-day gate was last dismissed on. Keyed
    * by day rather than a bare boolean so dismissing it today doesn't also

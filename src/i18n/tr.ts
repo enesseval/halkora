@@ -194,6 +194,7 @@ export const tr = {
     donePct: (done: number, total: number) => `${done}/${total} tamamladı`,
     peopleReady: (n: number) => `${n} kişi hazır`,
     completedOn: (day: number, total: number) => `Tamamlandı · Gün ${day}/${total}`,
+    closedOn: (day: number, total: number) => `Kapatıldı · Gün ${day}/${total}`,
   },
 
   create: {
@@ -218,7 +219,7 @@ export const tr = {
     deadlineMidnight: 'Gece yarısı',
     deadlineCustom: 'Özel saat',
     stakeKindNone: 'Bahis yok',
-    stakeKindHintNone: 'Bahissiz de olur. Halka yine aynı şekilde işler.',
+    stakeKindHintNone: 'Bahis olmadan da halka aynı şekilde işler: check-in, joker, istatistikler değişmez. Bitişte kimse bir şey ödemez, eşik ya da grup hedefi hesaplanmaz.',
     stakeKindIndividual: 'Bireysel',
     stakeKindCollective: 'Kolektif',
     stakeKindHintIndividual: 'Eşiğin üstünde gün kaçıran öder. Herkes kendi hesabını verir.',
@@ -579,7 +580,7 @@ export const tr = {
     closed: 'Halka kapandı. Yenisi yakında.',
     finishedHeadline: (days: number) => `${days} gün.\nBirlikte.`,
     startSoon: 'başlangıç yakında',
-    linkBeside: 'Davet bağlantısı bu hikâyenin yanında',
+    linkBeside: 'Katılma bağlantısı bu gönderiyle birlikte gönderildi',
     // Paylaşım sayfası
     sheetTitle: 'Halkanı paylaş',
     formatStory: 'Story',
@@ -588,7 +589,7 @@ export const tr = {
     shareLink: 'Linki gönder',
     saveImage: 'Görseli kaydet',
     copyLink: 'Bağlantıyı kopyala',
-    linkNote: 'Davet bağlantısı görselin yanında metin olarak gider.',
+    linkNote: 'Görselle birlikte davet bağlantısı da gider — Mesajlar ve WhatsApp ikisini de taşır, Instagram ve X yalnızca görseli alır.',
     saved: 'Görsel kaydedildi',
     savedFailed: 'Görsel kaydedilemedi',
     copied: 'Bağlantı kopyalandı',
