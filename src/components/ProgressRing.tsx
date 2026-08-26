@@ -139,6 +139,15 @@ function Segment({ d, length, state, isActive, stroke, repairable, decorative }:
       return;
     }
 
+    // A decorative ring's segments arrive straight from 'empty', which the
+    // static branch at the bottom would snap on. A short fade is the whole
+    // animation here, so it happens before that branch can.
+    if (state === 'done' && decorative) {
+      offset.value = 0;
+      op.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) });
+      return;
+    }
+
     if (state === 'done' && was === 'today') {
       // check-in: sweep fill (400ms) then a short brightness pulse
       op.value = 1;

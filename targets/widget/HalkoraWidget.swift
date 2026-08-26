@@ -1511,6 +1511,14 @@ struct HalkoraLockView: View {
     .widgetURL(
       URL(
         string: entry.snapshot.map { "halkora://challenge/\($0.challengeId)" } ?? "halkora://"))
+    // Required since iOS 17 — a widget that never declares its container
+    // background is replaced on screen by Apple's own "Please adopt the
+    // containerBackground API" notice. Every home-screen view here already
+    // had one; the Lock Screen view was the one that didn't, which is why the
+    // warning showed up there and nowhere else. Clear rather than a colour:
+    // accessory widgets are drawn into the system's own vibrancy, and the
+    // circular view supplies AccessoryWidgetBackground() itself.
+    .containerBackground(.clear, for: .widget)
   }
 
   @ViewBuilder
