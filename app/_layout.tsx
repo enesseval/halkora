@@ -232,13 +232,32 @@ export default function RootLayout() {
     'Satoshi-Bold': require('../assets/fonts/Satoshi-Bold.ttf'),
   });
 
+  /**
+   * A bound on the font gate.
+   *
+   * Below this, `return null` means the native splash stays up — and that
+   * splash carries no image and no name, so a stall there is a plain dark
+   * rectangle with nothing happening on it. That is what a notification
+   * cold-start was reported as landing on. Whatever holds it up, sitting
+   * there forever is never the right answer: after this long the app renders
+   * with whatever fonts iOS has, which is a worse-looking app rather than no
+   * app at all.
+   */
+  const [fontsTimedOut, setFontsTimedOut] = useState(false);
   useEffect(() => {
-    if (loaded || error) {
+    const timer = setTimeout(() => setFontsTimedOut(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const canRender = loaded || !!error || fontsTimedOut;
+
+  useEffect(() => {
+    if (canRender) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [loaded, error]);
+  }, [canRender]);
 
-  if (!loaded && !error) return null;
+  if (!canRender) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
