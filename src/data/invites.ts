@@ -15,6 +15,65 @@ interface UsernameLookupRow {
   username: string;
 }
 
+export interface PendingInvite {
+  id: string;
+  username: string;
+  name: string | null;
+}
+
+/**
+ * Who has been invited to this ring and hasn't joined.
+ *
+ * Reads `invites` directly rather than through an RPC: the policy added in
+ * docs/db-pending-invites.md lets a ring's members read that ring's invites,
+ * so RLS is the whole filter and there is nothing for a function to do. A
+ * caller who isn't a member simply gets an empty list.
+ *
+ * Rows for people who have since joined are dropped here rather than in SQL —
+ * the invite row is kept on purpose (it is the record of who asked whom), and
+ * the participants list needed for the comparison is already on screen.
+ *
+ * Two queries rather than one embedded select, because `invites.to_user`
+ * references auth.users and not profiles — there is no foreign key for
+ * PostgREST to follow, so `profiles(...)` inside the select would fail rather
+ * than join.
+ */
+export async function fetchPendingInvites(
+  challengeId: string,
+  joinedUserIds: string[],
+): Promise<PendingInvite[]> {
+  const { data, error } = await supabase
+    .from('invites')
+    .select('id, to_user')
+    .eq('challenge_id', challengeId);
+  if (error) throw error;
+
+  const joined = new Set(joinedUserIds);
+  const rows = (data ?? []).filter((r) => !joined.has(r.to_user as string));
+  if (rows.length === 0) return [];
+
+  const { data: profiles, error: pErr } = await supabase
+    .from('profiles')
+    .select('id, username, name')
+    .in(
+      'id',
+      rows.map((r) => r.to_user as string),
+    );
+  if (pErr) throw pErr;
+
+  const byId = new Map(
+    (profiles ?? []).map((p) => [p.id as string, p as { username: string | null; name: string | null }]),
+  );
+  return rows
+    .map((r) => {
+      const p = byId.get(r.to_user as string);
+      return { id: r.id as string, username: p?.username ?? '', name: p?.name ?? null };
+    })
+    // No username means the profile isn't readable from here; a row with
+    // nothing to show is worse than no row.
+    .filter((r) => !!r.username);
+}
+
 /** Exact-match handle lookup (docs/db-username.sql "Ek O") — null when no
  * user has that exact username. Never a prefix/partial search. */
 export async function findUserByUsername(username: string): Promise<UsernameLookup | null> {

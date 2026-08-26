@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
@@ -35,6 +36,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
 import { setActiveChallengeId } from '@/lib/push';
+import { fetchPendingInvites } from '@/data/invites';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
@@ -64,6 +67,7 @@ import { useT } from '@/i18n';
 
 type Row =
   | { kind: 'participant'; p: Participant }
+  | { kind: 'pendingInvite'; id: string; username: string }
   | { kind: 'label'; id: string; text: string }
   | { kind: 'chatError' }
   | { kind: 'chatDay'; day: number }
@@ -208,11 +212,34 @@ export default function DetailScreen() {
     return () => setActiveChallengeId(null);
   }, [id]);
 
+  /**
+   * People who have been invited and haven't turned up yet.
+   *
+   * Without this the owner had to remember who they had already called, and
+   * the usual way of checking — invite them again — answers with "already
+   * invited" rather than a list. Reads through the policy in
+   * docs/db-pending-invites.md; a ring whose database hasn't had that applied
+   * simply gets nothing back, which is the same as having no pending invites.
+   */
+  const joinedIds = useMemo(
+    () => (challenge?.participants ?? []).map((p) => p.id),
+    [challenge?.participants],
+  );
+  const { data: pendingInvites } = useQuery({
+    queryKey: ['pending-invites', id, joinedIds.length],
+    queryFn: () => fetchPendingInvites(id as string, joinedIds),
+    enabled: isSupabaseConfigured && !!id && !!challenge,
+    retry: 1,
+  });
+
   const rows = useMemo<Row[]>(() => {
     if (!challenge) return [];
     const out: Row[] = [];
     out.push({ kind: 'label', id: 'p', text: t.detail.participants });
     challenge.participants.forEach((p) => out.push({ kind: 'participant', p }));
+    (pendingInvites ?? []).forEach((i) =>
+      out.push({ kind: 'pendingInvite', id: i.id, username: i.username }),
+    );
     if (chatError || challenge.messages.length > 0) {
       out.push({ kind: 'label', id: 'c', text: t.detail.chat });
       if (chatError) out.push({ kind: 'chatError' });
@@ -230,7 +257,7 @@ export default function DetailScreen() {
       });
     }
     return out;
-  }, [challenge, chatError, t]);
+  }, [challenge, chatError, pendingInvites, t]);
 
   // Auto-scroll to the newest row whenever chat grows — sending your own
   // message (saha testi bulgusu: "mesaj attığım zaman aşağıda kalıyor, ben
@@ -867,6 +894,26 @@ export default function DetailScreen() {
             canNudge={!isUpcoming}
             onNudge={() => setNudgeTarget(item.p)}
           />
+        );
+      case 'pendingInvite':
+        return (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: 12,
+              paddingHorizontal: 4,
+              opacity: 0.55,
+            }}
+          >
+            <AppText variant="secondary" color={colors.textSecondary}>
+              @{item.username}
+            </AppText>
+            <AppText variant="meta" color={colors.textTertiary}>
+              {t.detail.inviteePending}
+            </AppText>
+          </View>
         );
       case 'chatDay':
         return <DayDivider day={item.day} />;
