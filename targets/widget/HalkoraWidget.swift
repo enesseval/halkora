@@ -1518,7 +1518,7 @@ struct HalkoraLockView: View {
     // warning showed up there and nowhere else. Clear rather than a colour:
     // accessory widgets are drawn into the system's own vibrancy, and the
     // circular view supplies AccessoryWidgetBackground() itself.
-    .containerBackground(.clear, for: .widget)
+    .containerBackground(Color.clear, for: .widget)
   }
 
   @ViewBuilder
@@ -2017,54 +2017,61 @@ struct HalkoraLockTodayView: View {
     let total = live.count
     let done = live.filter { $0.checkedInToday(at: at) }.count
 
-    switch family {
-    case .accessoryInline:
-      Text(
-        total == 0
-          ? c.noneActive
-          : "\(c.brand) · \(smartLine(for: live, at: at, c).headline)")
-    case .accessoryRectangular:
-      // Smart Mode: one prioritised sentence rather than a summary. On the
-      // Lock Screen there's room for exactly one thing, so it should be the
-      // thing that most deserves the glance.
-      VStack(alignment: .leading, spacing: 2) {
-        if total == 0 {
-          Text(c.todayTitle).font(.system(size: 13, weight: .semibold))
-          Text(c.noneActive).font(.system(size: 12)).opacity(0.75)
-        } else {
-          let line = smartLine(for: live, at: at, c)
-          Text(line.headline)
-            .font(.system(size: 13, weight: .semibold))
-            .lineLimit(1)
-          if let detail = line.detail {
-            Text(detail).font(.system(size: 12)).opacity(0.75).lineLimit(1)
-          }
-          // One tick per halka — the day at a glance, under the sentence.
-          HStack(spacing: 3) {
-            ForEach(live.indices, id: \.self) { i in
-              Capsule()
-                .fill(Color.white.opacity(live[i].checkedInToday(at: at) ? 1 : 0.28))
-                .frame(height: 3)
+    Group {
+      switch family {
+      case .accessoryInline:
+        Text(
+          total == 0
+            ? c.noneActive
+            : "\(c.brand) · \(smartLine(for: live, at: at, c).headline)")
+      case .accessoryRectangular:
+        // Smart Mode: one prioritised sentence rather than a summary. On the
+        // Lock Screen there's room for exactly one thing, so it should be the
+        // thing that most deserves the glance.
+        VStack(alignment: .leading, spacing: 2) {
+          if total == 0 {
+            Text(c.todayTitle).font(.system(size: 13, weight: .semibold))
+            Text(c.noneActive).font(.system(size: 12)).opacity(0.75)
+          } else {
+            let line = smartLine(for: live, at: at, c)
+            Text(line.headline)
+              .font(.system(size: 13, weight: .semibold))
+              .lineLimit(1)
+            if let detail = line.detail {
+              Text(detail).font(.system(size: 12)).opacity(0.75).lineLimit(1)
             }
+            // One tick per halka — the day at a glance, under the sentence.
+            HStack(spacing: 3) {
+              ForEach(live.indices, id: \.self) { i in
+                Capsule()
+                  .fill(Color.white.opacity(live[i].checkedInToday(at: at) ? 1 : 0.28))
+                  .frame(height: 3)
+              }
+            }
+            .padding(.top, 2)
           }
-          .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      default:
+        // Circular: rings closed today, as a gauge.
+        ZStack {
+          RingView(
+            segments: (0..<max(total, 1)).map { i in
+              total == 0 ? .waiting : (live[i].checkedInToday(at: at) ? .done : .waiting)
+            },
+            lineWidth: 5, maxSegments: 14, monochrome: true
+          )
+          Text(total == 0 ? "—" : "\(done)")
+            .font(.system(size: 17, weight: .semibold, design: .rounded))
+            .monospacedDigit()
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-    default:
-      // Circular: rings closed today, as a gauge.
-      ZStack {
-        RingView(
-          segments: (0..<max(total, 1)).map { i in
-            total == 0 ? .waiting : (live[i].checkedInToday(at: at) ? .done : .waiting)
-          },
-          lineWidth: 5, maxSegments: 14, monochrome: true
-        )
-        Text(total == 0 ? "—" : "\(done)")
-          .font(.system(size: 17, weight: .semibold, design: .rounded))
-          .monospacedDigit()
-      }
     }
+    // Required since iOS 17: a widget that never declares its container
+    // background is replaced on screen by Apple's own "please adopt the
+    // containerBackground API" notice. Clear, because an accessory widget is
+    // drawn into the system's own vibrancy rather than onto a surface.
+    .containerBackground(Color.clear, for: .widget)
   }
 }
 
@@ -2088,26 +2095,33 @@ struct HalkoraLockStreakView: View {
     let at = entry.date
     let streak = entry.snapshot?.streak(at: at) ?? 0
 
-    switch family {
-    case .accessoryInline:
-      Text("\(c.brand) · \(c.streakUnit(streak))")
-    default:
-      ZStack {
-        if let s = entry.snapshot {
-          RingView(
-            segments: s.streakSegments(at: at), lineWidth: 5, maxSegments: 14, monochrome: true)
-        }
-        VStack(spacing: -2) {
-          Text("\(streak)")
-            .font(.system(size: 18, weight: .semibold, design: .rounded))
-            .monospacedDigit()
-          Text(c.streakWord)
-            .font(.system(size: 7, weight: .medium))
-            .kerning(0.6)
-            .opacity(0.7)
+    Group {
+      switch family {
+      case .accessoryInline:
+        Text("\(c.brand) · \(c.streakUnit(streak))")
+      default:
+        ZStack {
+          if let s = entry.snapshot {
+            RingView(
+              segments: s.streakSegments(at: at), lineWidth: 5, maxSegments: 14, monochrome: true)
+          }
+          VStack(spacing: -2) {
+            Text("\(streak)")
+              .font(.system(size: 18, weight: .semibold, design: .rounded))
+              .monospacedDigit()
+            Text(c.streakWord)
+              .font(.system(size: 7, weight: .medium))
+              .kerning(0.6)
+              .opacity(0.7)
+          }
         }
       }
     }
+    // Required since iOS 17: a widget that never declares its container
+    // background is replaced on screen by Apple's own "please adopt the
+    // containerBackground API" notice. Clear, because an accessory widget is
+    // drawn into the system's own vibrancy rather than onto a surface.
+    .containerBackground(Color.clear, for: .widget)
   }
 }
 
