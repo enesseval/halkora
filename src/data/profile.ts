@@ -7,10 +7,14 @@ import { edgeFunctionError } from '@/lib/errors';
  * on `profiles`: the co-participant read policy there (Ek E) grants whole-row
  * access, which would let anyone sharing a challenge with you read your token.
  */
-export async function savePushToken(userId: string, token: string): Promise<void> {
+export async function savePushToken(
+  userId: string,
+  token: string,
+  environment: string | null,
+): Promise<void> {
   const { error } = await supabase
     .from('push_tokens')
-    .upsert({ user_id: userId, token, updated_at: new Date().toISOString() });
+    .upsert({ user_id: userId, token, environment, updated_at: new Date().toISOString() });
   if (error) throw error;
 }
 
