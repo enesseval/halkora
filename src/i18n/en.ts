@@ -55,6 +55,7 @@ export const en: Dictionary = {
     appleIncomplete: "Apple sign-in didn't complete.",
     updateFailed: "Couldn't update",
     checkInFailed: "Couldn't save check-in",
+    undoFailed: "Couldn't undo the check-in",
     jokerFailed: "Couldn't save joker",
     messageFailed: "Couldn't send message",
     messageFailedGeneric: "Couldn't join. Check the code and try again.",

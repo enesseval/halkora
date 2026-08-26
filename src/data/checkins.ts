@@ -47,6 +47,11 @@ export async function deleteCheckIn(challengeId: string, dayNumber: number): Pro
     .from('check_ins')
     .delete()
     .eq('participant_id', participantId)
-    .eq('day_number', dayNumber);
+    .eq('day_number', dayNumber)
+    // Undo belongs to the check-in button, and that button only ever writes a
+    // 'done'. Without this the same call would happily remove a joker sitting
+    // on that day — spending a joker is not something a stray undo should be
+    // able to take back.
+    .eq('type', 'done');
   if (error) throw error;
 }
