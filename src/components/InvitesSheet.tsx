@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -20,23 +21,30 @@ import { AppText } from './ui';
  * invite was gone with no trace anywhere in the app. Now the notification is
  * the nudge and this is the record.
  */
+export const RECEIVED_INVITES_KEY = ['invites', 'received'] as const;
+
 export function useReceivedInvites(): { invites: ReceivedInvite[]; reload: () => void } {
-  const [invites, setInvites] = useState<ReceivedInvite[]>([]);
+  const queryClient = useQueryClient();
+  // Fetched once on mount before this, which meant a push could land, be
+  // tapped, be dismissed — and the bell still wouldn't be there until the app
+  // was killed and reopened. It also meant an invite you'd just accepted kept
+  // its place in the list. The same poll and the same focus behaviour the
+  // challenge list already gets fixes both without inventing a mechanism.
+  const { data } = useQuery({
+    queryKey: RECEIVED_INVITES_KEY,
+    queryFn: fetchReceivedInvites,
+    enabled: isSupabaseConfigured,
+    refetchInterval: isSupabaseConfigured ? 60_000 : false,
+    // An unreachable invite list must never interrupt Home; the bell simply
+    // doesn't appear, and the next poll tries again.
+    retry: 1,
+  });
 
   const reload = useCallback(() => {
-    if (!isSupabaseConfigured) return;
-    fetchReceivedInvites()
-      .then(setInvites)
-      // Silent: an unreachable invite list must never interrupt Home. The
-      // bell simply doesn't appear.
-      .catch(() => {});
-  }, []);
+    queryClient.invalidateQueries({ queryKey: RECEIVED_INVITES_KEY });
+  }, [queryClient]);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
-
-  return { invites, reload };
+  return { invites: data ?? [], reload };
 }
 
 export function InvitesSheet({

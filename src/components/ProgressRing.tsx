@@ -43,6 +43,8 @@ interface Props {
 /** The today segment's breath, dim end to bright end. */
 const BREATH_DIM = 0.32;
 const BREATH_BRIGHT = 0.55;
+/** What a segment that never breathes sits at — the boot chase's lead. */
+const BREATH_LEAD = 0.4;
 
 const DIM: Record<RingSize, { px: number; stroke: number }> = {
   L: { px: 180, stroke: 11 },
@@ -114,6 +116,16 @@ function Segment({ d, length, state, isActive, stroke, repairable, decorative }:
       // snapped dark and then eased back up, once per cycle. Ping-ponging a
       // single timing has no seam to step across.
       offset.value = 0;
+      // The boot chase moves a segment through 'today' in 260ms, far less
+      // than one breath, so all a breath does there is catch it mid-fade at
+      // whatever value the timing had reached — the lead segment came out
+      // dimmer than it used to be and the chase lost its shape. A decorative
+      // ring gets a fixed lead instead, for the same reason it gets no
+      // check-in pulse: there is nothing here to celebrate or to wait for.
+      if (decorative) {
+        op.value = BREATH_LEAD;
+        return;
+      }
       // Anchored explicitly, because the ping-pong runs between the value at
       // the moment it starts and the target. A segment arriving here from
       // 'empty' at a day rollover sits at 0 and would otherwise breathe
@@ -157,7 +169,7 @@ function Segment({ d, length, state, isActive, stroke, repairable, decorative }:
     // static
     op.value = filled ? 1 : 0;
     offset.value = filled ? 0 : length;
-  }, [state, filled, length, op, offset]);
+  }, [state, filled, length, op, offset, decorative]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: offset.value,

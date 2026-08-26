@@ -301,6 +301,7 @@ export const en: Dictionary = {
     menuInvite: 'Invite by username',
     menuSettings: 'Ring settings',
     menuLeave: 'Leave this ring',
+    undoHint: 'Hold to undo',
     missedNotNow: 'Not now',
     todayCheckIn: "Today's check-in",
     useJoker: (n: number) => `Use a joker for yesterday · ${n} left`,

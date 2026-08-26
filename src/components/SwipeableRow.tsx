@@ -194,7 +194,14 @@ export function SwipeableRow({
     <Swipeable
       ref={ref}
       renderRightActions={renderRightActions}
-      overshootRight={false}
+      // Overshoot has to be ON. It was off to stop buttons drawing past their
+      // strip — a job `overflow: hidden` on that strip already does — and the
+      // side effect was that dragX could never exceed the width of the
+      // buttons, which is well short of the full-swipe threshold. So the full
+      // swipe was unreachable, and with it the growing button: the row simply
+      // stopped, open, however hard you pulled.
+      overshootRight
+      overshootFriction={8}
       friction={1.6}
       // The strip should be considered "open" while the buttons are visible,
       // rather than only after a long pull.

@@ -520,10 +520,21 @@ export default function DetailScreen() {
    */
   const openMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Inviting is offered only while someone could actually accept. A ring
+    // that closed its join window on day one, or that is over, would send an
+    // invite the RPC refuses — an option that exists to fail.
+    const canInvite =
+      challenge.status !== 'completed' &&
+      !(challenge.firstDayJoinOnly && challenge.currentDay > 1);
     const options: { text: string; onPress: () => void; style?: 'destructive' }[] = [
       { text: t.detail.menuShare, onPress: () => setSharing(true) },
-      { text: t.detail.menuInvite, onPress: () => router.push(`/challenge/${challenge.id}/invite`) },
     ];
+    if (canInvite) {
+      options.push({
+        text: t.detail.menuInvite,
+        onPress: () => router.push(`/challenge/${challenge.id}/invite`),
+      });
+    }
     if (challenge.isOwner) {
       options.push({ text: t.detail.menuSettings, onPress: () => setShowOwnerSettings(true) });
     } else {
