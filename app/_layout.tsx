@@ -38,13 +38,15 @@ if (Platform.OS !== 'web') {
  * Only enforced when Supabase is configured; otherwise the app stays on the
  * Phase-1 mock layer so nothing breaks mid-migration.
  */
-function useProtectedRoute() {
+function useProtectedRoute(navigatorMounted: boolean) {
   const { ready, configured, isSignedIn, needsOnboarding } = useAuth();
   const segments = useSegments();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
+    // Nothing to navigate until the Stack is on screen — see RootNavigator.
+    if (!navigatorMounted) return;
     if (!ready || !configured) return;
     const inAuthGroup = segments[0] === '(auth)';
     const atOnboarding = segments.some((s) => s === 'onboarding');
@@ -79,7 +81,7 @@ function useProtectedRoute() {
         });
       }
     }
-  }, [ready, configured, isSignedIn, needsOnboarding, segments, pathname, router]);
+  }, [navigatorMounted, ready, configured, isSignedIn, needsOnboarding, segments, pathname, router]);
 }
 
 /**
@@ -87,14 +89,20 @@ function useProtectedRoute() {
  * straight to the challenge it's about — `data.challengeId` is set by the
  * `notify` Edge Function (docs/PHASE2-SUPABASE.md "Ek I").
  */
-function useNotificationDeepLink(ready: boolean) {
+function useNotificationDeepLink(navigatorMounted: boolean) {
   const router = useRouter();
   const handled = useRef(false);
 
   useEffect(() => {
     // Native-only: expo-notifications' web shim doesn't implement
     // getLastNotificationResponseAsync and throws if called.
-    if (!ready || Platform.OS === 'web') return;
+    //
+    // Gated on the navigator being mounted, not merely on auth being ready.
+    // A tapped notification resolves as soon as the session does, which is
+    // well before the boot screen's own minimum beat is over — and while that
+    // beat runs, RootNavigator renders BootSplash INSTEAD of the Stack. So
+    // this used to push a route at a navigator that did not exist yet.
+    if (!navigatorMounted || Platform.OS === 'web') return;
 
     const go = (data: unknown) => {
       const d = data as { challengeId?: string; inviteCode?: string } | undefined;
@@ -119,7 +127,7 @@ function useNotificationDeepLink(ready: boolean) {
       go(response.notification.request.content.data);
     });
     return () => sub.remove();
-  }, [ready, router]);
+  }, [navigatorMounted, router]);
 }
 
 /** Reads the persisted language choice (or detects the device's) once, before
@@ -172,10 +180,24 @@ function RootNavigator() {
   // ring never actually finished a visible cycle (saha testi bulgusu).
   const bootDelayDone = useMinBootDelay(2600);
   useAuthInit();
-  useProtectedRoute();
+
+  /**
+   * Whether the <Stack> below is actually on screen.
+   *
+   * The two branches under this render BootSplash and ConfigErrorScreen
+   * INSTEAD of the Stack, so for as long as either holds there is no
+   * navigator for router.push/replace to act on. Both hooks that navigate
+   * wait for this rather than for their own readiness, which they used to —
+   * and a notification tap is the one path where those two moments are far
+   * enough apart to matter, because it navigates the instant the session
+   * resolves while the boot screen still has seconds of its beat to run.
+   */
+  const navigatorMounted = localeReady && bootDelayDone && configured && ready;
+
+  useProtectedRoute(navigatorMounted);
   useSyncPushToken();
   useSyncLocale();
-  useNotificationDeepLink(ready);
+  useNotificationDeepLink(navigatorMounted);
 
   // Avoid a flash of Home before the persisted session is restored, or of
   // default-locale copy before the saved/detected language is applied — and
