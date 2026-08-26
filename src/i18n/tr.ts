@@ -305,6 +305,8 @@ export const tr = {
     menuInvite: 'Kullanıcı adıyla davet et',
     menuSettings: 'Halka ayarları',
     menuLeave: 'Halkadan ayrıl',
+    inviteePending: 'davet edildi',
+    undoHint: 'Geri almak için basılı tut',
     missedNotNow: 'Şimdi değil',
     todayCheckIn: "Bugünün check-in'i",
     useJoker: (n: number) => `Dün için joker kullan · ${n} hakkın var`,

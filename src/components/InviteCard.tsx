@@ -144,7 +144,11 @@ function ShareRing({
             d={arcPath(cx, cy, r, i * step + LOGO_GAP / 2, i * step + LOGO_GAP / 2 + LOGO_SPAN)}
             stroke={i < lit ? colors.ember : colors.waiting}
             strokeWidth={stroke}
-            strokeLinecap="round"
+            // Butt, like every other ring in the app — the home cards, the
+            // detail screen, the boot chase and the widget all draw square
+            // ends. Round ones here made the share card read as a different
+            // product's artwork.
+            strokeLinecap="butt"
             fill="none"
           />
         ))}
@@ -214,7 +218,7 @@ function Wordmark() {
             d={arcPath(u(17), u(17), u(13), i * 45 + LOGO_GAP / 2, i * 45 + LOGO_GAP / 2 + LOGO_SPAN)}
             stroke={colors.ember}
             strokeWidth={u(7)}
-            strokeLinecap="round"
+            strokeLinecap="butt"
             fill="none"
           />
         ))}

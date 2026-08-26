@@ -69,6 +69,18 @@ export function CheckInButton({
             <AppText variant="meta" color={colors.textTertiary} tabular style={{ marginTop: 2 }}>
               {t.chat.day(day)}{time ? ` · ${time}` : ''}
             </AppText>
+            {/* Undo is a long press, and a long press nobody is told about is
+                the same as no undo at all — it was reported as missing. The
+                line only exists once there is something to undo. */}
+            {onUndo ? (
+              <AppText
+                variant="meta"
+                color={colors.textTertiary}
+                style={{ marginTop: 6, opacity: 0.75, textAlign: 'center' }}
+              >
+                {t.detail.undoHint}
+              </AppText>
+            ) : null}
           </Animated.View>
         ) : (
           <Animated.View entering={FadeIn.duration(200)} style={{ alignItems: 'center' }}>

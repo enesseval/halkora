@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { Alert, Modal, Pressable, Share, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
@@ -122,9 +121,12 @@ export function ShareRingSheet({
    * else, so the system sheet stands in for it — it offers "Save Image"
    * using a permission iOS already manages.
    *
-   * UTI is what makes that row appear. Without it iOS only knows it has been
-   * handed a file, and the image-specific actions (Save Image, Assign to
-   * Contact) are missing from an otherwise normal-looking sheet.
+   * It goes through React Native's Share rather than expo-sharing, which is
+   * what "Save Image" was missing from: expo-sharing hands the file to a
+   * document-interaction sheet, whose job is opening the file in another app,
+   * so it lists apps and no system actions at all. Share presents the real
+   * activity controller, and a lone image file URL is what makes iOS offer to
+   * save it.
    */
   const doSave = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -140,9 +142,9 @@ export function ShareRingSheet({
     setBusy(false);
     onClose();
     setTimeout(() => {
-      Sharing.isAvailableAsync()
-        .then((ok) => (ok ? Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png' }) : null))
-        .catch(() => {});
+      // No message: a share sheet holding only an image is the one that
+      // offers to save it. Adding text turns it into a "send this" sheet.
+      Share.share({ url: uri }).catch(() => {});
     }, 250);
   };
 

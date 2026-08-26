@@ -25,6 +25,7 @@ import {
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { amIParticipant, fetchChallengePreview, joinChallengeByCode } from '@/data/join';
 import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
+import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
 import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
 import {
@@ -82,6 +83,11 @@ export const MY_CHALLENGES_KEY = ['challenges', 'mine'] as const;
 export function useChallengesQuery() {
   const setChallenges = useMockStore((s) => s.setChallenges);
   const everHadData = useRef(false);
+  /**
+   * Ids the last response didn't contain. A ring is only dropped once it has
+   * been missing TWICE — see the pruning note below.
+   */
+  const missedOnce = useRef<Set<string>>(new Set());
   useRealtimeMyChallenges();
 
   const query = useQuery({
@@ -101,12 +107,6 @@ export function useChallengesQuery() {
       everHadData.current = true;
       const current = useMockStore.getState().challenges;
       const byId = new Map(query.data.map((c) => [c.id, c]));
-      // Nothing removes a challenge from "my list" (no leave/delete feature)
-      // — a poll/refetch should only ever add to or update it, never shrink
-      // it. A stale/out-of-order response racing with another concurrent
-      // fetch (e.g. a poll whose DB snapshot predates something that just
-      // committed) could otherwise wipe an already-loaded challenge off
-      // Home/Detail for a cycle even though nothing actually changed.
       const currentIds = new Set(current.map((c) => c.id));
       // fetchMyChallenges never fetches chat messages (that's the separate
       // useChallengeMessages poll) — its rows always carry `messages: []`.
@@ -118,10 +118,31 @@ export function useChallengesQuery() {
       // client, so every poll handed back a row without it and the
       // missed-day gate reappeared over whatever you were doing, about once
       // a minute, with no way to get past it except checking in.
-      const refreshed = current.map((c) => {
-        const fresh = byId.get(c.id);
-        return fresh ? { ...fresh, messages: c.messages, missedAckDay: c.missedAckDay } : c;
-      });
+      //
+      // Rings the server no longer returns are dropped, but only after being
+      // absent TWICE. The comment that used to sit here said nothing ever
+      // removes a ring from this list; leaving, deleting and closing all do
+      // now, and so does deleting a row by hand — a ring gone from the
+      // database sat in History until the app was reinstalled. Dropping on a
+      // single absence would reintroduce what that comment was guarding
+      // against, which is a just-created ring vanishing for a cycle because a
+      // poll already in flight predates it. Nothing survives two consecutive
+      // responses by accident.
+      const gone = new Set<string>();
+      for (const c of current) {
+        if (byId.has(c.id)) continue;
+        if (missedOnce.current.has(c.id)) gone.add(c.id);
+      }
+      missedOnce.current = new Set(
+        current.filter((c) => !byId.has(c.id) && !gone.has(c.id)).map((c) => c.id),
+      );
+
+      const refreshed = current
+        .filter((c) => !gone.has(c.id))
+        .map((c) => {
+          const fresh = byId.get(c.id);
+          return fresh ? { ...fresh, messages: c.messages, missedAckDay: c.missedAckDay } : c;
+        });
       const brandNew = query.data.filter((c) => !currentIds.has(c.id));
       const merged = [...refreshed, ...brandNew];
       setChallenges(merged);
@@ -880,6 +901,10 @@ export function useJoin() {
         queryFn: fetchMyChallenges,
       });
       setChallenges(fresh);
+      // The invite that brought you here is spent. my_invites() already
+      // excludes rings you're in, so this only has to ask again — without it
+      // the bell kept its count until the next poll came round.
+      queryClient.invalidateQueries({ queryKey: RECEIVED_INVITES_KEY });
       return id;
     }
     return joinByCode(code, name);
