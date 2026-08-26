@@ -251,17 +251,19 @@ export function useSyncPushToken(): void {
     // device's token stays the same across an account switch (saha testi
     // bulgusu: hesap silinip yenisi açılınca push_tokens'a yeni kullanıcı
     // için satır hiç yazılmadı, ref "bu token'ı zaten kaydettim" diyordu).
-    registerForPushToken().then((token) => {
-      if (!active || !token || `${userId}:${token}` === lastSaved.current) return;
-      lastSaved.current = `${userId}:${token}`;
-      savePushToken(userId, token).catch(() => {});
+    let environment: string | null = null;
+    registerForPushToken().then((reg) => {
+      if (!active || !reg || `${userId}:${reg.token}` === lastSaved.current) return;
+      environment = reg.environment;
+      lastSaved.current = `${userId}:${reg.token}`;
+      savePushToken(userId, reg.token, reg.environment).catch(() => {});
     });
 
     const sub = Notifications.addPushTokenListener((event) => {
       const token = event.data;
       if (!token || `${userId}:${token}` === lastSaved.current) return;
       lastSaved.current = `${userId}:${token}`;
-      savePushToken(userId, token).catch(() => {});
+      savePushToken(userId, token, environment).catch(() => {});
     });
 
     return () => {
