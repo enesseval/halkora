@@ -409,14 +409,23 @@ export function useCheckIn(id: string) {
   };
 
   const doUndo = () => {
+    if (!challenge) return;
     undo(id);
     syncWidgetSnapshot(useMockStore.getState().challenges);
-    if (isSupabaseConfigured && challenge) {
-      const day = lastServerDay.current ?? challenge.currentDay;
-      deleteCheckIn(id, day)
-        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch(() => {});
-    }
+    if (!isSupabaseConfigured) return;
+    const day = lastServerDay.current ?? challenge.currentDay;
+    deleteCheckIn(id, day)
+      .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
+      .catch((e) => {
+        // The optimistic undo didn't actually happen server-side. Swallowing
+        // this left the tick gone on screen while the row was still in the
+        // database, so the next poll silently put it back — undo looked like
+        // it had worked and then changed its mind. Put it back deliberately
+        // instead, and say why.
+        checkIn(id);
+        syncWidgetSnapshot(useMockStore.getState().challenges);
+        Alert.alert(t.errors.undoFailed, friendlyErrorMessage(e));
+      });
   };
 
   return {

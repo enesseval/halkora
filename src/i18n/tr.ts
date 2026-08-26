@@ -56,6 +56,7 @@ export const tr = {
     appleIncomplete: 'Apple girişi tamamlanamadı.',
     updateFailed: 'Güncellenemedi',
     checkInFailed: 'Check-in kaydedilemedi',
+    undoFailed: 'Check-in geri alınamadı',
     jokerFailed: 'Joker kaydedilemedi',
     messageFailed: 'Mesaj gönderilemedi',
     messageFailedGeneric: 'Katılamadık. Kodu kontrol edip tekrar dene.',
