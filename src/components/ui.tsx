@@ -13,6 +13,7 @@ import {
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 
 type TypeVariant = keyof typeof type;
 
@@ -62,16 +63,24 @@ interface ScreenProps {
 }
 
 export function Screen({ children, style, edges, padded = true }: ScreenProps) {
+  // Content keeps the measure it was designed at and sits centred in whatever
+  // space the window gives it (src/theme/layout.ts). The cap is above every
+  // phone width, so on a phone `sideGutter` is 0 and this renders exactly as
+  // it did before — the only device that sees a difference is the one that
+  // needed it.
+  const { sideGutter } = useLayout();
   return (
     <SafeAreaView
       edges={edges ?? ['top', 'bottom']}
       style={[
         { flex: 1, backgroundColor: colors.bgBase },
-        padded ? { paddingHorizontal: spacing.screenX } : null,
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
         style,
       ]}
     >
-      {children}
+      <View style={[{ flex: 1 }, padded ? { paddingHorizontal: spacing.screenX } : null]}>
+        {children}
+      </View>
     </SafeAreaView>
   );
 }
