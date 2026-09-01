@@ -127,6 +127,16 @@ export function useChallengesQuery() {
       // against, which is a just-created ring vanishing for a cycle because a
       // poll already in flight predates it. Nothing survives two consecutive
       // responses by accident.
+      //
+      // This is why `dataUpdatedAt` is in the dependency list below and not
+      // just `data`. React Query's structural sharing hands back the PREVIOUS
+      // object when a response is deeply equal to the last one, so two
+      // identical polls change nothing about `data`'s identity and this
+      // effect never runs a second time. The second strike could not land,
+      // and a hand-deleted ring stayed in History forever — the rule read
+      // correctly and could not fire (saha testi bulgusu — "veritabanından
+      // elle sildiğim halka hala geçmişte gözüküyor"). `dataUpdatedAt`
+      // changes on every successful fetch, equal payload or not.
       const gone = new Set<string>();
       for (const c of current) {
         if (byId.has(c.id)) continue;
@@ -147,7 +157,7 @@ export function useChallengesQuery() {
       setChallenges(merged);
       syncWidgetSnapshot(merged);
     }
-  }, [query.data, setChallenges]);
+  }, [query.data, query.dataUpdatedAt, setChallenges]);
 
   return {
     loading: isSupabaseConfigured && query.isLoading,
