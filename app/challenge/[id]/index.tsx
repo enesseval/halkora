@@ -425,7 +425,9 @@ export default function DetailScreen() {
           try {
             await blockUser(authorId);
             // Their messages are hidden by an RLS policy, so they disappear on
-            // the next fetch rather than needing to be filtered here.
+            // the next fetch rather than needing to be filtered here — the
+            // chat merge drops anything the server stopped returning
+            // (useChallengeMessages).
             retryChat();
           } catch (e) {
             Alert.alert(t.moderation.blockFailed, friendlyErrorMessage(e));

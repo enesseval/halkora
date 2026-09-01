@@ -34,6 +34,11 @@ export interface Message {
   dayNumber: number;
   reactions: Reaction[];
   mine?: boolean;
+  /** ISO timestamp from the server. Absent on a local optimistic bubble and
+   * on mock data. The chat merge needs it to tell "the server no longer
+   * returns this message" (blocked author) apart from "this response is
+   * simply older than the message" — see useChallengeMessages. */
+  createdAt?: string;
 }
 
 export type StakeMode = 'direct' | 'vote';

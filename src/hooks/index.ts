@@ -450,7 +450,7 @@ export function messagesKey(id: string) {
 export function useChallengeMessages(id: string | undefined) {
   const setMessages = useMockStore((s) => s.setChallengeMessages);
   const everHadData = useRef(false);
-  const { data, isError, error, refetch } = useQuery({
+  const { data, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: messagesKey(id ?? ''),
     queryFn: () => fetchMessages(id as string),
     enabled: isSupabaseConfigured && !!id,
@@ -474,19 +474,42 @@ export function useChallengeMessages(id: string | undefined) {
       (m) => !m.id.startsWith('local-') || !confirmed.has(`${m.dayNumber}::${m.text}`),
     );
 
-    // Messages are never deleted server-side — a poll/refetch should only
-    // ever add to (or refresh reaction counts on) the list, never shrink it.
-    // A stale/out-of-order response (racing with another concurrent fetch,
-    // e.g. the 4s poll vs. the post-send/post-reaction invalidate) could
-    // otherwise wipe an already-confirmed message off the screen for a cycle
-    // even though it's safely stored — this hit both the sender's and the
-    // recipient's device, since neither has anything to do with the local
-    // optimistic bubble once a message is truly persisted.
-    const keptIds = new Set(kept.map((m) => m.id));
-    const refreshed = kept.map((m) => byId.get(m.id) ?? m);
+    // A message on screen that this response doesn't contain is one of two
+    // very different things, and the merge has to tell them apart.
+    //
+    //  - The response is simply older than the message. A stale/out-of-order
+    //    fetch (the 20s poll racing the post-send invalidate) would otherwise
+    //    wipe an already-confirmed message off the screen for a cycle even
+    //    though it's safely stored — that hit both the sender's and the
+    //    recipient's device.
+    //  - The server genuinely stopped returning it. Blocking does exactly
+    //    this: `messages`'s RLS policy is `is_member(...) and not
+    //    is_blocked_pair(user_id)`, so a blocked person's messages stop
+    //    arriving. This merge used to never shrink the list, so they stayed
+    //    on screen forever and blocking looked broken (App Store 1.2).
+    //
+    // The cutoff separates them: only a message newer than the response
+    // itself can legitimately be missing from it. The 10s slack covers the
+    // request's own round trip — a message created while the request was in
+    // flight is older than `dataUpdatedAt` but could not have been in the
+    // answer. Blocked messages are older than that and drop out, at the
+    // latest on the next poll, on BOTH devices — which matters, because a
+    // client cannot compute this itself: `blocked_users` only lets you read
+    // the blocks YOU created, so the person who was blocked has no way to
+    // know. Only the server sees both directions.
+    const cutoff = dataUpdatedAt - 10_000;
+    const stillOnServer = (m: (typeof kept)[number]) => {
+      if (byId.has(m.id)) return true;
+      if (m.id.startsWith('local-')) return true; // not a server message yet
+      if (!m.createdAt) return true; // mock/legacy row, nothing to compare
+      return Date.parse(m.createdAt) > cutoff;
+    };
+
+    const keptIds = new Set(kept.filter(stillOnServer).map((m) => m.id));
+    const refreshed = kept.filter(stillOnServer).map((m) => byId.get(m.id) ?? m);
     const brandNew = data.filter((m) => !keptIds.has(m.id));
     setMessages(id, [...refreshed, ...brandNew]);
-  }, [data, id, setMessages]);
+  }, [data, dataUpdatedAt, id, setMessages]);
 
   return {
     // Only surface this the first time — if we already have messages showing,

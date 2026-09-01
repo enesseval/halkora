@@ -56,6 +56,7 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
     dayNumber: m.day_number,
     reactions: Array.from(countsByMsg.get(m.id) ?? new Map()).map(([emoji, count]) => ({ emoji, count })),
     mine: m.user_id === user?.id,
+    createdAt: m.created_at,
   }));
 }
 
