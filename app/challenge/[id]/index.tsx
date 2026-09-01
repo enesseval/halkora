@@ -149,6 +149,9 @@ export default function DetailScreen() {
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
   const [showOwnerSettings, setShowOwnerSettings] = useState(false);
+  // Which chat bubble has its long-press menu open. One value for the whole
+  // list, so opening a second menu closes the first.
+  const [openBubbleId, setOpenBubbleId] = useState<string | null>(null);
   // Guideline 1.2 — the message being reported, and the block confirmation.
   const [reportTarget, setReportTarget] = useState<Message | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -492,6 +495,17 @@ export default function DetailScreen() {
         // screen the moment that happens. Replacing the route here too would
         // race that effect.
         onPress: () => actions.endEarly(),
+      },
+    ]);
+  };
+
+  const confirmDeleteMessage = (messageId: string) => {
+    Alert.alert(t.chat.deleteMessageConfirmTitle, t.chat.deleteMessageConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.chat.deleteMessage,
+        style: 'destructive',
+        onPress: () => actions.deleteMessage(messageId),
       },
     ]);
   };
@@ -970,6 +984,9 @@ export default function DetailScreen() {
             onReact={(emoji) => actions.react(item.m.id, emoji)}
             onReport={item.m.authorId ? () => setReportTarget(item.m) : undefined}
             onBlock={item.m.authorId ? () => confirmBlock(item.m) : undefined}
+            onDelete={item.m.mine ? () => confirmDeleteMessage(item.m.id) : undefined}
+            openId={openBubbleId}
+            setOpenId={setOpenBubbleId}
           />
         );
       case 'chatError':

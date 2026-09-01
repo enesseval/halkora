@@ -60,6 +60,8 @@ export const tr = {
     jokerFailed: 'Joker kaydedilemedi',
     messageFailed: 'Mesaj gönderilemedi',
     messageFailedGeneric: 'Katılamadık. Kodu kontrol edip tekrar dene.',
+    reactFailed: 'Tepki eklenemedi',
+    deleteMessageFailed: 'Mesaj silinemedi',
     nudgeFailed: 'Dürtme gönderilemedi',
     endEarlyFailed: 'Bitirilemedi',
     linkFailed: 'Bağlanamadı',
@@ -615,6 +617,9 @@ export const tr = {
     declineFailed: 'Davet kaldırılamadı',
   },
   chat: {
+    deleteMessage: 'Sil',
+    deleteMessageConfirmTitle: 'Mesajı sil?',
+    deleteMessageConfirmBody: 'Bu mesaj herkesten kalkacak. Geri alınamaz.',
     day: (n: number) => `Gün ${n}`,
     // Halka başlamadan atılan mesajlar 0. güne yazılıyor; "Gün 0" diye bir
     // gün yok, o yüzden ayrı bir etiket.

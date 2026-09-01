@@ -48,13 +48,35 @@ interface BubbleProps {
    * nothing to report about myself. */
   onReport?: () => void;
   onBlock?: () => void;
+  /** Only on my own messages. */
+  onDelete?: () => void;
+  /** Which bubble currently has its menu open, and how to change that. Held
+   * by the list rather than each bubble: with a boolean per bubble, opening
+   * a second menu left the first one open behind it (saha testi bulgusu —
+   * "başka bir mesaja uzun bastığımda yine açılıyor ama önceki açık kalmaya
+   * devam ediyor"). One value can only name one bubble. */
+  openId: string | null;
+  setOpenId: (id: string | null) => void;
 }
 
-export function MessageBubble({ message, onReact, onReport, onBlock }: BubbleProps) {
+export function MessageBubble({
+  message,
+  onReact,
+  onReport,
+  onBlock,
+  onDelete,
+  openId,
+  setOpenId,
+}: BubbleProps) {
   const { t } = useT();
-  const [showPicker, setShowPicker] = useState(false);
+  const showPicker = openId === message.id;
+  const setShowPicker = (next: boolean | ((v: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(showPicker) : next;
+    setOpenId(value ? message.id : null);
+  };
   const mine = message.mine;
   const canModerate = !mine && (onReport || onBlock);
+  const canDelete = !!mine && !!onDelete;
 
   return (
     <View style={{ alignItems: mine ? 'flex-end' : 'flex-start', marginVertical: 5 }}>
@@ -147,6 +169,30 @@ export function MessageBubble({ message, onReact, onReport, onBlock }: BubblePro
           {/* Same long-press that reacts also reports — one gesture, so
               reporting is never harder to find than a thumbs-up. Divider and
               muted colour keep it from competing with the reactions. */}
+          {canDelete ? (
+            <>
+              <View
+                style={{
+                  width: hairline,
+                  alignSelf: 'stretch',
+                  backgroundColor: colors.strokeSubtle,
+                  marginHorizontal: 4,
+                }}
+              />
+              <Pressable
+                onPress={() => {
+                  setShowPicker(false);
+                  onDelete?.();
+                }}
+                style={{ paddingHorizontal: 6, justifyContent: 'center' }}
+              >
+                <AppText variant="meta" color={colors.joker}>
+                  {t.chat.deleteMessage}
+                </AppText>
+              </Pressable>
+            </>
+          ) : null}
+
           {canModerate ? (
             <>
               <View

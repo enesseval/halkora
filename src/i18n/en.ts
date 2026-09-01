@@ -59,6 +59,8 @@ export const en: Dictionary = {
     jokerFailed: "Couldn't save joker",
     messageFailed: "Couldn't send message",
     messageFailedGeneric: "Couldn't join. Check the code and try again.",
+    reactFailed: "Couldn't add the reaction",
+    deleteMessageFailed: "Couldn't delete the message",
     nudgeFailed: "Couldn't send the nudge",
     endEarlyFailed: "Couldn't end challenge",
     linkFailed: "Couldn't link",
@@ -587,6 +589,9 @@ export const en: Dictionary = {
     declineFailed: "Couldn't dismiss the invite",
   },
   chat: {
+    deleteMessage: 'Delete',
+    deleteMessageConfirmTitle: 'Delete message?',
+    deleteMessageConfirmBody: "This removes it for everyone. It can't be undone.",
     day: (n: number) => `Day ${n}`,
     beforeStart: 'Before it starts',
     reloadFailed: "Couldn't load chat",

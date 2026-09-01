@@ -23,7 +23,14 @@ import {
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { amIParticipant, fetchChallengePreview, joinChallengeByCode } from '@/data/join';
-import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
+import {
+  fetchMessages,
+  insertMessage,
+  setReaction,
+  deleteMessage,
+  insertNudge,
+  insertSystemMessage,
+} from '@/data/chat';
 import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
 import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
 import { router } from 'expo-router';
@@ -677,12 +684,24 @@ export function useChallengeActions(id: string) {
   };
 
   const doReact = (messageId: string, emoji: string) => {
-    reactMock(id, messageId, emoji); // optimistic +1
-    if (isSupabaseConfigured) {
-      insertReaction(messageId, emoji)
-        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
-        .catch(() => {});
+    // No optimistic step against a real backend: the outcome depends on what
+    // this person already put on the message — a swap, or taking it back —
+    // and guessing wrong makes the counter jump the wrong way before the
+    // refetch corrects it. The round trip is one insert/delete.
+    if (!isSupabaseConfigured) {
+      reactMock(id, messageId, emoji);
+      return;
     }
+    setReaction(messageId, emoji)
+      .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+      .catch((e) => Alert.alert(t.errors.reactFailed, friendlyErrorMessage(e)));
+  };
+
+  const doDeleteMessage = (messageId: string) => {
+    if (!isSupabaseConfigured) return;
+    deleteMessage(messageId)
+      .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+      .catch((e) => Alert.alert(t.errors.deleteMessageFailed, friendlyErrorMessage(e)));
   };
 
   const doNudge = (participantId: string, recipientName: string, message: string) => {
@@ -846,6 +865,7 @@ export function useChallengeActions(id: string) {
     ackMissed: () => ackMissed(id),
     sendMessage: doSendMessage,
     react: doReact,
+    deleteMessage: doDeleteMessage,
     nudge: doNudge,
     endEarly: doEndEarly,
     updateDetails: doUpdateDetails,
