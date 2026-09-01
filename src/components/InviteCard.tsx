@@ -1,7 +1,7 @@
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { View } from 'react-native';
 import { colors, fonts } from '@/theme/tokens';
-import { AppText } from './ui';
+import { AppText, FixedType } from './ui';
 import { useT } from '@/i18n';
 import type { Challenge } from '@/data/types';
 
@@ -476,8 +476,12 @@ export function InviteCard({
     </View>
   );
 
+  // Both formats are a fixed w x h box captured to an image, so nothing in
+  // them may follow the system text-size setting — the box cannot grow with
+  // the text, so scaled type overflows the card that gets shared.
   if (format === 'square') {
     return (
+      <FixedType>
       <View style={{ width: w, height: h, overflow: 'hidden' }}>
         <Backdrop w={w} h={h} />
         <View
@@ -497,10 +501,12 @@ export function InviteCard({
           </View>
         </View>
       </View>
+      </FixedType>
     );
   }
 
   return (
+    <FixedType>
     <View style={{ width: w, height: h, overflow: 'hidden' }}>
       <Backdrop w={w} h={h} />
       <View
@@ -518,5 +524,6 @@ export function InviteCard({
         {foot}
       </View>
     </View>
+    </FixedType>
   );
 }

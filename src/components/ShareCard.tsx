@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors, fonts, hairline, radius } from '@/theme/tokens';
-import { AppText, Avatar, AvatarStack } from '@/components/ui';
+import { AppText, Avatar, AvatarStack, FixedType } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useT } from '@/i18n';
 import type { Challenge } from '@/data/types';
@@ -696,6 +696,13 @@ function StatsCard({ challenge }: { challenge: Challenge }) {
 }
 
 export function ShareCard({ challenge, variant = 'classic' }: { challenge: Challenge; variant?: ShareTemplateId }) {
+  // Every template is a fixed CARD_W x CARD_H box that gets captured to an
+  // image. Nothing in it may follow the system text-size setting: the box
+  // cannot grow, so scaled text overflows the card that gets posted.
+  return <FixedType>{card(challenge, variant)}</FixedType>;
+}
+
+function card(challenge: Challenge, variant: ShareTemplateId) {
   switch (variant) {
     case 'bold':
       return <BoldCard challenge={challenge} />;

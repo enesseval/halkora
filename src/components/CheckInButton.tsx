@@ -15,7 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, fonts, hairline, type } from '@/theme/tokens';
 import { useT } from '@/i18n';
-import { AppText } from './ui';
+import { AppText, FixedType } from './ui';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -98,6 +98,7 @@ export function CheckInButton({
   };
 
   return (
+    <FixedType>
     <Animated.View style={animStyle}>
       <Pressable
         onPress={press}
@@ -138,8 +139,15 @@ export function CheckInButton({
           </Svg>
         ) : null}
 
+        {/* A circle of a fixed radius: text inside it cannot reflow its way
+            out of trouble, it just spills past the edge. So the type here
+            neither follows the system size setting nor runs wider than the
+            circle's own usable chord. */}
         {done ? (
-          <Animated.View entering={FadeIn.duration(250)} style={{ alignItems: 'center' }}>
+          <Animated.View
+            entering={FadeIn.duration(250)}
+            style={{ alignItems: 'center', maxWidth: size * 0.78 }}
+          >
             <AppText style={{ fontSize: 24, color: colors.ember, marginBottom: 2 }}>✓</AppText>
             <AppText
               style={{ fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textPrimary }}
@@ -153,6 +161,7 @@ export function CheckInButton({
               <AppText
                 variant="meta"
                 color={colors.textTertiary}
+                numberOfLines={2}
                 style={{ marginTop: 6, opacity: 0.75, textAlign: 'center' }}
               >
                 {t.detail.undoHint}
@@ -160,7 +169,10 @@ export function CheckInButton({
             ) : null}
           </Animated.View>
         ) : (
-          <Animated.View entering={FadeIn.duration(200)} style={{ alignItems: 'center' }}>
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            style={{ alignItems: 'center', maxWidth: size * 0.78 }}
+          >
             <AppText
               style={{ fontFamily: fonts.displaySemibold, fontSize: 22, color: colors.bgBase }}
             >
@@ -173,5 +185,6 @@ export function CheckInButton({
         )}
       </Pressable>
     </Animated.View>
+    </FixedType>
   );
 }

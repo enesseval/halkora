@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import {
   Pressable,
   PressableProps,
@@ -17,11 +17,40 @@ import { useLayout } from '@/theme/layout';
 
 type TypeVariant = keyof typeof type;
 
+/**
+ * Inside this, text does not follow the system's text-size setting at all.
+ *
+ * allowFontScaling defaults to true in React Native, so iOS Dynamic Type was
+ * silently resizing every string in the app — including the ones drawn inside
+ * boxes that cannot grow with them. A share card is a fixed 360x640 that gets
+ * captured to an image, and the ring counter sits inside a circle of a fixed
+ * radius: scaled-up text there doesn't reflow, it overflows (saha testi
+ * bulgusu — "ipadde davet kısmında oluşturulan resimlerde puntolar çok
+ * büyük", "ipadde yazılar halka içinden taşıyor").
+ *
+ * Only for fixed geometry. Everywhere else the app should follow the
+ * setting — that's an accessibility feature, not a bug — which is why the
+ * default below bounds the multiplier instead of switching it off.
+ */
+const FixedTypeContext = createContext(false);
+
+export function FixedType({ children }: { children: ReactNode }) {
+  return <FixedTypeContext.Provider value={true}>{children}</FixedTypeContext.Provider>;
+}
+
 interface AppTextProps extends TextProps {
   variant?: TypeVariant;
   color?: string;
   tabular?: boolean;
 }
+
+/**
+ * How far the app lets the system text-size setting push type before layouts
+ * start breaking. Unbounded, the largest accessibility sizes are roughly 3.5x
+ * and nothing in this design survives that; 1.3 is a real, useful increase
+ * that every screen still holds.
+ */
+const MAX_FONT_SCALE = 1.3;
 
 /** All text goes through here so nothing renders in the system font. Text used
  * as a tap target (onPress, e.g. "Atla" / "Tekrar dene" links) gets the same
@@ -32,11 +61,16 @@ export function AppText({
   tabular,
   style,
   onPress,
+  allowFontScaling,
+  maxFontSizeMultiplier,
   ...rest
 }: AppTextProps) {
+  const fixed = useContext(FixedTypeContext);
   return (
     <Text
       {...rest}
+      allowFontScaling={allowFontScaling ?? (fixed ? false : undefined)}
+      maxFontSizeMultiplier={maxFontSizeMultiplier ?? MAX_FONT_SCALE}
       onPress={
         onPress
           ? (e) => {
