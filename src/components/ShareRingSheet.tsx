@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { AppText, Button } from './ui';
 import { InviteCard, STORY_H, STORY_W, SQUARE, type InviteCardFormat } from './InviteCard';
 import { inviteUrl } from '@/lib/invite';
@@ -62,6 +63,7 @@ export function ShareRingSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const [format, setFormat] = useState<InviteCardFormat>('story');
   const [busy, setBusy] = useState(false);
   const shotRef = useRef<View>(null);
@@ -172,7 +174,7 @@ export function ShareRingSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim }}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
 
           <Animated.View

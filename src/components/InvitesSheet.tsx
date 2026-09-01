@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { dismissInvite, fetchReceivedInvites, type ReceivedInvite } from '@/data/invites';
 import { friendlyErrorMessage } from '@/lib/errors';
@@ -57,6 +58,7 @@ export function InvitesSheet({
   onChanged: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -83,7 +85,7 @@ export function InvitesSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim }}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
 
           <Animated.View

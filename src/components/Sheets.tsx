@@ -3,6 +3,7 @@ import { Alert, Modal, Pressable, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { Challenge, Momentum } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
 import type { ReportReason } from '@/data/moderation';
@@ -55,6 +56,7 @@ function SheetOverlay({
   children: ReactNode;
 }) {
   const keyboardHeight = useKeyboardHeight();
+  const { sideGutter } = useLayout();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -81,7 +83,12 @@ function SheetOverlay({
         entering={FadeIn.duration(180)}
         style={{ flex: 1, backgroundColor: colors.scrim }}
       >
-        <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+        <View
+          style={[
+            { flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight },
+            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+          ]}
+        >
           <Pressable style={{ flex: 1 }} onPress={onClose} />
           {children}
         </View>
@@ -245,20 +252,24 @@ export function MomentumSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const startDay = momentum.daysTogether - momentum.last3.length + 1;
   return (
     <Animated.View
       entering={FadeIn.duration(200)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.scrim,
+          justifyContent: 'flex-end',
+          zIndex: 30,
+        },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
     >
       <Pressable style={{ flex: 1 }} onPress={onClose} />
       <Animated.View
@@ -755,19 +766,23 @@ export function NudgeMessageSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.scrim,
+          justifyContent: 'flex-end',
+          zIndex: 30,
+        },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
     >
       <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onClose} />
 
@@ -902,19 +917,23 @@ export function JokerDaySheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.scrim,
+          justifyContent: 'flex-end',
+          zIndex: 30,
+        },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
     >
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -971,21 +990,25 @@ export function JokerDaySheet({
  */
 export function WidgetHintSheet({ onClose }: { onClose: () => void }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const steps = [t.widgetHint.step1, t.widgetHint.step2, t.widgetHint.step3];
 
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.scrim,
+          justifyContent: 'flex-end',
+          zIndex: 30,
+        },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
     >
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
