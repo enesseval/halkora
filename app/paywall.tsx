@@ -245,6 +245,15 @@ export default function Paywall() {
     close();
   };
 
+  // The store's own per-month figure, in the storefront's own currency. The
+  // dictionary's "≈₺33/ay" is a hard-coded lira string: it goes wrong the
+  // moment the price changes and is wrong for every non-Turkish storefront,
+  // sitting directly under a price the store localized correctly. Kept only
+  // as the fallback for a store that doesn't compute one.
+  const annualNote = plans.annual?.perMonth
+    ? t.pro.annualPerMonth(plans.annual.perMonth)
+    : t.pro.annualNote;
+
   return (
     <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' }}>
       {/* tap outside to dismiss */}
@@ -324,7 +333,7 @@ export default function Paywall() {
             label={t.pro.planAnnualLabel}
             price={plans.annual?.price ?? t.pro.annualPrice}
             per={t.pro.annualPer}
-            note={t.pro.annualNote}
+            note={annualNote}
             badge={t.pro.saveBadge}
             selected={plan === 'annual'}
             onPress={() => setPlan('annual')}

@@ -109,6 +109,10 @@ export interface PlanOption {
   /** Localized, store-formatted price ("₺59,99") — Apple requires the real
    * price for the viewer's storefront, not a hard-coded one. */
   price: string;
+  /** The same price expressed per month, formatted by the store in the same
+   * currency ("≈₺33,25/ay"). Null for a monthly package, and null on any
+   * store that doesn't compute it. */
+  perMonth: string | null;
 }
 
 export interface Plans {
@@ -123,7 +127,13 @@ export async function fetchPlans(): Promise<Plans> {
   const offering = offerings.all[DEFAULT_OFFERING] ?? offerings.current;
   if (!offering) return {};
   const pick = (p?: PurchasesPackage | null): PlanOption | undefined =>
-    p ? { pkg: p, price: p.product.priceString } : undefined;
+    p
+      ? {
+          pkg: p,
+          price: p.product.priceString,
+          perMonth: p.product.pricePerMonthString ?? null,
+        }
+      : undefined;
   return {
     monthly: pick(offering.monthly),
     annual: pick(offering.annual),
