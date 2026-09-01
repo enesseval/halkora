@@ -1,4 +1,4 @@
-import { useState } from 'react';
+
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
