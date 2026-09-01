@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import * as Notifications from 'expo-notifications';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
+import { isAuthApiError, isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { useMockStore } from '@/stores/mockStore';
@@ -128,6 +129,34 @@ export async function awaitProUnlock(attempts = 6, gapMs = 1500): Promise<boolea
 }
 
 /**
+ * Is this error the server telling us the session is genuinely dead?
+ *
+ * getUser() reports EVERYTHING through the same `error` field — a deleted
+ * user, a 500, a timeout, a dropped connection. Treating all of them alike
+ * signs people out of their own account on a momentary network blip, and
+ * because the app then starts a fresh anonymous session they land back in
+ * onboarding with a brand-new account and no data (saha testi bulgusu:
+ * "1 kere satın almayı yeniledikten sonra onboardinge tekrar atıp yeni hesap
+ * oluşturttu" — restoring a purchase is exactly the moment the app is
+ * bouncing through the App Store and a request is most likely to fail).
+ *
+ * So only a definitive 4xx from the auth API ends a session. Anything the
+ * client couldn't get an answer to leaves the cached session alone; the very
+ * next request retries it, and a session that really is dead surfaces as a
+ * clean auth error instead of silent data loss.
+ */
+function sessionRejectedByServer(error: unknown): boolean {
+  // Network/transport failures are explicitly retryable — never fatal.
+  if (isAuthRetryableFetchError(error)) return false;
+  // Anything that isn't an answer from the auth API (unknown/parse errors)
+  // says nothing about whether the user still exists.
+  if (!isAuthApiError(error)) return false;
+  const status = error.status;
+  // 408 request timeout and 429 rate limit are transient despite being 4xx.
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+/**
  * Call once from the root layout. Restores the persisted session and keeps
  * the store in sync with Supabase auth changes.
  */
@@ -151,7 +180,7 @@ export function useAuthInit(): void {
         // cryptic FK error (e.g. "participants_user_id_fkey") instead of a
         // clean "please sign in again". Validate against the server up front.
         const { error } = await supabase.auth.getUser();
-        if (error) {
+        if (error && sessionRejectedByServer(error)) {
           await supabase.auth.signOut();
           session = null;
         }
