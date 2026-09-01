@@ -59,6 +59,7 @@ export const en: Dictionary = {
     jokerFailed: "Couldn't save joker",
     messageFailed: "Couldn't send message",
     messageFailedGeneric: "Couldn't join. Check the code and try again.",
+    nudgeFailed: "Couldn't send the nudge",
     endEarlyFailed: "Couldn't end challenge",
     linkFailed: "Couldn't link",
     deleteFailed: "Couldn't delete",
@@ -607,6 +608,8 @@ export const en: Dictionary = {
       "Almost there, don't give up 💪",
       'We miss you, check-in time 🔥',
     ],
+    alreadyNudgedTitle: 'Already nudged today',
+    alreadyNudgedBody: (name: string) => `You get one nudge a day for ${name}. Try again tomorrow.`,
     nudgeSystemMessage: (from: string, to: string, msg: string) => `👋 ${from} nudged ${to}: "${msg}"`,
   },
 

@@ -60,6 +60,7 @@ export const tr = {
     jokerFailed: 'Joker kaydedilemedi',
     messageFailed: 'Mesaj gönderilemedi',
     messageFailedGeneric: 'Katılamadık. Kodu kontrol edip tekrar dene.',
+    nudgeFailed: 'Dürtme gönderilemedi',
     endEarlyFailed: 'Bitirilemedi',
     linkFailed: 'Bağlanamadı',
     deleteFailed: 'Silinemedi',
@@ -642,6 +643,8 @@ export const tr = {
     ],
     // El sallamayı özel bir push'ta gizli kalmak yerine sohbette de görünür
     // kılıyor (saha testi bulgusu: "chatte gözüksün, ne yaptın diye").
+    alreadyNudgedTitle: 'Bugün zaten dürttün',
+    alreadyNudgedBody: (name: string) => `${name} için günde bir dürtme hakkın var. Yarın tekrar deneyebilirsin.`,
     nudgeSystemMessage: (from: string, to: string, msg: string) => `👋 ${from}, ${to}'a el salladı: "${msg}"`,
   },
 

@@ -122,7 +122,20 @@ export async function insertReaction(messageId: string, emoji: string): Promise<
   if (error && error.code !== '23505') throw error;
 }
 
-export async function insertNudge(challengeId: string, toUserId: string, message?: string): Promise<void> {
+/**
+ * Returns false when the DB's own "one nudge per person per day" limit
+ * (docs/PHASE2-SUPABASE.md "Ek K") had already been reached — not an error,
+ * but the caller has to know: it must not post a second identical system
+ * message to the chat, and the person deserves to be told rather than shown
+ * a "Sallandı ✓" for something that didn't happen (saha testi bulgusu —
+ * "2.de icon yanında sallandı yazıyor ama ne sohbete ne de bildirime
+ * düşmüyor").
+ */
+export async function insertNudge(
+  challengeId: string,
+  toUserId: string,
+  message?: string,
+): Promise<boolean> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -131,8 +144,7 @@ export async function insertNudge(challengeId: string, toUserId: string, message
   const { error } = await supabase
     .from('nudges')
     .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId, message });
-  // 23505 = unique violation — the DB's own "one nudge per person per day"
-  // limit (docs/PHASE2-SUPABASE.md "Ek K") already tripped; not a real error,
-  // the UI already shows the nudge as sent.
-  if (error && error.code !== '23505') throw error;
+  if (error?.code === '23505') return false;
+  if (error) throw error;
+  return true;
 }

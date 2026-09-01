@@ -687,22 +687,39 @@ export function useChallengeActions(id: string) {
 
   const doNudge = (participantId: string, recipientName: string, message: string) => {
     nudgeMock(id, participantId); // optimistic "Sallandı ✓"
-    if (isSupabaseConfigured && challenge) {
-      insertNudge(id, participantId, message)
+    if (!isSupabaseConfigured || !challenge) return;
+    insertNudge(id, participantId, message)
+      .then(async (sent) => {
+        if (!sent) {
+          // The day's one nudge was already spent. Nothing was written and
+          // nothing was pushed, so saying "Sallandı ✓" and stopping there is
+          // the app telling the person something it knows isn't true.
+          Alert.alert(
+            t.participant.alreadyNudgedTitle,
+            t.participant.alreadyNudgedBody(recipientName),
+          );
+          return;
+        }
         // Visible to the whole group in chat, not just a private push to the
         // recipient (saha testi bulgusu: "chatte gözüksün, ne yaptın diye").
-        // Best-effort — a failure here shouldn't undo the nudge itself.
-        .then(() =>
-          insertSystemMessage(
-            id,
-            challenge.currentDay,
-            t.participant.nudgeSystemMessage(myName ?? t.common.person, recipientName, message),
-            false, // already pushed via the nudges table above — don't double-notify
-          ),
-        )
-        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
-        .catch(() => {});
-    }
+        await insertSystemMessage(
+          id,
+          challenge.currentDay,
+          t.participant.nudgeSystemMessage(myName ?? t.common.person, recipientName, message),
+          false, // already pushed via the nudges table above — don't double-notify
+        );
+        queryClient.invalidateQueries({ queryKey: messagesKey(id) });
+      })
+      // Was `.catch(() => {})`, which is why a nudge that never left the
+      // device still showed as sent, with nothing in the chat and nothing on
+      // the other phone, and no way to tell why.
+      .catch((e) => {
+        // Clear the optimistic "Sallandı ✓" now rather than letting it sit
+        // until the next 60s poll: `nudged` is derived from the server's own
+        // rows, so a refetch is what tells the truth here.
+        queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+        Alert.alert(t.errors.nudgeFailed, friendlyErrorMessage(e));
+      });
   };
 
 
