@@ -294,6 +294,11 @@ export const tr = {
     deleteConfirmTitle: 'Hesabını sil?',
     deleteConfirmBody:
       "Bu geri alınamaz. Katılımcılığın, check-in'lerin, mesajların kalıcı olarak silinir. Kurduğun challenge'lar grubun diğer üyeleri için kalmaya devam eder.",
+    legalSection: 'Yasal',
+    legalTerms: 'Kullanım Şartları',
+    legalPrivacy: 'Gizlilik Politikası',
+    legalSupport: 'Destek',
+    legalOpenFailed: 'Sayfa açılamadı.',
     version: (v: string) => `Sürüm ${v}`,
   },
 

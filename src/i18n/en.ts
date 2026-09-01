@@ -290,6 +290,11 @@ export const en: Dictionary = {
     deleteConfirmTitle: 'Delete your account?',
     deleteConfirmBody:
       "This can't be undone. Your participation, check-ins, and messages are permanently deleted. Challenges you created stay around for the rest of the group.",
+    legalSection: 'Legal',
+    legalTerms: 'Terms of Use',
+    legalPrivacy: 'Privacy Policy',
+    legalSupport: 'Support',
+    legalOpenFailed: 'Could not open the page.',
     version: (v: string) => `Version ${v}`,
   },
 

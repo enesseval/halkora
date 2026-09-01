@@ -12,6 +12,7 @@ import { useMockStore } from '@/stores/mockStore';
 import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
 import { purchasesDiagnostics } from '@/lib/purchases';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '@/lib/legal';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { NameSheet, UsernameSheet, WidgetHintSheet } from '@/components/Sheets';
 import { BlockedSheet } from '@/components/BlockedSheet';
@@ -208,6 +209,16 @@ export default function SettingsScreen() {
     ]);
   };
 
+  // The published legal pages have to be reachable from inside the app, not
+  // only from onboarding and the paywall — App Review opens them, and until
+  // now someone past onboarding had no route to them at all. Account deletion
+  // is deliberately NOT a link here: the real thing is the in-app "Hesabı sil"
+  // below, which is what Guideline 5.1.1(v) actually asks for. The published
+  // /hesap-silme/ page exists for App Store Connect's own field.
+  const openLegal = (url: string) => {
+    Linking.openURL(url).catch(() => Alert.alert(t.settings.legalOpenFailed));
+  };
+
   // Leaving a pending reset behind would fire setState on an unmounted
   // screen; harmless today, but the cleanup costs three lines.
   useEffect(() => () => {
@@ -371,6 +382,31 @@ export default function SettingsScreen() {
             </View>
           </View>
         ) : null}
+
+        <View style={{ marginTop: 20 }}>
+          <SectionLabel>{t.settings.legalSection}</SectionLabel>
+          <View style={{ marginTop: 10 }}>
+            <Group>
+              <Row
+                icon="file-text"
+                label={t.settings.legalTerms}
+                onPress={() => openLegal(TERMS_URL)}
+              />
+              <Divider />
+              <Row
+                icon="shield"
+                label={t.settings.legalPrivacy}
+                onPress={() => openLegal(PRIVACY_URL)}
+              />
+              <Divider />
+              <Row
+                icon="life-buoy"
+                label={t.settings.legalSupport}
+                onPress={() => openLegal(SUPPORT_URL)}
+              />
+            </Group>
+          </View>
+        </View>
 
         {/* logout — faint, never red */}
         <Pressable
