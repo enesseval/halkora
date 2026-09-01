@@ -310,6 +310,11 @@ export const tr = {
     menuShare: 'Halkayı paylaş',
     menuInvite: 'Kullanıcı adıyla davet et',
     menuSettings: 'Halka ayarları',
+    menuEndEarly: 'Halkayı erken bitir',
+    endEarlyConfirmTitle: 'Halkayı şimdi bitir?',
+    endEarlyConfirmBody:
+      'Halka bugünde donar ve bitiş ekranına geçer. Kalan günler kaçırılmış sayılmaz, ama kimse bir daha check-in yapamaz.',
+    endEarlyConfirm: 'Bitir',
     menuLeave: 'Halkadan ayrıl',
     inviteePending: 'davet edildi',
     undoHint: 'Geri almak için basılı tut',

@@ -475,6 +475,33 @@ export default function DetailScreen() {
     }
   };
 
+  /**
+   * "Erken bitir" had no way in. The button existed in MomentumSheet, but that
+   * sheet only opens when `momentumDemoId` is set and nothing in the app ever
+   * set it — openMomentumDemo is defined in the store and called from nowhere,
+   * and Detail destructures the hook without taking `open`. So the feature was
+   * unreachable, along with "Yeniden başlat" beside it (saha testi bulgusu —
+   * "erken bitir diye birşey yok").
+   *
+   * It belongs in the owner's menu: it is a founder action on a running ring,
+   * next to the ring's other founder actions.
+   */
+  const confirmEndEarly = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Alert.alert(t.detail.endEarlyConfirmTitle, t.detail.endEarlyConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.detail.endEarlyConfirm,
+        style: 'destructive',
+        // No navigation here on purpose: endEarly flips the local status to
+        // 'completed' and the effect above already moves to the finish
+        // screen the moment that happens. Replacing the route here too would
+        // race that effect.
+        onPress: () => actions.endEarly(),
+      },
+    ]);
+  };
+
   const confirmLeave = () => {
     if (leaving) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -580,9 +607,16 @@ export default function DetailScreen() {
     }
     if (challenge.isOwner) {
       options.push({ text: t.detail.menuSettings, onPress: () => setShowOwnerSettings(true) });
-    } else {
-      options.push({ text: t.detail.menuLeave, onPress: confirmLeave, style: 'destructive' });
+      // Only while it is actually running — ending a ring that is upcoming,
+      // in a lobby, or already over is an option that exists to do nothing.
+      if (challenge.status === 'active') {
+        options.push({ text: t.detail.menuEndEarly, onPress: confirmEndEarly, style: 'destructive' });
+      }
     }
+    // The owner may leave too: leave_challenge hands the ring to the
+    // earliest-joined member. Offering this only to members is why "kurucu
+    // grup ayarları kısmından sadece halkayı kapatabiliyor, ordan çıkamıyor".
+    options.push({ text: t.detail.menuLeave, onPress: confirmLeave, style: 'destructive' });
     Alert.alert(challenge.title, undefined, [
       ...options.map((o) => ({ text: o.text, onPress: o.onPress, style: o.style })),
       { text: t.common.cancel, style: 'cancel' as const },

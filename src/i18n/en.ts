@@ -306,6 +306,11 @@ export const en: Dictionary = {
     menuShare: 'Share this ring',
     menuInvite: 'Invite by username',
     menuSettings: 'Ring settings',
+    menuEndEarly: 'End the ring early',
+    endEarlyConfirmTitle: 'End the ring now?',
+    endEarlyConfirmBody:
+      "The ring freezes on today and moves to its finish screen. The remaining days don't count as missed, but nobody can check in again.",
+    endEarlyConfirm: 'End it',
     menuLeave: 'Leave this ring',
     inviteePending: 'invited',
     undoHint: 'Hold to undo',
