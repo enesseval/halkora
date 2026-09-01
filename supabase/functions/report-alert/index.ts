@@ -47,17 +47,40 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // The newest open report, read server-side rather than taken from the
-    // request body — a client could otherwise send whatever text it liked
-    // straight into the moderator's inbox.
-    const { data: report } = await admin
+    // WHICH report to describe. The caller names it, but every field in the
+    // mail is still read from the database — a client cannot put its own text
+    // in front of a moderator, which is the property the previous version was
+    // protecting. It got there by mailing "the newest open report" instead,
+    // and that is wrong as soon as two reports land close together: both
+    // invocations describe the second one and the first is never mentioned.
+    const body = await req.json().catch(() => ({}));
+    const reportId = typeof body?.report_id === 'string' ? body.report_id : null;
+
+    const query = admin
       .from('reports')
-      .select('id, reason, message_text, challenge_id, reported_user_id, created_at')
-      .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!report) return new Response(JSON.stringify({ ok: true }), { headers: cors });
+      .select('id, reason, message_text, challenge_id, reported_user_id, created_at, reporter_id');
+    const { data: report } = reportId
+      ? await query.eq('id', reportId).maybeSingle()
+      : await query
+          .eq('status', 'open')
+          .eq('reporter_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+    if (!report) {
+      console.log('report-alert: no report found', { reportId, reporter: user.id });
+      return new Response(JSON.stringify({ ok: true, mailed: false, reason: 'NO_REPORT' }), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+    // You may only trigger the alert for your own report.
+    if (report.reporter_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'NOT_YOUR_REPORT' }), {
+        status: 403,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
 
     const { count } = await admin
       .from('reports')
@@ -69,12 +92,21 @@ Deno.serve(async (req) => {
     const from = Deno.env.get('REPORT_EMAIL_FROM');
     if (!key || !to || !from) {
       // Not an error: the app works without mail configured, the report is
-      // stored either way. Logged so it's obvious why no mail arrived.
-      console.log('report-alert: mail not configured, report stored only', report.id);
-      return new Response(JSON.stringify({ ok: true, mailed: false }), { headers: cors });
+      // stored either way. Named individually so the log says WHICH secret is
+      // missing instead of "something isn't configured".
+      console.error('report-alert: mail not configured', {
+        RESEND_API_KEY: key ? 'set' : 'MISSING',
+        REPORT_EMAIL_TO: to ? 'set' : 'MISSING',
+        REPORT_EMAIL_FROM: from ? 'set' : 'MISSING',
+        report: report.id,
+      });
+      return new Response(
+        JSON.stringify({ ok: true, mailed: false, reason: 'MAIL_NOT_CONFIGURED' }),
+        { headers: { ...cors, 'Content-Type': 'application/json' } },
+      );
     }
 
-    const body = [
+    const mailBody = [
       `Yeni şikayet / New report`,
       ``,
       `Sebep / Reason: ${report.reason}`,
@@ -98,12 +130,29 @@ Deno.serve(async (req) => {
         from,
         to: [to],
         subject: `[Halkora] Şikayet: ${report.reason}`,
-        text: body,
+        text: mailBody,
       }),
     });
-    if (!res.ok) console.error('report-alert: mail failed', res.status, await res.text());
 
-    return new Response(JSON.stringify({ ok: true, mailed: res.ok }), {
+    // Resend's own words, verbatim, at error level. A rejected send is the
+    // single most likely reason a report never reaches the inbox — an
+    // unverified sending domain is rejected here, not at configuration time —
+    // and until now that answer was one line of console.error nobody read.
+    if (!res.ok) {
+      const detail = await res.text();
+      console.error('report-alert: RESEND REJECTED', res.status, detail, {
+        from,
+        to,
+        report: report.id,
+      });
+      return new Response(
+        JSON.stringify({ ok: true, mailed: false, reason: 'RESEND_REJECTED', status: res.status }),
+        { headers: { ...cors, 'Content-Type': 'application/json' } },
+      );
+    }
+    console.log('report-alert: mailed', report.id, 'to', to);
+
+    return new Response(JSON.stringify({ ok: true, mailed: true }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (e) {
