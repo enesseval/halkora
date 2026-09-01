@@ -79,11 +79,6 @@ export interface StakeOutcome {
   collectiveTarget?: number;
 }
 
-export interface Momentum {
-  last3: number[]; // e.g. [6, 4, 2]
-  total: number; // group size
-  daysTogether: number; // "9 gün birlikte devam ettiniz."
-}
 
 export interface Challenge {
   id: string;
@@ -148,7 +143,6 @@ export interface Challenge {
   stake?: Stake;
   participants: Participant[];
   messages: Message[];
-  momentum?: Momentum;
   // finish/E9
   finishStats?: { people: number; checkins: number; completionPct: number };
   // Halkora Pro — gelişmiş istatistikler (Faz 4). Yalnızca tamamlanmış

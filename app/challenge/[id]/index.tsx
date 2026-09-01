@@ -24,7 +24,6 @@ import {
   useChallengesQuery,
   useCheckIn,
   useChallengeActions,
-  useMomentumDemo,
   useRefreshChallenges,
   useChallengeMessages,
   useRealtimeChallenge,
@@ -49,7 +48,6 @@ import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
 import {
   JokerDaySheet,
   MissedDaySheet,
-  MomentumSheet,
   OwnerSettingsSheet,
   NudgeMessageSheet,
   ReportSheet,
@@ -146,7 +144,6 @@ export default function DetailScreen() {
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const { checkIn, undo, meCheckedInToday, myOrder, myCheckinTime } = useCheckIn(id ?? '');
   const actions = useChallengeActions(id ?? '');
-  const { momentumDemoId, close } = useMomentumDemo();
   const { refreshing, refresh } = useRefreshChallenges();
   const { firstLoadError: chatError, error: chatErrorDetail, retry: retryChat } = useChallengeMessages(id);
   useRealtimeChallenge(id);
@@ -406,7 +403,6 @@ export default function DetailScreen() {
     challenge.hasMissedYesterday &&
     challenge.missedAckDay !== challenge.currentDay &&
     !meCheckedInToday;
-  const showMomentum = momentumDemoId === challenge.id;
 
   // Gaps a joker could still fill. Only while the ring is running and only if
   // there's an allowance left — otherwise the ring shows no invitation to tap
@@ -476,12 +472,10 @@ export default function DetailScreen() {
   };
 
   /**
-   * "Erken bitir" had no way in. The button existed in MomentumSheet, but that
-   * sheet only opens when `momentumDemoId` is set and nothing in the app ever
-   * set it — openMomentumDemo is defined in the store and called from nowhere,
-   * and Detail destructures the hook without taking `open`. So the feature was
-   * unreachable, along with "Yeniden başlat" beside it (saha testi bulgusu —
-   * "erken bitir diye birşey yok").
+   * "Erken bitir" had no way in. Its button lived in a momentum sheet that
+   * nothing could open — the flag it keyed off was set from nowhere, and the
+   * data it rendered was only ever present in mock fixtures — so the feature
+   * was unreachable (saha testi bulgusu — "erken bitir diye birşey yok").
    *
    * It belongs in the owner's menu: it is a founder action on a running ring,
    * next to the ring's other founder actions.
@@ -1165,23 +1159,6 @@ export default function DetailScreen() {
           onUseJoker={actions.useJoker}
           onCheckInToday={checkIn}
           onDismiss={actions.ackMissed}
-        />
-      ) : null}
-
-      {/* E10 momentum */}
-      {showMomentum && challenge.momentum ? (
-        <MomentumSheet
-          momentum={challenge.momentum}
-          onRestart={() => {
-            actions.restart();
-            close();
-          }}
-          onEndEarly={() => {
-            actions.endEarly();
-            close();
-            router.replace(`/challenge/${challenge.id}/complete`);
-          }}
-          onClose={close}
         />
       ) : null}
 

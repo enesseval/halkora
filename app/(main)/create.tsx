@@ -228,7 +228,7 @@ function DayPickerTrigger({
  * platform's own convention, matching DateTimePicker below) for the custom
  * day count (1..max), presented as a real modal: blurred/dimmed backdrop +
  * slide-up sheet, same as every other picker/action in this app (Ek
- * MomentumSheet/UsernameSheet) — not an inline panel wedged into the page
+ * UsernameSheet) — not an inline panel wedged into the page
  * that pushes everything below it down.
  */
 function DayPickerSheet({

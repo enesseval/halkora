@@ -13,7 +13,6 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   insertChallenge,
   fetchMyChallenges,
-  restartChallenge,
   endChallengeEarly,
   updateChallengeDetails,
   deleteChallenge as deleteChallengeRemote,
@@ -45,7 +44,7 @@ import { Challenge, Participant } from '@/data/types';
 import { useT } from '@/i18n';
 
 // Re-export types + static config so screens have a single import source.
-export type { Challenge, Participant, Message, Stake, StakeOption, SegmentState, Momentum } from '@/data/types';
+export type { Challenge, Participant, Message, Stake, StakeOption, SegmentState } from '@/data/types';
 export type { CreateChallengeInput };
 export {
   ME_ID,
@@ -609,7 +608,6 @@ export function useChallengeActions(id: string) {
   const sendMessageMock = useMockStore((s) => s.sendMessage);
   const reactMock = useMockStore((s) => s.react);
   const nudgeMock = useMockStore((s) => s.nudge);
-  const restart = useMockStore((s) => s.restart);
   const endEarly = useMockStore((s) => s.endEarly);
   const removeChallengeMock = useMockStore((s) => s.removeChallenge);
   const startChallengeMock = useMockStore((s) => s.startChallenge);
@@ -697,14 +695,6 @@ export function useChallengeActions(id: string) {
     }
   };
 
-  const doRestart = () => {
-    restart(id); // optimistic: local state already reflects "restarted"
-    if (isSupabaseConfigured) {
-      restartChallenge(id)
-        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert(t.errors.restartFailed, friendlyErrorMessage(e)));
-    }
-  };
 
   /** Closes the stake. Awaited by the finish screen so it can show the error
    * inline; ALREADY_SETTLED counts as success — two members tapping at the
@@ -830,7 +820,6 @@ export function useChallengeActions(id: string) {
     sendMessage: doSendMessage,
     react: doReact,
     nudge: doNudge,
-    restart: doRestart,
     endEarly: doEndEarly,
     updateDetails: doUpdateDetails,
     settleStake: doSettleStake,
@@ -943,13 +932,6 @@ export function useJoin() {
   };
 }
 
-/** E10 momentum demo toggle (fired from Settings). */
-export function useMomentumDemo() {
-  const momentumDemoId = useMockStore((s) => s.momentumDemoId);
-  const open = useMockStore((s) => s.openMomentumDemo);
-  const close = useMockStore((s) => s.closeMomentumDemo);
-  return { momentumDemoId, open, close };
-}
 
 /* ---- derived helpers used across screens ---- */
 

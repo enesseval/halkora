@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
-import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
+import { ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { useMockStore } from '@/stores/mockStore';
 import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
@@ -101,7 +101,6 @@ function Group({ children }: { children: React.ReactNode }) {
 export default function SettingsScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useT();
-  const { open } = useMomentumDemo();
   const {
     configured,
     session,
@@ -364,15 +363,6 @@ export default function SettingsScreen() {
             <SectionLabel>{t.settings.demo}</SectionLabel>
             <View style={{ marginTop: 10 }}>
               <Group>
-                <Row
-                  icon="trending-down"
-                  label={t.settings.demoMomentum}
-                  onPress={() => {
-                    open('c1');
-                    router.push('/challenge/c1');
-                  }}
-                />
-                <Divider />
                 <Row
                   icon="flag"
                   label={t.settings.demoComplete}

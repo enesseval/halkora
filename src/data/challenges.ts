@@ -634,11 +634,6 @@ export async function fetchMyChallenges(): Promise<Challenge[]> {
   });
 }
 
-/** E10 "Yeniden başlat" — resets start_date to today and status to active. */
-export async function restartChallenge(challengeId: string): Promise<void> {
-  const { error } = await supabase.rpc('restart_challenge', { p_challenge_id: challengeId });
-  if (error) throw error;
-}
 
 /** E10 "Erken bitir" — marks the challenge completed. */
 export async function endChallengeEarly(challengeId: string): Promise<void> {

@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useLayout } from '@/theme/layout';
-import { Challenge, Momentum } from '@/data/types';
+import { Challenge } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
 import type { ReportReason } from '@/data/moderation';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -237,127 +237,6 @@ export function MissedDaySheet({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* E10 — Momentum bottom sheet (scrim + slide up)                       */
-/* ------------------------------------------------------------------ */
-export function MomentumSheet({
-  momentum,
-  onRestart,
-  onEndEarly,
-  onClose,
-}: {
-  momentum: Momentum;
-  onRestart: () => void;
-  onEndEarly: () => void;
-  onClose: () => void;
-}) {
-  const { t } = useT();
-  const { sideGutter } = useLayout();
-  const startDay = momentum.daysTogether - momentum.last3.length + 1;
-  return (
-    <Animated.View
-      entering={FadeIn.duration(200)}
-      style={[
-        {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: colors.scrim,
-          justifyContent: 'flex-end',
-          zIndex: 30,
-        },
-        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-      ]}
-    >
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <Animated.View
-        entering={SlideInDown.duration(280)}
-        style={{
-          backgroundColor: colors.bgSurface,
-          borderTopLeftRadius: radius.sheet,
-          borderTopRightRadius: radius.sheet,
-          borderWidth: hairline,
-          borderColor: colors.strokeSubtle,
-          paddingHorizontal: spacing.screenX,
-          paddingTop: 12,
-          paddingBottom: 36,
-        }}
-      >
-        <View
-          style={{
-            alignSelf: 'center',
-            width: 40,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: colors.strokeSubtle,
-            marginBottom: 20,
-          }}
-        />
-        <AppText variant="screenTitle" style={{ fontSize: 24 }}>
-          {t.detail.momentumTitle}
-        </AppText>
-        <AppText variant="secondary" style={{ marginTop: 8 }}>
-          {t.detail.momentumSubtitle}
-        </AppText>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            marginTop: 20,
-            backgroundColor: colors.bgElevated,
-            borderRadius: radius.card,
-            borderWidth: hairline,
-            borderColor: colors.strokeSubtle,
-            padding: 16,
-            gap: 12,
-            alignItems: 'center',
-          }}
-        >
-          {momentum.last3.map((n, i) => (
-            <View key={i} style={{ alignItems: 'center', flex: 1 }}>
-              <AppText variant="meta" color={colors.textTertiary} tabular>
-                {t.detail.momentumDay(startDay + i)}
-              </AppText>
-              <AppText
-                tabular
-                style={{ fontFamily: fonts.displayBold, fontSize: 22, color: colors.textPrimary, marginTop: 4 }}
-              >
-                {n}
-              </AppText>
-              <AppText variant="meta" color={colors.textTertiary} tabular>
-                {t.detail.momentumOutOf(momentum.total)}
-              </AppText>
-            </View>
-          ))}
-          <View style={{ flex: 1.4, paddingLeft: 8 }}>
-            <AppText variant="secondary" color={colors.textSecondary}>
-              {t.detail.momentumFootnote}
-            </AppText>
-          </View>
-        </View>
-
-        <View style={{ gap: 12, marginTop: 20 }}>
-          <Button label={t.detail.restart} onPress={onRestart} />
-          <Button label={t.detail.endEarly} variant="secondary" onPress={onEndEarly} />
-        </View>
-
-        <AppText
-          variant="meta"
-          color={colors.textTertiary}
-          tabular
-          style={{ textAlign: 'center', marginTop: 18 }}
-        >
-          {t.detail.daysTogether(momentum.daysTogether)}
-        </AppText>
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Ayarlar — görünen isim düzenleme (saha testi bulgusu, ROADMAP "MVP-öncesi") */
 /* ------------------------------------------------------------------ */
 export function NameSheet({
   visible,
