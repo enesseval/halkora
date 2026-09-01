@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
-import { useChallenge, useChallengesQuery, INVITE_JOINERS } from '@/hooks';
+import { useChallenge, useChallengesQuery, useRealtimeChallenge, INVITE_JOINERS } from '@/hooks';
 import type { Challenge, Participant } from '@/hooks';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { friendlyErrorMessage } from '@/lib/errors';
@@ -25,6 +25,11 @@ export default function InviteScreen() {
   const { t } = useT();
   const challenge = useChallenge(id);
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
+  // This screen is where you sit watching for people to accept, so it is the
+  // last place that should wait up to 60s for the next poll to notice
+  // (saha testi bulgusu — "davet ekranında katılanlar altındaki kısım anlık
+  // güncellenmiyor"). Detail already subscribes; this one never did.
+  useRealtimeChallenge(id);
   // The animated INVITE_JOINERS list is a Phase-1 demo-only flourish — a real
   // challenge shows its actual participants (already polled in by
   // useChallengesQuery above), never fake people "joining" live.

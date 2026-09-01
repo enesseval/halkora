@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
+import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
 import { colors } from '@/theme/tokens';
 import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
@@ -106,13 +107,22 @@ function useNotificationDeepLink(navigatorMounted: boolean) {
 
     const go = (data: unknown) => {
       const d = data as { challengeId?: string; inviteCode?: string } | undefined;
-      // An invite recipient isn't a participant yet — RLS blocks
-      // /challenge/{id}, so this routes to the public join-preview screen
-      // instead (docs/PHASE2-SUPABASE.md "Ek O" follow-up).
+      // dismissTo, not push. Every tap used to stack another screen: three
+      // notifications meant three ring screens to back out of one at a time,
+      // and tapping a notification for the ring you were already looking at
+      // put a second copy of it on top of the first (saha testi bulgusu —
+      // "3 kere girersem tek tek 3 ayrı halka detayını gördükten sonra ana
+      // ekrana erişebiliyorum").
+      //
+      // dismissTo pops back to that route if it is already in the stack and
+      // swaps its params, and pushes only when it isn't there. So the stack
+      // stays Home + one ring, however many notifications get tapped, and
+      // one back press always reaches Home. Same call the join flow already
+      // uses for the same reason (app/join/[code].tsx).
       if (d?.inviteCode) {
-        router.push(`/join/${d.inviteCode}`);
+        router.dismissTo(`/join/${d.inviteCode}`);
       } else if (d?.challengeId) {
-        router.push(`/challenge/${d.challengeId}`);
+        router.dismissTo(`/challenge/${d.challengeId}`);
       }
     };
 
@@ -126,7 +136,22 @@ function useNotificationDeepLink(navigatorMounted: boolean) {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       go(response.notification.request.content.data);
     });
-    return () => sub.remove();
+
+    // An invite that ARRIVES while the app is open should light the bell then
+    // and there, without waiting for the next poll and without depending on
+    // the invites table having been added to the realtime publication. The
+    // push already reached this device, so it is the most reliable signal
+    // available (saha testi bulgusu — "bildirim geliyor ama zil aktif
+    // olmuyor").
+    const received = Notifications.addNotificationReceivedListener((n) => {
+      const d = n.request.content.data as { inviteCode?: string } | undefined;
+      if (d?.inviteCode) queryClient.invalidateQueries({ queryKey: RECEIVED_INVITES_KEY });
+    });
+
+    return () => {
+      sub.remove();
+      received.remove();
+    };
   }, [navigatorMounted, router]);
 }
 

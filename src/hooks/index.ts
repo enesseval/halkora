@@ -560,6 +560,18 @@ function useRealtimeMyChallenges(): void {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'check_ins' }, bump)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, bump)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, bump)
+      .on(
+        // An invite is the one thing that arrives for someone who is not in
+        // the challenge yet, so no per-challenge subscription can ever carry
+        // it. Without this the bell only appeared on the next 60s poll, or
+        // whenever Home happened to remount — which read as "zil ancak
+        // uygulamayı yeniden başlatınca geliyor". Unfiltered like the rest:
+        // realtime only delivers rows the subscriber's own RLS lets them see,
+        // and `invites` is readable by its recipient.
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invites' },
+        () => queryClient.invalidateQueries({ queryKey: RECEIVED_INVITES_KEY }),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
