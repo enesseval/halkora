@@ -6,10 +6,20 @@
 //
 // Design: deletes/removes the calling user's OWN rows everywhere (messages,
 // reactions, nudges, stake votes, push token, participant rows — which
-// cascades their check-ins) without touching anyone else's data. Challenges
-// they OWN are not destroyed just because the owner left — owner_id is
-// nulled so the group keeps its history — UNLESS that challenge no longer
-// has any participants at all, in which case it's cleaned up too.
+// cascades their check-ins) without touching anyone else's data.
+//
+// Challenges they OWN are handed to somebody. They used to have owner_id set
+// to NULL, which kept the history but left the ring with no founder at all:
+// nobody could edit it, invite to it, end it or close it, and the chat never
+// said what had happened (saha testi bulgusu — "kurduğu halka duruyor ama
+// sahipliği başkasına geçmiyor, mesajlarda ayrıldı diye gözükmeli").
+//
+// The new owner is chosen by pick_new_owner: the earliest-joined member who
+// still has room under the free plan, so a handover can't quietly push
+// someone past the limit they'd hit creating the same ring themselves. If
+// nobody has room the ring is CLOSED rather than deleted — the remaining
+// members keep their history — and only a ring with no participants left at
+// all is removed.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -43,10 +53,74 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return fail('INVALID_SESSION', 401);
     const userId = userData.user.id;
 
+    const body = await req.json().catch(() => ({}));
+    const tr = body?.locale !== 'en';
+
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
+
+    // Read the name BEFORE anything is deleted — profiles cascades with the
+    // user, and the handover note has to be able to say who left.
+    const { data: me } = await admin
+      .from('profiles')
+      .select('name')
+      .eq('id', userId)
+      .maybeSingle();
+    const myName = (me?.name as string) ?? (tr ? 'Bir üye' : 'A member');
+
+    // Hand over every ring this user owns, before their own rows go. Each
+    // note is written as the NEW owner: a message authored by the departing
+    // user would cascade away with them a few lines further down.
+    const { data: ownedNow } = await admin
+      .from('challenges')
+      .select('id')
+      .eq('owner_id', userId);
+
+    for (const ch of ownedNow ?? []) {
+      const challengeId = ch.id as string;
+      const { data: nextOwner } = await admin.rpc('pick_new_owner', {
+        p_challenge_id: challengeId,
+        p_leaving: userId,
+      });
+
+      const { data: lastMsg } = await admin
+        .from('messages')
+        .select('day_number')
+        .eq('challenge_id', challengeId)
+        .order('day_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const day = (lastMsg?.day_number as number) ?? 0;
+
+      if (nextOwner) {
+        const { data: owner } = await admin
+          .from('profiles')
+          .select('name')
+          .eq('id', nextOwner as string)
+          .maybeSingle();
+        const ownerName = (owner?.name as string) ?? (tr ? 'bir üye' : 'a member');
+        await admin.from('challenges').update({ owner_id: nextOwner }).eq('id', challengeId);
+        await admin.from('messages').insert({
+          challenge_id: challengeId,
+          user_id: nextOwner,
+          day_number: day,
+          kind: 'system',
+          text: tr
+            ? `${myName} ayrıldı. Halkanın yöneticisi artık ${ownerName}.`
+            : `${myName} left. ${ownerName} is the ring's owner now.`,
+          notify_others: true,
+        });
+      } else {
+        // Nobody left, or nobody with room. Closing keeps everyone's history;
+        // an empty ring is removed further down.
+        await admin
+          .from('challenges')
+          .update({ owner_id: null, status: 'closed', closed_at: new Date().toISOString() })
+          .eq('id', challengeId);
+      }
+    }
 
     // Order matters: remove every row that references auth.users directly
     // BEFORE calling admin.deleteUser() below, so nothing is left blocking
@@ -65,19 +139,15 @@ Deno.serve(async (req) => {
     await admin.from('push_tokens').delete().eq('user_id', userId);
     await admin.from('participants').delete().eq('user_id', userId);
 
-    // Challenges this user created: keep them for the rest of the group
-    // (owner_id -> null) unless nobody's left in them at all.
-    const { data: owned } = await admin.from('challenges').select('id').eq('owner_id', userId);
-    if (owned && owned.length > 0) {
-      await admin.from('challenges').update({ owner_id: null }).eq('owner_id', userId);
-      for (const challenge of owned) {
-        const { count } = await admin
-          .from('participants')
-          .select('id', { count: 'exact', head: true })
-          .eq('challenge_id', challenge.id as string);
-        if (!count) {
-          await admin.from('challenges').delete().eq('id', challenge.id as string);
-        }
+    // Anything handed over above that turned out to have nobody left in it is
+    // removed outright — an empty ring is not history worth keeping.
+    for (const ch of ownedNow ?? []) {
+      const { count } = await admin
+        .from('participants')
+        .select('id', { count: 'exact', head: true })
+        .eq('challenge_id', ch.id as string);
+      if (!count) {
+        await admin.from('challenges').delete().eq('id', ch.id as string);
       }
     }
 

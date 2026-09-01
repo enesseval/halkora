@@ -466,7 +466,7 @@ async function signOut(): Promise<void> {
  * no longer exists.
  */
 async function deleteAccount(): Promise<void> {
-  await deleteAccountRequest();
+  await deleteAccountRequest(useI18nStore.getState().locale);
   // The server-side user is gone, but supabase-js still holds its JWT locally
   // — drop it so the next Apple sign-in gets a clean SIGNED_IN under the new
   // user instead of piggybacking on a dead session.

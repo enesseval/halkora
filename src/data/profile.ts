@@ -53,7 +53,14 @@ export async function saveMessagePreviewPref(userId: string, preview: boolean): 
  * server-side under the `delete-account` Edge Function so it can call the
  * admin API; see docs/PHASE2-SUPABASE.md "Ek L" for what it removes/keeps.
  */
-export async function deleteAccount(): Promise<void> {
-  const { error } = await supabase.functions.invoke('delete-account');
+export async function deleteAccount(locale: string): Promise<void> {
+  // The locale travels with the request because the handover note the
+  // function writes into each ring's chat is built server-side — the same
+  // pattern settle_stake uses. It can't come from the client as finished
+  // text: the note names the NEW owner, and only the server knows who that
+  // turned out to be.
+  const { error } = await supabase.functions.invoke('delete-account', {
+    body: { locale },
+  });
   if (error) throw await edgeFunctionError(error);
 }
