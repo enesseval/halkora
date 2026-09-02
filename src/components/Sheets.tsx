@@ -465,16 +465,27 @@ export function UsernameSheet({
 /* ------------------------------------------------------------------ */
 /* Detay ekranı — kurucu ayarları (Faz 3C, docs "Ek O3")               */
 /* ------------------------------------------------------------------ */
+/**
+ * Same caps as creating a ring (app/(main)/create.tsx). Without them the
+ * owner could edit past a limit the create screen enforces, which is the
+ * same string ending up somewhere it doesn't fit by a different door.
+ */
+const TITLE_MAX = 40;
+const ACTION_MAX = 60;
+const STAKE_MAX = 60;
+
 function EditField({
   label,
   value,
   onChangeText,
   placeholder,
+  maxLength,
 }: {
   label: string;
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
+  maxLength?: number;
 }) {
   return (
     <View style={{ marginTop: 16 }}>
@@ -486,6 +497,7 @@ function EditField({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textTertiary}
+        maxLength={maxLength}
         style={{
           height: 50,
           backgroundColor: colors.bgElevated,
@@ -583,17 +595,24 @@ export function OwnerSettingsSheet({
           {t.detail.ownerSettingsTitle}
         </AppText>
 
-        <EditField label={t.detail.ownerSettingsTitleLabel} value={title} onChangeText={setTitle} />
+        <EditField
+          label={t.detail.ownerSettingsTitleLabel}
+          value={title}
+          onChangeText={setTitle}
+          maxLength={TITLE_MAX}
+        />
         <EditField
           label={t.detail.ownerSettingsDailyActionLabel}
           value={dailyAction}
           onChangeText={setDailyAction}
+          maxLength={ACTION_MAX}
         />
         <EditField
           label={t.detail.ownerSettingsStakeLabel}
           value={stakeText}
           onChangeText={setStakeText}
           placeholder={t.detail.ownerSettingsStakePlaceholder}
+          maxLength={STAKE_MAX}
         />
 
         {error ? (

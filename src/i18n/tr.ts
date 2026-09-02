@@ -204,7 +204,7 @@ export const tr = {
     titles: ['Ne yapacaksınız?', 'Kaç gün?', 'Joker hakkı', 'Bahis'],
     challengeName: 'Challenge adı',
     challengeNamePlaceholder: '30 Gün Kitap Okuma',
-    dailyActionLabel: 'Günlük aksiyon',
+    dailyActionLabel: 'Günlük eylem',
     dailyActionPlaceholder: 'ör. 20 sayfa oku',
     custom: 'Özel',
     start: 'Başlangıç',

@@ -40,6 +40,21 @@ interface AuthState {
   // push notification, or just "X sent a message" (Settings toggle).
   // Defaults true (matches the column's own DB default) until loaded.
   messagePreview: boolean;
+  /**
+   * The name Apple handed back at sign-in, kept so onboarding can start with
+   * it filled in instead of an empty field.
+   *
+   * Apple only returns fullName on the FIRST authorization for an app — after
+   * that the credential comes back with it null forever. We were discarding
+   * it, so the one moment the name was available was also the moment it was
+   * thrown away, and everyone typed a name the phone had just told us
+   * (saha testi bulgusu — "apple ile girişte adı alıp onboardingdeki ad
+   * kısmını otomatik doldurmak?").
+   *
+   * A suggestion, not a decision: onboarding seeds the field with it and the
+   * person edits or replaces it like any other text.
+   */
+  appleSuggestedName: string | null;
 }
 
 const useAuthStore = create<AuthState>(() => ({
@@ -49,7 +64,17 @@ const useAuthStore = create<AuthState>(() => ({
   username: null,
   isPro: false,
   messagePreview: true,
+  appleSuggestedName: null,
 }));
+
+/** "Selin" + "Nur" -> "Selin Nur"; nothing usable -> null. */
+function nameFromApple(
+  fullName: AppleAuthentication.AppleAuthenticationFullName | null | undefined,
+): string | null {
+  const parts = [fullName?.givenName, fullName?.familyName].filter(Boolean);
+  const joined = parts.join(' ').trim();
+  return joined.length > 0 ? joined : null;
+}
 
 /**
  * Wipes every piece of per-ACCOUNT client state so the next sign-in on this
@@ -372,11 +397,14 @@ async function signInWithApple(): Promise<void> {
     throw e;
   }
   if (!credential.identityToken) throw new Error(getDict().errors.appleIncomplete);
+  const suggested = nameFromApple(credential.fullName);
   const { error } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
     token: credential.identityToken,
   });
   if (error) throw error;
+  // After the sign-in, so a failed one doesn't leave a suggestion behind.
+  if (suggested) useAuthStore.setState({ appleSuggestedName: suggested });
 }
 
 /**
@@ -528,6 +556,7 @@ export function useAuth() {
   const username = useAuthStore((s) => s.username);
   const isPro = useAuthStore((s) => s.isPro);
   const messagePreview = useAuthStore((s) => s.messagePreview);
+  const appleSuggestedName = useAuthStore((s) => s.appleSuggestedName);
   return {
     ready,
     session,
@@ -538,6 +567,7 @@ export function useAuth() {
     username,
     isPro,
     messagePreview,
+    appleSuggestedName,
     needsOnboarding: !!session && !name,
     signInAnonymously,
     signInWithApple,
