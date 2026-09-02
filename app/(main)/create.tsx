@@ -228,7 +228,7 @@ function DayPickerTrigger({
  * platform's own convention, matching DateTimePicker below) for the custom
  * day count (1..max), presented as a real modal: blurred/dimmed backdrop +
  * slide-up sheet, same as every other picker/action in this app (Ek
- * MomentumSheet/UsernameSheet) — not an inline panel wedged into the page
+ * UsernameSheet) — not an inline panel wedged into the page
  * that pushes everything below it down.
  */
 function DayPickerSheet({
@@ -334,18 +334,29 @@ function Dots({ step }: { step: number }) {
   );
 }
 
+/**
+ * Character caps. Chosen from where these strings actually have to fit: a
+ * home card's title line, the ring's centre, and the 360pt share image.
+ */
+const TITLE_MAX = 40;
+const ACTION_MAX = 60;
+const STAKE_MAX = 60;
+
 function Field({
   label,
   value,
   onChangeText,
   placeholder,
   autoFocus,
+  maxLength,
 }: {
   label: string;
   value: string;
   onChangeText: (t: string) => void;
   placeholder: string;
   autoFocus?: boolean;
+  /** Hard cap, enforced by the native input. */
+  maxLength?: number;
 }) {
   return (
     <View style={{ marginTop: 20 }}>
@@ -358,6 +369,15 @@ function Field({
         placeholder={placeholder}
         placeholderTextColor={colors.textTertiary}
         autoFocus={autoFocus}
+        // These strings are drawn into fixed places — a home card, the ring's
+        // centre, a 360pt share image — where the only thing an unbounded
+        // title can do is get truncated with an ellipsis. Better to stop the
+        // typing than to accept text the app can't show (saha testi bulgusu
+        // — "taşacak kısım 3 nokta ile devam ettiriliyor, ama limit
+        // koymalıyız"). maxLength is the one place it's right to refuse a
+        // keystroke: the native input never shows the character at all, so
+        // there is nothing to flicker.
+        maxLength={maxLength}
         style={{
           height: 54,
           backgroundColor: colors.bgSurface,
@@ -586,8 +606,20 @@ export default function CreateScreen() {
                 />
               ))}
             </View>
-            <Field label={t.create.challengeName} value={title} onChangeText={setTitle} placeholder={t.create.challengeNamePlaceholder} />
-            <Field label={t.create.dailyActionLabel} value={action} onChangeText={setAction} placeholder={t.create.dailyActionPlaceholder} />
+            <Field
+              label={t.create.challengeName}
+              value={title}
+              onChangeText={setTitle}
+              placeholder={t.create.challengeNamePlaceholder}
+              maxLength={TITLE_MAX}
+            />
+            <Field
+              label={t.create.dailyActionLabel}
+              value={action}
+              onChangeText={setAction}
+              placeholder={t.create.dailyActionPlaceholder}
+              maxLength={ACTION_MAX}
+            />
           </>
         ) : null}
 
@@ -846,7 +878,13 @@ export default function CreateScreen() {
                     />
                   ))}
                 </View>
-                <Field label={t.create.stakeCustomLabel} value={stakeText} onChangeText={setStakeText} placeholder={t.create.stakeCustomPlaceholder} />
+                <Field
+                  label={t.create.stakeCustomLabel}
+                  value={stakeText}
+                  onChangeText={setStakeText}
+                  placeholder={t.create.stakeCustomPlaceholder}
+                  maxLength={STAKE_MAX}
+                />
               </>
             ) : (
               <>
@@ -929,6 +967,7 @@ export default function CreateScreen() {
                   value={stakeText}
                   onChangeText={setStakeText}
                   placeholder={t.create.stakeCollectivePlaceholder}
+                  maxLength={STAKE_MAX}
                 />
               </>
             )}

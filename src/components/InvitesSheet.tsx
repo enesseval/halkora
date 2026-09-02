@@ -1,14 +1,15 @@
 import { useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { dismissInvite, fetchReceivedInvites, type ReceivedInvite } from '@/data/invites';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { useT } from '@/i18n';
 import { AppText } from './ui';
 
@@ -57,6 +58,7 @@ export function InvitesSheet({
   onChanged: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -74,7 +76,7 @@ export function InvitesSheet({
       await dismissInvite(invite.id);
       onChanged();
     } catch (e) {
-      Alert.alert(t.invites.declineFailed, friendlyErrorMessage(e));
+      alertOnce(t.invites.declineFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -83,7 +85,7 @@ export function InvitesSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim }}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
 
           <Animated.View
@@ -216,7 +218,21 @@ export function InvitesBell({ count, onPress }: { count: number; onPress: () => 
           justifyContent: 'center',
         }}
       >
-        <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.bgBase }}>
+        {/* Explicit lineHeight matching the badge, and no font scaling: a
+            digit in a 16pt circle has nowhere to go. Left to its own line
+            box, Satoshi's asymmetric ascent/descent parks it low and slightly
+            off-centre (saha testi bulgusu — "bildirim zili içindeki sayı
+            konumu hatalı"). */}
+        <AppText
+          allowFontScaling={false}
+          style={{
+            fontFamily: fonts.bodyMedium,
+            fontSize: 10,
+            lineHeight: 16,
+            textAlign: 'center',
+            color: colors.bgBase,
+          }}
+        >
           {count > 9 ? '9+' : count}
         </AppText>
       </View>

@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { AppText, Button } from './ui';
 import { InviteCard, STORY_H, STORY_W, SQUARE, type InviteCardFormat } from './InviteCard';
 import { inviteUrl } from '@/lib/invite';
@@ -62,6 +63,7 @@ export function ShareRingSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const [format, setFormat] = useState<InviteCardFormat>('story');
   const [busy, setBusy] = useState(false);
   const shotRef = useRef<View>(null);
@@ -69,14 +71,25 @@ export function ShareRingSheet({
   const link = inviteUrl(challenge.inviteCode);
   const scale = PREVIEW_W / (format === 'story' ? STORY_W : SQUARE);
 
-  const capture = async (): Promise<string> =>
-    captureRef(shotRef, {
+  const capture = async (): Promise<string> => {
+    const path = await captureRef(shotRef, {
       format: 'png',
       quality: 1,
       // The card is laid out at 360pt wide; capturing at the device's pixel
       // ratio is what makes a 3x phone produce the 1080px the design targets.
       result: 'tmpfile',
     });
+    // `tmpfile` hands back a bare filesystem path on iOS, with no scheme.
+    // Share.share({ url }) needs a real URL: given a plain path it treats the
+    // value as text, and an activity sheet built from text has no "Save
+    // Image" in it — which is exactly what was missing (saha testi bulgusu —
+    // "hala fotoğraflara kaydetme olayı yok"). No permission plumbing is
+    // needed beyond this; iOS asks for Photos access itself when the person
+    // taps Save.
+    return path.startsWith('file://') || path.startsWith('content://')
+      ? path
+      : `file://${path}`;
+  };
 
   /**
    * Image and link together.
@@ -172,7 +185,7 @@ export function ShareRingSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim }}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
 
           <Animated.View

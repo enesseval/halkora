@@ -269,9 +269,12 @@ function NotifStep() {
 export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useT();
-  const { saveName, ensureUsername } = useAuth();
+  const { saveName, ensureUsername, appleSuggestedName } = useAuth();
   const [step, setStep] = useState(0); // 0,1,2 intro · 3 name · 4 notifications
-  const [name, setName] = useState('');
+  // Seeded with whatever Apple handed back at sign-in — a suggestion, edited
+  // or replaced like any other text. Apple only returns it on the very first
+  // authorization, so this is the one chance to use it.
+  const [name, setName] = useState(appleSuggestedName ?? '');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [askingPermission, setAskingPermission] = useState(false);

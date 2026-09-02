@@ -1,7 +1,7 @@
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { View } from 'react-native';
 import { colors, fonts } from '@/theme/tokens';
-import { AppText } from './ui';
+import { AppText, FixedType } from './ui';
 import { useT } from '@/i18n';
 import type { Challenge } from '@/data/types';
 
@@ -87,6 +87,19 @@ const RING = {
  * mapped onto those eight.
  */
 const LOGO_SEGMENTS = 8;
+/**
+ * The share ring's own geometry, matched to the app's.
+ *
+ * It used to borrow the wordmark's 12° gaps, and that is twice what
+ * ProgressRing draws on every screen (6°) — so the card's ring read as a
+ * different, airier object than the one people had been looking at all week
+ * (saha testi bulgusu — "parçaların arası çok açık, uygulamanın diğer
+ * noktalarında gösterdiğimiz görsellerle aynı değil"). The wordmark keeps
+ * the logo's spacing below; it IS the logo.
+ */
+const RING_GAP = 6;
+const RING_SPAN = 360 / 8 - RING_GAP;
+
 /** Straight from the wordmark below: 33° of arc, 12° of gap. */
 const LOGO_SPAN = 33;
 const LOGO_GAP = 12;
@@ -141,7 +154,7 @@ function ShareRing({
         {Array.from({ length: LOGO_SEGMENTS }, (_, i) => (
           <Path
             key={i}
-            d={arcPath(cx, cy, r, i * step + LOGO_GAP / 2, i * step + LOGO_GAP / 2 + LOGO_SPAN)}
+            d={arcPath(cx, cy, r, i * step + RING_GAP / 2, i * step + RING_GAP / 2 + RING_SPAN)}
             stroke={i < lit ? colors.ember : colors.waiting}
             strokeWidth={stroke}
             // Butt, like every other ring in the app — the home cards, the
@@ -275,6 +288,13 @@ export function InviteCard({
   // runs) pushed into the small line under it. For these the day count is
   // the headline and the missing date is stated plainly instead.
   const undated = challenge.status === 'lobby';
+  /**
+   * A ring whose join window has shut. The detail menu already hides "invite"
+   * for this, but the shared card still said "katılabilirsin" — an image
+   * inviting people into something they cannot enter (saha testi bulgusu —
+   * "sanki birini davet edebilecekmişim gibi").
+   */
+  const joinsClosed = !!challenge.firstDayJoinOnly && challenge.currentDay > 1;
   /** The ring's big line, and the day counter that shares its slot. */
   const counter = format === 'square' ? u(84) : u(112);
   const headline = undated ? counter : format === 'square' ? u(52) : u(72);
@@ -452,7 +472,9 @@ export function InviteCard({
             : t.shareCard.askGroup
           : finished
             ? t.shareCard.closed
-            : t.shareCard.stillOpen}
+            : joinsClosed
+              ? t.shareCard.joinClosed
+              : t.shareCard.stillOpen}
       </AppText>
 
       <AppText
@@ -476,8 +498,12 @@ export function InviteCard({
     </View>
   );
 
+  // Both formats are a fixed w x h box captured to an image, so nothing in
+  // them may follow the system text-size setting — the box cannot grow with
+  // the text, so scaled type overflows the card that gets shared.
   if (format === 'square') {
     return (
+      <FixedType>
       <View style={{ width: w, height: h, overflow: 'hidden' }}>
         <Backdrop w={w} h={h} />
         <View
@@ -497,10 +523,12 @@ export function InviteCard({
           </View>
         </View>
       </View>
+      </FixedType>
     );
   }
 
   return (
+    <FixedType>
     <View style={{ width: w, height: h, overflow: 'hidden' }}>
       <Backdrop w={w} h={h} />
       <View
@@ -518,5 +546,6 @@ export function InviteCard({
         {foot}
       </View>
     </View>
+    </FixedType>
   );
 }

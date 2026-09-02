@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { codeProblem, extractCode } from '@/lib/invite';
 import { useClipboardCode } from '@/hooks/useClipboardCode';
 import { useCreateGate } from '@/hooks';
@@ -78,6 +79,7 @@ export function QuickStartSheet({
 }) {
   const router = useRouter();
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const canCreate = useCreateGate();
   const keyboardHeight = useKeyboardHeight();
   const [mode, setMode] = useState<'choose' | 'join'>('choose');
@@ -144,7 +146,12 @@ export function QuickStartSheet({
       {/* Live keyboard-height padding, not KeyboardAvoidingView — KAV
           mis-measures inside absolute overlays (relative frame vs the
           keyboard's screen coords) and left the join-code input covered. */}
-      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+      <View
+        style={[
+          { flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight },
+          sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+        ]}
+      >
       <Pressable style={{ flex: 1 }} onPress={onClose} />
       <Animated.View
         entering={SlideInDown.duration(260)}

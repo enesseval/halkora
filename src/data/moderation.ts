@@ -94,18 +94,30 @@ export async function reportMessage(input: {
   reason: ReportReason;
 }): Promise<void> {
   const me = await requireUser();
-  const { error } = await supabase.from('reports').insert({
-    reporter_id: me,
-    reported_user_id: input.reportedUserId,
-    message_id: input.messageId,
-    challenge_id: input.challengeId,
-    message_text: input.messageText,
-    reason: input.reason,
-  });
+  const { data, error } = await supabase
+    .from('reports')
+    .insert({
+      reporter_id: me,
+      reported_user_id: input.reportedUserId,
+      message_id: input.messageId,
+      challenge_id: input.challengeId,
+      message_text: input.messageText,
+      reason: input.reason,
+    })
+    .select('id')
+    .single();
   if (error) throw error;
 
-  // Tell the moderator inbox. Deliberately not awaited into failure: the
-  // report is already stored, and a mail outage must not make the person
-  // think their report was lost.
-  supabase.functions.invoke('report-alert', { body: { reporter: me } }).catch(() => {});
+  // Tell the moderator inbox about THIS report. Naming it matters: the
+  // function used to mail whichever open report was newest, so two reports
+  // landing close together both described the second one and the first was
+  // never mentioned. The mail's contents are still read from the database
+  // server-side, so naming the row gives a client no way to write into a
+  // moderator's inbox.
+  //
+  // Deliberately not awaited into failure: the report is already stored, and
+  // a mail outage must not make the person think their report was lost.
+  supabase.functions
+    .invoke('report-alert', { body: { report_id: data.id } })
+    .catch(() => {});
 }

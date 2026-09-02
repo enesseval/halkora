@@ -35,8 +35,6 @@ export interface CreateChallengeInput {
 
 interface MockState {
   challenges: Challenge[];
-  /** demo toggle so E10 momentum sheet can be forced from Settings */
-  momentumDemoId: string | null;
 
   // actions
   checkIn: (id: string) => void;
@@ -59,7 +57,6 @@ interface MockState {
   /** Replace one challenge's messages (Supabase-fetched, real ids). */
   setChallengeMessages: (id: string, messages: Message[]) => void;
   joinByCode: (code: string, name: string) => string;
-  restart: (id: string) => void;
   endEarly: (id: string) => void;
   removeChallenge: (id: string) => void;
   /** Lobby → started (mock mode has no real dates, so this just flips the
@@ -72,8 +69,6 @@ interface MockState {
   settleStake: (id: string) => void;
   /** Faz 3C madde 3 — owner-only edit of title/daily action/stake text. */
   updateDetails: (id: string, title: string, dailyAction: string, stakeText: string) => void;
-  openMomentumDemo: (id: string) => void;
-  closeMomentumDemo: () => void;
 }
 
 /** Deep clone the seed so store mutations never touch the source module. */
@@ -98,7 +93,6 @@ function firstName(full: string): string {
 
 export const useMockStore = create<MockState>((set, get) => ({
   challenges: initialChallenges(),
-  momentumDemoId: null,
 
   checkIn: (id) =>
     set((s) => ({
@@ -343,30 +337,6 @@ export const useMockStore = create<MockState>((set, get) => ({
     return 'c1';
   },
 
-  restart: (id) =>
-    set((s) => ({
-      challenges: s.challenges.map((c) => {
-        if (c.id !== id) return c;
-        return {
-          ...c,
-          status: 'active',
-          currentDay: 1,
-          days: buildDays(c.totalDays, ['today']),
-          meCheckedInToday: false,
-          myCheckinTime: undefined,
-          myOrder: undefined,
-          hasMissedYesterday: false,
-          missedAckDay: 1,
-          participants: c.participants.map((p) => ({
-            ...p,
-            checkedInToday: false,
-            checkinTime: undefined,
-          })),
-        };
-      }),
-      momentumDemoId: null,
-    })),
-
   endEarly: (id) =>
     set((s) => ({
       challenges: s.challenges.map((c) =>
@@ -381,7 +351,6 @@ export const useMockStore = create<MockState>((set, get) => ({
             }
           : c,
       ),
-      momentumDemoId: null,
     })),
 
   removeChallenge: (id) =>
@@ -427,9 +396,6 @@ export const useMockStore = create<MockState>((set, get) => ({
         };
       }),
     })),
-
-  openMomentumDemo: (id) => set({ momentumDemoId: id }),
-  closeMomentumDemo: () => set({ momentumDemoId: null }),
 
   updateDetails: (id, title, dailyAction, stakeText) => {
     const t = getDict();

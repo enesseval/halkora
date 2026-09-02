@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import { queryClient } from '@/lib/queryClient';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { fetchBlocked, unblockUser, type BlockedPerson } from '@/data/moderation';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { useT } from '@/i18n';
 import { AppText } from './ui';
 
@@ -19,6 +21,7 @@ export function BlockedSheet({ onClose }: { onClose: () => void }) {
   const { t } = useT();
   const [people, setPeople] = useState<BlockedPerson[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { sideGutter } = useLayout();
 
   useEffect(() => {
     let alive = true;
@@ -39,8 +42,14 @@ export function BlockedSheet({ onClose }: { onClose: () => void }) {
     try {
       await unblockUser(person.userId);
       setPeople((prev) => (prev ?? []).filter((p) => p.userId !== person.userId));
+      // Their messages come back through the same RLS policy that hid them,
+      // but only on the next fetch — without this the chat keeps showing the
+      // blocked-out version until something else happens to refetch it.
+      // No challenge id here (this sheet lives in Settings), so every chat
+      // gets invalidated; they're small and only the open one refetches.
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
     } catch (e) {
-      Alert.alert(t.moderation.unblockFailed, friendlyErrorMessage(e));
+      alertOnce(t.moderation.unblockFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -52,7 +61,7 @@ export function BlockedSheet({ onClose }: { onClose: () => void }) {
         entering={FadeIn.duration(180)}
         style={{ flex: 1, backgroundColor: colors.scrim }}
       >
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
           <Animated.View
             entering={SlideInDown.duration(260)}

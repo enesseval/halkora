@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import * as Notifications from 'expo-notifications';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import type { Session } from '@supabase/supabase-js';
+import { isAuthApiError, isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { useMockStore } from '@/stores/mockStore';
@@ -39,6 +40,21 @@ interface AuthState {
   // push notification, or just "X sent a message" (Settings toggle).
   // Defaults true (matches the column's own DB default) until loaded.
   messagePreview: boolean;
+  /**
+   * The name Apple handed back at sign-in, kept so onboarding can start with
+   * it filled in instead of an empty field.
+   *
+   * Apple only returns fullName on the FIRST authorization for an app — after
+   * that the credential comes back with it null forever. We were discarding
+   * it, so the one moment the name was available was also the moment it was
+   * thrown away, and everyone typed a name the phone had just told us
+   * (saha testi bulgusu — "apple ile girişte adı alıp onboardingdeki ad
+   * kısmını otomatik doldurmak?").
+   *
+   * A suggestion, not a decision: onboarding seeds the field with it and the
+   * person edits or replaces it like any other text.
+   */
+  appleSuggestedName: string | null;
 }
 
 const useAuthStore = create<AuthState>(() => ({
@@ -48,7 +64,17 @@ const useAuthStore = create<AuthState>(() => ({
   username: null,
   isPro: false,
   messagePreview: true,
+  appleSuggestedName: null,
 }));
+
+/** "Selin" + "Nur" -> "Selin Nur"; nothing usable -> null. */
+function nameFromApple(
+  fullName: AppleAuthentication.AppleAuthenticationFullName | null | undefined,
+): string | null {
+  const parts = [fullName?.givenName, fullName?.familyName].filter(Boolean);
+  const joined = parts.join(' ').trim();
+  return joined.length > 0 ? joined : null;
+}
 
 /**
  * Wipes every piece of per-ACCOUNT client state so the next sign-in on this
@@ -128,6 +154,34 @@ export async function awaitProUnlock(attempts = 6, gapMs = 1500): Promise<boolea
 }
 
 /**
+ * Is this error the server telling us the session is genuinely dead?
+ *
+ * getUser() reports EVERYTHING through the same `error` field — a deleted
+ * user, a 500, a timeout, a dropped connection. Treating all of them alike
+ * signs people out of their own account on a momentary network blip, and
+ * because the app then starts a fresh anonymous session they land back in
+ * onboarding with a brand-new account and no data (saha testi bulgusu:
+ * "1 kere satın almayı yeniledikten sonra onboardinge tekrar atıp yeni hesap
+ * oluşturttu" — restoring a purchase is exactly the moment the app is
+ * bouncing through the App Store and a request is most likely to fail).
+ *
+ * So only a definitive 4xx from the auth API ends a session. Anything the
+ * client couldn't get an answer to leaves the cached session alone; the very
+ * next request retries it, and a session that really is dead surfaces as a
+ * clean auth error instead of silent data loss.
+ */
+function sessionRejectedByServer(error: unknown): boolean {
+  // Network/transport failures are explicitly retryable — never fatal.
+  if (isAuthRetryableFetchError(error)) return false;
+  // Anything that isn't an answer from the auth API (unknown/parse errors)
+  // says nothing about whether the user still exists.
+  if (!isAuthApiError(error)) return false;
+  const status = error.status;
+  // 408 request timeout and 429 rate limit are transient despite being 4xx.
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+/**
  * Call once from the root layout. Restores the persisted session and keeps
  * the store in sync with Supabase auth changes.
  */
@@ -151,7 +205,7 @@ export function useAuthInit(): void {
         // cryptic FK error (e.g. "participants_user_id_fkey") instead of a
         // clean "please sign in again". Validate against the server up front.
         const { error } = await supabase.auth.getUser();
-        if (error) {
+        if (error && sessionRejectedByServer(error)) {
           await supabase.auth.signOut();
           session = null;
         }
@@ -251,18 +305,28 @@ export function useSyncPushToken(): void {
     // device's token stays the same across an account switch (saha testi
     // bulgusu: hesap silinip yenisi açılınca push_tokens'a yeni kullanıcı
     // için satır hiç yazılmadı, ref "bu token'ı zaten kaydettim" diyordu).
+    // The dedupe key carries the ENVIRONMENT as well as the token. Keyed on
+    // the token alone, a device whose token never changes stops writing this
+    // row entirely — so a row first written without an environment (an older
+    // build, before expo-application was linked) keeps its null forever, no
+    // matter how many times a newer build launches. That is why §11.8 found
+    // both test devices null and staying null.
     let environment: string | null = null;
     registerForPushToken().then((reg) => {
-      if (!active || !reg || `${userId}:${reg.token}` === lastSaved.current) return;
+      if (!active || !reg) return;
       environment = reg.environment;
-      lastSaved.current = `${userId}:${reg.token}`;
+      const key = `${userId}:${reg.token}:${reg.environment ?? ''}`;
+      if (key === lastSaved.current) return;
+      lastSaved.current = key;
       savePushToken(userId, reg.token, reg.environment).catch(() => {});
     });
 
     const sub = Notifications.addPushTokenListener((event) => {
       const token = event.data;
-      if (!token || `${userId}:${token}` === lastSaved.current) return;
-      lastSaved.current = `${userId}:${token}`;
+      if (!token) return;
+      const key = `${userId}:${token}:${environment ?? ''}`;
+      if (key === lastSaved.current) return;
+      lastSaved.current = key;
       savePushToken(userId, token, environment).catch(() => {});
     });
 
@@ -333,11 +397,14 @@ async function signInWithApple(): Promise<void> {
     throw e;
   }
   if (!credential.identityToken) throw new Error(getDict().errors.appleIncomplete);
+  const suggested = nameFromApple(credential.fullName);
   const { error } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
     token: credential.identityToken,
   });
   if (error) throw error;
+  // After the sign-in, so a failed one doesn't leave a suggestion behind.
+  if (suggested) useAuthStore.setState({ appleSuggestedName: suggested });
 }
 
 /**
@@ -437,7 +504,7 @@ async function signOut(): Promise<void> {
  * no longer exists.
  */
 async function deleteAccount(): Promise<void> {
-  await deleteAccountRequest();
+  await deleteAccountRequest(useI18nStore.getState().locale);
   // The server-side user is gone, but supabase-js still holds its JWT locally
   // — drop it so the next Apple sign-in gets a clean SIGNED_IN under the new
   // user instead of piggybacking on a dead session.
@@ -489,6 +556,7 @@ export function useAuth() {
   const username = useAuthStore((s) => s.username);
   const isPro = useAuthStore((s) => s.isPro);
   const messagePreview = useAuthStore((s) => s.messagePreview);
+  const appleSuggestedName = useAuthStore((s) => s.appleSuggestedName);
   return {
     ready,
     session,
@@ -499,6 +567,7 @@ export function useAuth() {
     username,
     isPro,
     messagePreview,
+    appleSuggestedName,
     needsOnboarding: !!session && !name,
     signInAnonymously,
     signInWithApple,

@@ -90,8 +90,14 @@ export async function registerForPushToken(): Promise<PushRegistration | null> {
 async function apnsEnvironment(): Promise<string | null> {
   if (Platform.OS !== 'ios') return null;
   try {
-    return await Application.getIosPushNotificationServiceEnvironmentAsync();
+    // A build with no embedded provisioning profile answers null here. That
+    // is a different fact from "we never asked", and a null column cannot
+    // tell them apart — which is exactly the state §11.8 found the two test
+    // devices in. Record the distinction instead of collapsing it.
+    return (await Application.getIosPushNotificationServiceEnvironmentAsync()) ?? 'unknown';
   } catch {
-    return null;
+    // The native module isn't in this build (prebuild not re-run after
+    // expo-application became a direct dependency), or the call failed.
+    return 'unavailable';
   }
 }

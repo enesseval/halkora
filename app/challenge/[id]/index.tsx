@@ -24,7 +24,6 @@ import {
   useChallengesQuery,
   useCheckIn,
   useChallengeActions,
-  useMomentumDemo,
   useRefreshChallenges,
   useChallengeMessages,
   useRealtimeChallenge,
@@ -33,12 +32,12 @@ import {
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
 import { setActiveChallengeId } from '@/lib/push';
 import { fetchPendingInvites } from '@/data/invites';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
+import { AppText, AvatarStack, Button, IconButton, FixedType } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
 import { StakeBadge } from '@/components/StakeBadge';
@@ -49,7 +48,6 @@ import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
 import {
   JokerDaySheet,
   MissedDaySheet,
-  MomentumSheet,
   OwnerSettingsSheet,
   NudgeMessageSheet,
   ReportSheet,
@@ -64,6 +62,7 @@ import {
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
+import { useLayout } from '@/theme/layout';
 
 type Row =
   | { kind: 'participant'; p: Participant }
@@ -104,7 +103,17 @@ function InfoChip({ emoji, label }: { emoji: string; label: string }) {
           justifyContent: 'center',
         }}
       >
-        <AppText style={{ fontSize: 11 }}>{emoji}</AppText>
+        {/* An emoji has its own metrics and sits low in a line box it was
+            never measured for, so in a fixed 18pt circle it lands off
+            centre (saha testi bulgusu — "joker hakkı ikonu içindeki, sadece
+            ilk gün ikonu içindeki resim konumu hatalı"). An explicit line
+            height the size of the circle puts it back. */}
+        <AppText
+          allowFontScaling={false}
+          style={{ fontSize: 11, lineHeight: 18, textAlign: 'center' }}
+        >
+          {emoji}
+        </AppText>
       </View>
       <AppText variant="secondary" color={colors.textSecondary}>
         {label}
@@ -117,6 +126,7 @@ export default function DetailScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const router = useRouter();
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const { name } = useAuth();
   const challenge = useChallenge(id);
 
@@ -144,12 +154,14 @@ export default function DetailScreen() {
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const { checkIn, undo, meCheckedInToday, myOrder, myCheckinTime } = useCheckIn(id ?? '');
   const actions = useChallengeActions(id ?? '');
-  const { momentumDemoId, close } = useMomentumDemo();
   const { refreshing, refresh } = useRefreshChallenges();
   const { firstLoadError: chatError, error: chatErrorDetail, retry: retryChat } = useChallengeMessages(id);
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
   const [showOwnerSettings, setShowOwnerSettings] = useState(false);
+  // Which chat bubble has its long-press menu open. One value for the whole
+  // list, so opening a second menu closes the first.
+  const [openBubbleId, setOpenBubbleId] = useState<string | null>(null);
   // Guideline 1.2 — the message being reported, and the block confirmation.
   const [reportTarget, setReportTarget] = useState<Message | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -349,7 +361,13 @@ export default function DetailScreen() {
     );
     if (loading) {
       return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase }} edges={['top']}>
+        <SafeAreaView
+          style={[
+            { flex: 1, backgroundColor: colors.bgBase },
+            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+          ]}
+          edges={['top']}
+        >
           {backButton}
           <View style={{ paddingHorizontal: spacing.screenX }}>
             <RingScreenSkeleton withList />
@@ -359,7 +377,13 @@ export default function DetailScreen() {
     }
     if (firstLoadError) {
       return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase }} edges={['top']}>
+        <SafeAreaView
+          style={[
+            { flex: 1, backgroundColor: colors.bgBase },
+            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+          ]}
+          edges={['top']}
+        >
           {backButton}
           <ErrorState
             message={t.detail.loadFailed}
@@ -392,7 +416,6 @@ export default function DetailScreen() {
     challenge.hasMissedYesterday &&
     challenge.missedAckDay !== challenge.currentDay &&
     !meCheckedInToday;
-  const showMomentum = momentumDemoId === challenge.id;
 
   // Gaps a joker could still fill. Only while the ring is running and only if
   // there's an allowance left — otherwise the ring shows no invitation to tap
@@ -425,10 +448,12 @@ export default function DetailScreen() {
           try {
             await blockUser(authorId);
             // Their messages are hidden by an RLS policy, so they disappear on
-            // the next fetch rather than needing to be filtered here.
+            // the next fetch rather than needing to be filtered here — the
+            // chat merge drops anything the server stopped returning
+            // (useChallengeMessages).
             retryChat();
           } catch (e) {
-            Alert.alert(t.moderation.blockFailed, friendlyErrorMessage(e));
+            alertOnce(t.moderation.blockFailed, friendlyErrorMessage(e));
           }
         },
       },
@@ -455,30 +480,76 @@ export default function DetailScreen() {
         { text: t.moderation.blockConfirm, style: 'destructive', onPress: () => confirmBlock(m) },
       ]);
     } catch (e) {
-      Alert.alert(t.moderation.reportFailed, friendlyErrorMessage(e));
+      alertOnce(t.moderation.reportFailed, friendlyErrorMessage(e));
     }
+  };
+
+  /**
+   * "Erken bitir" had no way in. Its button lived in a momentum sheet that
+   * nothing could open — the flag it keyed off was set from nowhere, and the
+   * data it rendered was only ever present in mock fixtures — so the feature
+   * was unreachable (saha testi bulgusu — "erken bitir diye birşey yok").
+   *
+   * It belongs in the owner's menu: it is a founder action on a running ring,
+   * next to the ring's other founder actions.
+   */
+  const confirmEndEarly = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Alert.alert(t.detail.endEarlyConfirmTitle, t.detail.endEarlyConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.detail.endEarlyConfirm,
+        style: 'destructive',
+        // No navigation here on purpose: endEarly flips the local status to
+        // 'completed' and the effect above already moves to the finish
+        // screen the moment that happens. Replacing the route here too would
+        // race that effect.
+        onPress: () => actions.endEarly(),
+      },
+    ]);
+  };
+
+  const confirmDeleteMessage = (messageId: string) => {
+    Alert.alert(t.chat.deleteMessageConfirmTitle, t.chat.deleteMessageConfirmBody, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.chat.deleteMessage,
+        style: 'destructive',
+        onPress: () => actions.deleteMessage(messageId),
+      },
+    ]);
   };
 
   const confirmLeave = () => {
     if (leaving) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    Alert.alert(t.detail.leaveChallengeConfirmTitle, t.detail.leaveChallengeConfirmBody, [
-      { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.detail.leaveChallenge,
-        style: 'destructive',
-        onPress: async () => {
-          setLeaving(true);
-          try {
-            await actions.leaveChallenge(t.detail.systemLeft(myName));
-            goHomeAfterExit();
-          } catch (e) {
-            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
-            setLeaving(false);
-          }
+    // An owner who is the only one here isn't leaving a group, they're
+    // closing one — leave_challenge closes the ring when there is nobody to
+    // hand it to. Asking "leave this ring?" described a different action
+    // from the one about to happen (saha testi bulgusu — "kapatmak mı
+    // istiyorsun demeli").
+    const closes = !!challenge.isOwner && challenge.participants.length <= 1;
+    Alert.alert(
+      closes ? t.detail.leaveClosesTitle : t.detail.leaveChallengeConfirmTitle,
+      closes ? t.detail.leaveClosesBody : t.detail.leaveChallengeConfirmBody,
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: closes ? t.detail.leaveCloses : t.detail.leaveChallenge,
+          style: 'destructive',
+          onPress: async () => {
+            setLeaving(true);
+            try {
+              await actions.leaveChallenge(t.detail.systemLeft(myName));
+              goHomeAfterExit();
+            } catch (e) {
+              alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+              setLeaving(false);
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   /**
@@ -507,7 +578,7 @@ export default function DetailScreen() {
             await actions.leaveChallenge(t.detail.systemLeft(myName));
             goHomeAfterExit();
           } catch (e) {
-            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+            alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
           }
         },
       });
@@ -526,7 +597,7 @@ export default function DetailScreen() {
                 await actions.closeChallenge(t.detail.systemClosed(myName));
                 goHomeAfterExit();
               } catch (e) {
-                Alert.alert(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
+                alertOnce(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
               }
             },
           },
@@ -564,9 +635,16 @@ export default function DetailScreen() {
     }
     if (challenge.isOwner) {
       options.push({ text: t.detail.menuSettings, onPress: () => setShowOwnerSettings(true) });
-    } else {
-      options.push({ text: t.detail.menuLeave, onPress: confirmLeave, style: 'destructive' });
+      // Only while it is actually running — ending a ring that is upcoming,
+      // in a lobby, or already over is an option that exists to do nothing.
+      if (challenge.status === 'active') {
+        options.push({ text: t.detail.menuEndEarly, onPress: confirmEndEarly, style: 'destructive' });
+      }
     }
+    // The owner may leave too: leave_challenge hands the ring to the
+    // earliest-joined member. Offering this only to members is why "kurucu
+    // grup ayarları kısmından sadece halkayı kapatabiliyor, ordan çıkamıyor".
+    options.push({ text: t.detail.menuLeave, onPress: confirmLeave, style: 'destructive' });
     Alert.alert(challenge.title, undefined, [
       ...options.map((o) => ({ text: o.text, onPress: o.onPress, style: o.style })),
       { text: t.common.cancel, style: 'cancel' as const },
@@ -614,7 +692,7 @@ export default function DetailScreen() {
     try {
       await actions.startChallenge();
     } catch (e) {
-      Alert.alert(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
+      alertOnce(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
     } finally {
       setStarting(false);
     }
@@ -632,7 +710,7 @@ export default function DetailScreen() {
       await actions.startChallenge(iso);
       setShowLobbyDatePicker(false);
     } catch (e) {
-      Alert.alert(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
+      alertOnce(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
     } finally {
       setStarting(false);
     }
@@ -744,14 +822,35 @@ export default function DetailScreen() {
           onRepairDayPress={setJokerDay}
           centerContent={
             isUpcoming ? (
-              <View style={{ alignItems: 'center' }}>
-                <AppText style={{ fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textSecondary }}>
-                  {t.detail.upcomingRing}
-                </AppText>
-                <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
-                  {challenge.startsWhen}
-                </AppText>
-              </View>
+              // Capped to the ring's clear inner width (L is 180 across with
+              // an 11pt stroke, so 158 inside) and held to the ring's own
+              // fixed type. Unbounded, the line ran straight over the
+              // segments either side (saha testi bulgusu — "henüz başlamadı
+              // yazısı halka dilimleri üstüne biniyor").
+              <FixedType>
+                <View style={{ alignItems: 'center', maxWidth: 126 }}>
+                  <AppText
+                    numberOfLines={2}
+                    style={{
+                      fontFamily: fonts.displaySemibold,
+                      fontSize: 16,
+                      lineHeight: 20,
+                      textAlign: 'center',
+                      color: colors.textSecondary,
+                    }}
+                  >
+                    {t.detail.upcomingRing}
+                  </AppText>
+                  <AppText
+                    variant="meta"
+                    color={colors.textTertiary}
+                    numberOfLines={2}
+                    style={{ marginTop: 4, textAlign: 'center' }}
+                  >
+                    {challenge.startsWhen}
+                  </AppText>
+                </View>
+              </FixedType>
             ) : (
               <CheckInButton
                 day={challenge.currentDay}
@@ -926,6 +1025,9 @@ export default function DetailScreen() {
             onReact={(emoji) => actions.react(item.m.id, emoji)}
             onReport={item.m.authorId ? () => setReportTarget(item.m) : undefined}
             onBlock={item.m.authorId ? () => confirmBlock(item.m) : undefined}
+            onDelete={item.m.mine ? () => confirmDeleteMessage(item.m.id) : undefined}
+            openId={openBubbleId}
+            setOpenId={setOpenBubbleId}
           />
         );
       case 'chatError':
@@ -952,7 +1054,13 @@ export default function DetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Detail doesn't go through <Screen>, so it needs the same measure cap
+          applied by hand — otherwise the chat runs the full width of an iPad
+          while every other screen is centred (src/theme/layout.ts). */}
+      <SafeAreaView
+        style={[{ flex: 1 }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}
+        edges={['top']}
+      >
         {topBar}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -972,6 +1080,10 @@ export default function DetailScreen() {
             ListHeaderComponent={header}
             contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
+            // Scrolling the thread puts an open bubble menu away — it floats
+            // over the conversation now, so leaving it up while the messages
+            // move under it would be worse than the old inline version.
+            onScrollBeginDrag={() => setOpenBubbleId(null)}
             onScroll={handleListScroll}
             scrollEventThrottle={100}
             refreshControl={
@@ -1109,23 +1221,6 @@ export default function DetailScreen() {
           onUseJoker={actions.useJoker}
           onCheckInToday={checkIn}
           onDismiss={actions.ackMissed}
-        />
-      ) : null}
-
-      {/* E10 momentum */}
-      {showMomentum && challenge.momentum ? (
-        <MomentumSheet
-          momentum={challenge.momentum}
-          onRestart={() => {
-            actions.restart();
-            close();
-          }}
-          onEndEarly={() => {
-            actions.endEarly();
-            close();
-            router.replace(`/challenge/${challenge.id}/complete`);
-          }}
-          onClose={close}
         />
       ) : null}
 

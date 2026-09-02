@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { AppText, Button } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useT } from '@/i18n';
@@ -17,7 +18,7 @@ import {
   type Plans,
 } from '@/lib/purchases';
 import { awaitProUnlock } from '@/hooks/useAuth';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 import type { SegmentState } from '@/data/types';
 
@@ -206,7 +207,7 @@ export default function Paywall() {
         await onEntitled();
         return;
       }
-      Alert.alert(t.pro.purchaseFailed, friendlyErrorMessage(e));
+      alertOnce(t.pro.purchaseFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -220,7 +221,7 @@ export default function Paywall() {
       if (ok) await onEntitled();
       else Alert.alert(t.pro.restoreNoneTitle, t.pro.restoreNoneBody);
     } catch (e) {
-      if (!isCancelled(e)) Alert.alert(t.pro.restoreFailed, friendlyErrorMessage(e));
+      if (!isCancelled(e)) alertOnce(t.pro.restoreFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -245,8 +246,25 @@ export default function Paywall() {
     close();
   };
 
+  // The store's own per-month figure, in the storefront's own currency. The
+  // dictionary's "≈₺33/ay" is a hard-coded lira string: it goes wrong the
+  // moment the price changes and is wrong for every non-Turkish storefront,
+  // sitting directly under a price the store localized correctly. Kept only
+  // as the fallback for a store that doesn't compute one.
+  const { sideGutter } = useLayout();
+
+  const annualNote = plans.annual?.perMonth
+    ? t.pro.annualPerMonth(plans.annual.perMonth)
+    : t.pro.annualNote;
+
   return (
-    <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' }}>
+    <Animated.View
+      entering={FadeIn.duration(180)}
+      style={[
+        { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
+    >
       {/* tap outside to dismiss */}
       <Pressable style={{ flex: 1 }} onPress={close} />
 
@@ -324,7 +342,7 @@ export default function Paywall() {
             label={t.pro.planAnnualLabel}
             price={plans.annual?.price ?? t.pro.annualPrice}
             per={t.pro.annualPer}
-            note={t.pro.annualNote}
+            note={annualNote}
             badge={t.pro.saveBadge}
             selected={plan === 'annual'}
             onPress={() => setPlan('annual')}
@@ -345,8 +363,16 @@ export default function Paywall() {
           <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
             {t.pro.renewalTerms}
           </AppText>
-          <AppText variant="secondary" color={colors.textSecondary} onPress={doRestore}>
-            {t.pro.restore}
+          {/* Restoring goes to the App Store and then waits on the webhook to
+              write is_pro, which takes long enough that a link that doesn't
+              change reads as a tap that missed (saha testi bulgusu — "biraz
+              uzun sürüyor, dondu mu hissi uyandırdı"). */}
+          <AppText
+            variant="secondary"
+            color={busy ? colors.textTertiary : colors.textSecondary}
+            onPress={busy ? undefined : doRestore}
+          >
+            {busy ? t.pro.restoring : t.pro.restore}
           </AppText>
           <View style={{ flexDirection: 'row', gap: 14 }}>
             <AppText

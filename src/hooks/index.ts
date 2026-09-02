@@ -13,7 +13,6 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   insertChallenge,
   fetchMyChallenges,
-  restartChallenge,
   endChallengeEarly,
   updateChallengeDetails,
   deleteChallenge as deleteChallengeRemote,
@@ -24,9 +23,16 @@ import {
 } from '@/data/challenges';
 import { insertCheckIn, deleteCheckIn } from '@/data/checkins';
 import { amIParticipant, fetchChallengePreview, joinChallengeByCode } from '@/data/join';
-import { fetchMessages, insertMessage, insertReaction, insertNudge, insertSystemMessage } from '@/data/chat';
+import {
+  fetchMessages,
+  insertMessage,
+  setReaction,
+  deleteMessage,
+  insertNudge,
+  insertSystemMessage,
+} from '@/data/chat';
 import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
-import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
+import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError, alertOnce } from '@/lib/errors';
 import { router } from 'expo-router';
 import {
   ME_ID,
@@ -45,7 +51,7 @@ import { Challenge, Participant } from '@/data/types';
 import { useT } from '@/i18n';
 
 // Re-export types + static config so screens have a single import source.
-export type { Challenge, Participant, Message, Stake, StakeOption, SegmentState, Momentum } from '@/data/types';
+export type { Challenge, Participant, Message, Stake, StakeOption, SegmentState } from '@/data/types';
 export type { CreateChallengeInput };
 export {
   ME_ID,
@@ -128,6 +134,16 @@ export function useChallengesQuery() {
       // against, which is a just-created ring vanishing for a cycle because a
       // poll already in flight predates it. Nothing survives two consecutive
       // responses by accident.
+      //
+      // This is why `dataUpdatedAt` is in the dependency list below and not
+      // just `data`. React Query's structural sharing hands back the PREVIOUS
+      // object when a response is deeply equal to the last one, so two
+      // identical polls change nothing about `data`'s identity and this
+      // effect never runs a second time. The second strike could not land,
+      // and a hand-deleted ring stayed in History forever — the rule read
+      // correctly and could not fire (saha testi bulgusu — "veritabanından
+      // elle sildiğim halka hala geçmişte gözüküyor"). `dataUpdatedAt`
+      // changes on every successful fetch, equal payload or not.
       const gone = new Set<string>();
       for (const c of current) {
         if (byId.has(c.id)) continue;
@@ -148,7 +164,7 @@ export function useChallengesQuery() {
       setChallenges(merged);
       syncWidgetSnapshot(merged);
     }
-  }, [query.data, setChallenges]);
+  }, [query.data, query.dataUpdatedAt, setChallenges]);
 
   return {
     loading: isSupabaseConfigured && query.isLoading,
@@ -403,7 +419,7 @@ export function useCheckIn(id: string) {
         .catch((e) => {
           undo(id); // roll back the optimistic update
           syncWidgetSnapshot(useMockStore.getState().challenges);
-          Alert.alert(t.errors.checkInFailed, friendlyErrorMessage(e));
+          alertOnce(t.errors.checkInFailed, friendlyErrorMessage(e));
         });
     }
   };
@@ -424,7 +440,7 @@ export function useCheckIn(id: string) {
         // instead, and say why.
         checkIn(id);
         syncWidgetSnapshot(useMockStore.getState().challenges);
-        Alert.alert(t.errors.undoFailed, friendlyErrorMessage(e));
+        alertOnce(t.errors.undoFailed, friendlyErrorMessage(e));
       });
   };
 
@@ -450,7 +466,7 @@ export function messagesKey(id: string) {
 export function useChallengeMessages(id: string | undefined) {
   const setMessages = useMockStore((s) => s.setChallengeMessages);
   const everHadData = useRef(false);
-  const { data, isError, error, refetch } = useQuery({
+  const { data, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: messagesKey(id ?? ''),
     queryFn: () => fetchMessages(id as string),
     enabled: isSupabaseConfigured && !!id,
@@ -474,19 +490,42 @@ export function useChallengeMessages(id: string | undefined) {
       (m) => !m.id.startsWith('local-') || !confirmed.has(`${m.dayNumber}::${m.text}`),
     );
 
-    // Messages are never deleted server-side — a poll/refetch should only
-    // ever add to (or refresh reaction counts on) the list, never shrink it.
-    // A stale/out-of-order response (racing with another concurrent fetch,
-    // e.g. the 4s poll vs. the post-send/post-reaction invalidate) could
-    // otherwise wipe an already-confirmed message off the screen for a cycle
-    // even though it's safely stored — this hit both the sender's and the
-    // recipient's device, since neither has anything to do with the local
-    // optimistic bubble once a message is truly persisted.
-    const keptIds = new Set(kept.map((m) => m.id));
-    const refreshed = kept.map((m) => byId.get(m.id) ?? m);
+    // A message on screen that this response doesn't contain is one of two
+    // very different things, and the merge has to tell them apart.
+    //
+    //  - The response is simply older than the message. A stale/out-of-order
+    //    fetch (the 20s poll racing the post-send invalidate) would otherwise
+    //    wipe an already-confirmed message off the screen for a cycle even
+    //    though it's safely stored — that hit both the sender's and the
+    //    recipient's device.
+    //  - The server genuinely stopped returning it. Blocking does exactly
+    //    this: `messages`'s RLS policy is `is_member(...) and not
+    //    is_blocked_pair(user_id)`, so a blocked person's messages stop
+    //    arriving. This merge used to never shrink the list, so they stayed
+    //    on screen forever and blocking looked broken (App Store 1.2).
+    //
+    // The cutoff separates them: only a message newer than the response
+    // itself can legitimately be missing from it. The 10s slack covers the
+    // request's own round trip — a message created while the request was in
+    // flight is older than `dataUpdatedAt` but could not have been in the
+    // answer. Blocked messages are older than that and drop out, at the
+    // latest on the next poll, on BOTH devices — which matters, because a
+    // client cannot compute this itself: `blocked_users` only lets you read
+    // the blocks YOU created, so the person who was blocked has no way to
+    // know. Only the server sees both directions.
+    const cutoff = dataUpdatedAt - 10_000;
+    const stillOnServer = (m: (typeof kept)[number]) => {
+      if (byId.has(m.id)) return true;
+      if (m.id.startsWith('local-')) return true; // not a server message yet
+      if (!m.createdAt) return true; // mock/legacy row, nothing to compare
+      return Date.parse(m.createdAt) > cutoff;
+    };
+
+    const keptIds = new Set(kept.filter(stillOnServer).map((m) => m.id));
+    const refreshed = kept.filter(stillOnServer).map((m) => byId.get(m.id) ?? m);
     const brandNew = data.filter((m) => !keptIds.has(m.id));
     setMessages(id, [...refreshed, ...brandNew]);
-  }, [data, id, setMessages]);
+  }, [data, dataUpdatedAt, id, setMessages]);
 
   return {
     // Only surface this the first time — if we already have messages showing,
@@ -521,6 +560,18 @@ function useRealtimeMyChallenges(): void {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'check_ins' }, bump)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, bump)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, bump)
+      .on(
+        // An invite is the one thing that arrives for someone who is not in
+        // the challenge yet, so no per-challenge subscription can ever carry
+        // it. Without this the bell only appeared on the next 60s poll, or
+        // whenever Home happened to remount — which read as "zil ancak
+        // uygulamayı yeniden başlatınca geliyor". Unfiltered like the rest:
+        // realtime only delivers rows the subscriber's own RLS lets them see,
+        // and `invites` is readable by its recipient.
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invites' },
+        () => queryClient.invalidateQueries({ queryKey: RECEIVED_INVITES_KEY }),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -586,7 +637,6 @@ export function useChallengeActions(id: string) {
   const sendMessageMock = useMockStore((s) => s.sendMessage);
   const reactMock = useMockStore((s) => s.react);
   const nudgeMock = useMockStore((s) => s.nudge);
-  const restart = useMockStore((s) => s.restart);
   const endEarly = useMockStore((s) => s.endEarly);
   const removeChallengeMock = useMockStore((s) => s.removeChallenge);
   const startChallengeMock = useMockStore((s) => s.startChallenge);
@@ -619,7 +669,7 @@ export function useChallengeActions(id: string) {
           } catch {
             // best-effort resync; the alert below still tells the user it failed
           }
-          Alert.alert(t.errors.jokerFailed, friendlyErrorMessage(e));
+          alertOnce(t.errors.jokerFailed, friendlyErrorMessage(e));
         });
     }
   };
@@ -638,7 +688,7 @@ export function useChallengeActions(id: string) {
         return true;
       } catch (e) {
         removeMessageMock(id, localId); // roll back — it never actually sent
-        Alert.alert(t.errors.messageFailed, friendlyErrorMessage(e));
+        alertOnce(t.errors.messageFailed, friendlyErrorMessage(e));
         return false;
       }
     }
@@ -646,42 +696,63 @@ export function useChallengeActions(id: string) {
   };
 
   const doReact = (messageId: string, emoji: string) => {
-    reactMock(id, messageId, emoji); // optimistic +1
-    if (isSupabaseConfigured) {
-      insertReaction(messageId, emoji)
-        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
-        .catch(() => {});
+    // No optimistic step against a real backend: the outcome depends on what
+    // this person already put on the message — a swap, or taking it back —
+    // and guessing wrong makes the counter jump the wrong way before the
+    // refetch corrects it. The round trip is one insert/delete.
+    if (!isSupabaseConfigured) {
+      reactMock(id, messageId, emoji);
+      return;
     }
+    setReaction(messageId, emoji)
+      .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+      .catch((e) => alertOnce(t.errors.reactFailed, friendlyErrorMessage(e)));
+  };
+
+  const doDeleteMessage = (messageId: string) => {
+    if (!isSupabaseConfigured) return;
+    deleteMessage(messageId)
+      .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
+      .catch((e) => alertOnce(t.errors.deleteMessageFailed, friendlyErrorMessage(e)));
   };
 
   const doNudge = (participantId: string, recipientName: string, message: string) => {
     nudgeMock(id, participantId); // optimistic "Sallandı ✓"
-    if (isSupabaseConfigured && challenge) {
-      insertNudge(id, participantId, message)
+    if (!isSupabaseConfigured || !challenge) return;
+    insertNudge(id, participantId, message)
+      .then(async (sent) => {
+        if (!sent) {
+          // The day's one nudge was already spent. Nothing was written and
+          // nothing was pushed, so saying "Sallandı ✓" and stopping there is
+          // the app telling the person something it knows isn't true.
+          Alert.alert(
+            t.participant.alreadyNudgedTitle,
+            t.participant.alreadyNudgedBody(recipientName),
+          );
+          return;
+        }
         // Visible to the whole group in chat, not just a private push to the
         // recipient (saha testi bulgusu: "chatte gözüksün, ne yaptın diye").
-        // Best-effort — a failure here shouldn't undo the nudge itself.
-        .then(() =>
-          insertSystemMessage(
-            id,
-            challenge.currentDay,
-            t.participant.nudgeSystemMessage(myName ?? t.common.person, recipientName, message),
-            false, // already pushed via the nudges table above — don't double-notify
-          ),
-        )
-        .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
-        .catch(() => {});
-    }
+        await insertSystemMessage(
+          id,
+          challenge.currentDay,
+          t.participant.nudgeSystemMessage(myName ?? t.common.person, recipientName, message),
+          false, // already pushed via the nudges table above — don't double-notify
+        );
+        queryClient.invalidateQueries({ queryKey: messagesKey(id) });
+      })
+      // Was `.catch(() => {})`, which is why a nudge that never left the
+      // device still showed as sent, with nothing in the chat and nothing on
+      // the other phone, and no way to tell why.
+      .catch((e) => {
+        // Clear the optimistic "Sallandı ✓" now rather than letting it sit
+        // until the next 60s poll: `nudged` is derived from the server's own
+        // rows, so a refetch is what tells the truth here.
+        queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+        alertOnce(t.errors.nudgeFailed, friendlyErrorMessage(e));
+      });
   };
 
-  const doRestart = () => {
-    restart(id); // optimistic: local state already reflects "restarted"
-    if (isSupabaseConfigured) {
-      restartChallenge(id)
-        .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert(t.errors.restartFailed, friendlyErrorMessage(e)));
-    }
-  };
 
   /** Closes the stake. Awaited by the finish screen so it can show the error
    * inline; ALREADY_SETTLED counts as success — two members tapping at the
@@ -705,7 +776,7 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       endChallengeEarly(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert(t.errors.endEarlyFailed, friendlyErrorMessage(e)));
+        .catch((e) => alertOnce(t.errors.endEarlyFailed, friendlyErrorMessage(e)));
     }
   };
 
@@ -806,8 +877,8 @@ export function useChallengeActions(id: string) {
     ackMissed: () => ackMissed(id),
     sendMessage: doSendMessage,
     react: doReact,
+    deleteMessage: doDeleteMessage,
     nudge: doNudge,
-    restart: doRestart,
     endEarly: doEndEarly,
     updateDetails: doUpdateDetails,
     settleStake: doSettleStake,
@@ -882,7 +953,7 @@ export function useCreateChallenge() {
           if (isNetworkError(e)) {
             Alert.alert(t.errors.offlineTitle, t.errors.checkConnection);
           } else {
-            Alert.alert(t.errors.createFailed, friendlyErrorMessage(e));
+            alertOnce(t.errors.createFailed, friendlyErrorMessage(e));
           }
           return null;
         }
@@ -920,13 +991,6 @@ export function useJoin() {
   };
 }
 
-/** E10 momentum demo toggle (fired from Settings). */
-export function useMomentumDemo() {
-  const momentumDemoId = useMockStore((s) => s.momentumDemoId);
-  const open = useMockStore((s) => s.openMomentumDemo);
-  const close = useMockStore((s) => s.closeMomentumDemo);
-  return { momentumDemoId, open, close };
-}
 
 /* ---- derived helpers used across screens ---- */
 

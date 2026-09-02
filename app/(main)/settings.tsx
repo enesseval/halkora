@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
@@ -6,12 +6,13 @@ import { Feather } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
-import { useMomentumDemo, ME_NAME, ME_INITIALS } from '@/hooks';
+import { ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { useMockStore } from '@/stores/mockStore';
 import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
 import { purchasesDiagnostics } from '@/lib/purchases';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '@/lib/legal';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { NameSheet, UsernameSheet, WidgetHintSheet } from '@/components/Sheets';
 import { BlockedSheet } from '@/components/BlockedSheet';
@@ -100,7 +101,6 @@ function Group({ children }: { children: React.ReactNode }) {
 export default function SettingsScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useT();
-  const { open } = useMomentumDemo();
   const {
     configured,
     session,
@@ -128,6 +128,15 @@ export default function SettingsScreen() {
   const [editingName, setEditingName] = useState(false);
   const [showWidgetHint, setShowWidgetHint] = useState(false);
   const [showBlocked, setShowBlocked] = useState(false);
+  // The DEV block below ships in the release build on purpose — that is the
+  // build almost all on-device testing happens in, and gating it behind
+  // __DEV__ hid it exactly where it was needed. It must not be *findable*
+  // though: a reviewer opening Settings has to see a finished app, and
+  // "Onboarding'i tekrar gör" next to a Pro toggle is not that. So it hides
+  // behind a gesture nobody reaches by accident.
+  const [devTaps, setDevTaps] = useState(0);
+  const [devUnlocked, setDevUnlocked] = useState(false);
+  const devTapReset = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -199,6 +208,37 @@ export default function SettingsScreen() {
     ]);
   };
 
+  // The published legal pages have to be reachable from inside the app, not
+  // only from onboarding and the paywall — App Review opens them, and until
+  // now someone past onboarding had no route to them at all. Account deletion
+  // is deliberately NOT a link here: the real thing is the in-app "Hesabı sil"
+  // below, which is what Guideline 5.1.1(v) actually asks for. The published
+  // /hesap-silme/ page exists for App Store Connect's own field.
+  const openLegal = (url: string) => {
+    Linking.openURL(url).catch(() => Alert.alert(t.settings.legalOpenFailed));
+  };
+
+  // Leaving a pending reset behind would fire setState on an unmounted
+  // screen; harmless today, but the cleanup costs three lines.
+  useEffect(() => () => {
+    if (devTapReset.current) clearTimeout(devTapReset.current);
+  }, []);
+
+  // Six deliberate taps on your own name, each within 1.5s of the last.
+  const tapName = () => {
+    if (devUnlocked) return;
+    if (devTapReset.current) clearTimeout(devTapReset.current);
+    const next = devTaps + 1;
+    if (next >= 6) {
+      setDevTaps(0);
+      setDevUnlocked(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      return;
+    }
+    setDevTaps(next);
+    devTapReset.current = setTimeout(() => setDevTaps(0), 1500);
+  };
+
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }}>
@@ -224,11 +264,11 @@ export default function SettingsScreen() {
           }}
         >
           <Avatar initials={displayInitials} size={48} tint />
-          <View style={{ flex: 1 }}>
+          <Pressable style={{ flex: 1 }} onPress={tapName}>
             <AppText variant="bodyMedium" style={{ fontSize: 18 }}>
               {displayName}
             </AppText>
-          </View>
+          </Pressable>
         </View>
 
         {/* Halkora Pro — always reachable (a door, not a nag). Free: ember-
@@ -314,8 +354,6 @@ export default function SettingsScreen() {
               value={locale === 'tr' ? t.settings.languageTurkish : t.settings.languageEnglish}
               onPress={pickLanguage}
             />
-            <Divider />
-            <Row icon="rotate-ccw" label={t.settings.seeOnboardingAgain} onPress={goOnboarding} />
           </Group>
         </View>
 
@@ -326,15 +364,6 @@ export default function SettingsScreen() {
             <View style={{ marginTop: 10 }}>
               <Group>
                 <Row
-                  icon="trending-down"
-                  label={t.settings.demoMomentum}
-                  onPress={() => {
-                    open('c1');
-                    router.push('/challenge/c1');
-                  }}
-                />
-                <Divider />
-                <Row
                   icon="flag"
                   label={t.settings.demoComplete}
                   onPress={() => router.push('/challenge/a1/complete')}
@@ -343,6 +372,31 @@ export default function SettingsScreen() {
             </View>
           </View>
         ) : null}
+
+        <View style={{ marginTop: 20 }}>
+          <SectionLabel>{t.settings.legalSection}</SectionLabel>
+          <View style={{ marginTop: 10 }}>
+            <Group>
+              <Row
+                icon="file-text"
+                label={t.settings.legalTerms}
+                onPress={() => openLegal(TERMS_URL)}
+              />
+              <Divider />
+              <Row
+                icon="shield"
+                label={t.settings.legalPrivacy}
+                onPress={() => openLegal(PRIVACY_URL)}
+              />
+              <Divider />
+              <Row
+                icon="life-buoy"
+                label={t.settings.legalSupport}
+                onPress={() => openLegal(SUPPORT_URL)}
+              />
+            </Group>
+          </View>
+        </View>
 
         {/* logout — faint, never red */}
         <Pressable
@@ -373,12 +427,16 @@ export default function SettingsScreen() {
             (compare against `select id, is_pro from profiles;`) instead of
             guessing. Deliberately NOT gated behind __DEV__ — that hid this
             entirely in a Release/TestFlight-style build, which is exactly
-            the build most on-device testing happens in right now. */}
-        {configured ? (
+            the build most on-device testing happens in right now. Reached by
+            tapping your own name six times (tapName above), so it is present
+            for testing without being part of the app anyone else sees. */}
+        {configured && devUnlocked ? (
           <View style={{ marginBottom: 24 }}>
             <SectionLabel>DEV</SectionLabel>
             <View style={{ marginTop: 10 }}>
               <Group>
+                <Row icon="rotate-ccw" label={t.settings.seeOnboardingAgain} onPress={goOnboarding} />
+                <Divider />
                 <Row
                   icon="zap"
                   label={t.pro.devToggle}
