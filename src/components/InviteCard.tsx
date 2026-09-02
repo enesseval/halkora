@@ -288,6 +288,13 @@ export function InviteCard({
   // runs) pushed into the small line under it. For these the day count is
   // the headline and the missing date is stated plainly instead.
   const undated = challenge.status === 'lobby';
+  /**
+   * A ring whose join window has shut. The detail menu already hides "invite"
+   * for this, but the shared card still said "katılabilirsin" — an image
+   * inviting people into something they cannot enter (saha testi bulgusu —
+   * "sanki birini davet edebilecekmişim gibi").
+   */
+  const joinsClosed = !!challenge.firstDayJoinOnly && challenge.currentDay > 1;
   /** The ring's big line, and the day counter that shares its slot. */
   const counter = format === 'square' ? u(84) : u(112);
   const headline = undated ? counter : format === 'square' ? u(52) : u(72);
@@ -465,7 +472,9 @@ export function InviteCard({
             : t.shareCard.askGroup
           : finished
             ? t.shareCard.closed
-            : t.shareCard.stillOpen}
+            : joinsClosed
+              ? t.shareCard.joinClosed
+              : t.shareCard.stillOpen}
       </AppText>
 
       <AppText

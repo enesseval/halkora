@@ -363,8 +363,16 @@ export default function Paywall() {
           <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
             {t.pro.renewalTerms}
           </AppText>
-          <AppText variant="secondary" color={colors.textSecondary} onPress={doRestore}>
-            {t.pro.restore}
+          {/* Restoring goes to the App Store and then waits on the webhook to
+              write is_pro, which takes long enough that a link that doesn't
+              change reads as a tap that missed (saha testi bulgusu — "biraz
+              uzun sürüyor, dondu mu hissi uyandırdı"). */}
+          <AppText
+            variant="secondary"
+            color={busy ? colors.textTertiary : colors.textSecondary}
+            onPress={busy ? undefined : doRestore}
+          >
+            {busy ? t.pro.restoring : t.pro.restore}
           </AppText>
           <View style={{ flexDirection: 'row', gap: 14 }}>
             <AppText
