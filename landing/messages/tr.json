@@ -1,0 +1,222 @@
+{
+  "meta": {
+    "title": "halkora — Söz ver. Halka tutsun.",
+    "description": "Arkadaşlarınla ortak bir hedef kur. Her gün tek dokunuşla check-in yap, halkan dolsun. Konfeti yok — sadece sen, grubun ve dolan bir halka."
+  },
+  "nav": {
+    "download": "App Store'dan İndir"
+  },
+  "hero": {
+    "eyebrow": "halkora",
+    "titleA": "Kendine verdiğin sözler",
+    "titleB": "yalnızken kolay unutulur.",
+    "titleAccent": "Arkadaşların izlerken değil.",
+    "sub": "Ortak bir hedef kur, grubunu davet et. Her gün tek dokunuşla check-in yap — günün segmenti dolar, grubun anında görür.",
+    "primaryCta": "App Store'dan İndir",
+    "secondaryCta": "Nasıl çalışır?",
+    "meta": "Ücretsiz · Hesap yok · Reklam yok",
+    "cardTitle": "30 Gün Kitap Okuma",
+    "cardAction": "Bugün: 20 sayfa oku",
+    "cardDone": "5/8 tamamladı",
+    "stake": "Bahis: Tamamlayamayan kahve ısmarlar",
+    "bubbleDone": "Enes tamamladı",
+    "dayLabel": "Gün"
+  },
+  "marquee": {
+    "row1": [
+      "30 Gün Kitap Okuma",
+      "Sabah 06:30 Kulübü",
+      "Şekersiz 14 Gün",
+      "10.000 Adım × 7 Gün",
+      "Her Gün 20 Sayfa",
+      "Soğuk Duş · 21 Gün",
+      "Telefonsuz Akşam",
+      "Günde 1 Sayfa Yazı",
+      "8 Saat Uyku",
+      "Ekransız İlk 30 Dakika"
+    ],
+    "row2": [
+      "Günde 2 Litre Su",
+      "Haftada 3 Koşu",
+      "Meditasyon · 10 Dakika",
+      "Öğle Yürüyüşü",
+      "Dil Pratiği · 15 Dakika",
+      "Şükür Günlüğü",
+      "10 Sayfa Gece Okuması",
+      "Merdiven Kuralı",
+      "Erken Kalk, Kazan",
+      "Hafta Sonu Doğa Yürüyüşü"
+    ]
+  },
+  "manifesto": {
+    "kicker": "halkora ilkeleri",
+    "l1": "Bildirim yağmuru yok.",
+    "l2": "Rozet koleksiyonu yok.",
+    "l3": "Konfeti yok.",
+    "l4": "Sen, grubun ve dolan bir halka."
+  },
+  "how": {
+    "kicker": "01 · Nasıl çalışır",
+    "title": "Üç adım. Sonra sadece her gün tek dokunuş.",
+    "s1": {
+      "title": "Halkanı kur",
+      "copy": "Bir hedef seç, günlük eylemini yaz, süreyi belirle. 30 saniye sürer.",
+      "fieldName": "Sabah Kulübü",
+      "fieldAction": "Her sabah 06:30'da uyan",
+      "fieldDays": "14 gün"
+    },
+    "s2": {
+      "title": "Arkadaşlarını çağır",
+      "copy": "Tek bir davet linki yeter. Katılanın hesabı, şifresi, e-postası olmaz — sadece ismi.",
+      "link": "halkora.app/j/8K2N",
+      "ready": "6 kişi hazır"
+    },
+    "s3": {
+      "title": "Her gün tek dokunuş",
+      "copy": "Check-in yaparsın, günün segmenti Ember ile dolar. Grubun anında görür.",
+      "button": "Check-in"
+    }
+  },
+  "ringDemo": {
+    "kicker": "02 · İmza halka",
+    "title": "Halka nasıl dolar?",
+    "copy": "Kaydırmaya devam et. Her segment bir gün; her gün tek bir dokunuş.",
+    "scrollHint": "Kaydır",
+    "action": "Bugün: 20 sayfa oku",
+    "checkin": "Check-in",
+    "done": "Tamamlandı",
+    "dayLabel": "Gün",
+    "m1": {
+      "title": "Gün 1",
+      "copy": "Söz verdin. Halka kuruldu, herkes yerinde."
+    },
+    "m2": {
+      "title": "Gün 7",
+      "copy": "Bu kadar geldin. Şimdi bırakmazsın."
+    },
+    "m3": {
+      "title": "Gün 14",
+      "copy": "Halka kapandı. Bahis sonuçlanır."
+    }
+  },
+  "features": {
+    "kicker": "03 · Neden işe yarıyor",
+    "title": "Utandırmaz. Yargılamaz. Görünür kılar.",
+    "stake": {
+      "title": "İşin ucunda bir şey olsun",
+      "copy": "Grup küçük, dostça bir bahis koyar. Kaybeden belli olur — kimse utandırılmaz.",
+      "opt1": "Kahve ısmarlar",
+      "opt2": "Grubun seçtiği filmi izler"
+    },
+    "joker": {
+      "title": "Hayat olur",
+      "copy": "Kaçan bir gün halkayı kırmaz. Joker günün amber yanar, yola devam edersin."
+    },
+    "social": {
+      "title": "Kim nerede, tek bakışta",
+      "copy": "Herkesin halkası açık. Bugün kim yaptı, kim bekliyor görünür.",
+      "now": "Bugün",
+      "waiting": "Bekliyor"
+    },
+    "wave": {
+      "title": "Sessiz kalana el salla",
+      "copy": "Dürtmek yok, azar yok. Tek dokunuşla nazik bir “buradayız”.",
+      "button": "El salla 👋",
+      "status": "2 gündür sessiz"
+    },
+    "chat": {
+      "title": "Aynı halkanın sohbeti",
+      "copy": "Gün gün akan sade bir sohbet. Reklam, gürültü, sonsuz kaydırma yok.",
+      "b1": "Bugün 30 sayfa gitti, kitap açıldı resmen 📖",
+      "b2": "Ben akşama bırakıyorum, uyumadan hallederim 💪",
+      "sys": "Enes tamamladı",
+      "day": "Gün 7"
+    }
+  },
+  "story": {
+    "chip": "Gerçek bir akşam",
+    "l1": "Bugünün 20 sayfası hâlâ okunmadı.",
+    "rTime": "20:30",
+    "rTitle": "Halkan bekliyor.",
+    "rBody": "Bugünün check-in'i hâlâ seni bekliyor.",
+    "l2": "Telefon elinde, göz kapakların ağırlaşıyor.",
+    "l3": "Tam bırakacakken bir titreşim.",
+    "wTime": "22:14",
+    "wTitle": "👋 Ela sana el salladı",
+    "wBody": "30 Gün Kitap Okuma",
+    "closing": "Üç dakika sonra kitap elinde. Bir segment daha doluyor."
+  },
+  "widgets": {
+    "kicker": "04 · Widget",
+    "chip": "Yeni",
+    "title": "Şimdi ana ekranında da.",
+    "sub": "Uygulamayı açmadan gör, tek dokunuşla check-in yap. Halkan artık ana ekranında ve kilit ekranında seninle.",
+    "checkin": "Check-in yap",
+    "smallName": "Sabah 06:30 Kulübü",
+    "mediumName": "30 Gün Kitap Okuma",
+    "mediumAction": "Bugün: 20 sayfa oku",
+    "mediumDay": "GÜN 10/21",
+    "mediumDone": "4/8 tamamladı",
+    "mediumJoker": "1 joker kaldı",
+    "sTitle": "Küçük · 2×2",
+    "sCopy": "Tek halka, tek bakış, tek dokunuş.",
+    "mTitle": "Orta · 4×2",
+    "mCopy": "Günün hedefi ve grubun durumu birlikte.",
+    "lTitle": "Kilit ekranı",
+    "lCopy": "Telefonu her açışında halkan orada — bakmadan geçemezsin.",
+    "note": "Tamamlanan widget sakinleşir — konfeti yok, ödül dolan halkadır."
+  },
+  "done": {
+    "chip": "On dört gün sonra",
+    "title": "14 gün. Birlikte.",
+    "sub": "Kitap Kulübü Challenge tamamlandı",
+    "s1": "kişi",
+    "s2": "check-in",
+    "s3": "tamamlama",
+    "perfect": "11 kusursuz gün",
+    "perfectCopy": "Herkesin check-in yaptığı günler",
+    "closing": "Tek başına üçüncü günde bırakılırdı. Halkada on dördüncü güne kadar gitti."
+  },
+  "share": {
+    "chip": "Bittiğinde bunu paylaşırsın",
+    "title": "Arkadaşlarına göster.",
+    "sub": "Her tamamlanan halka paylaşılabilir bir karta dönüşür — dört görünüm, tek an.",
+    "cardTitle": "30 Gün Kitap Okuma",
+    "completed": "Birlikte tamamlandı",
+    "together": "gün, birlikte",
+    "days": "14 gün",
+    "people": "8 kişi",
+    "checkins": "96 check-in",
+    "rate": "%86",
+    "daysL": "gün",
+    "peopleL": "kişi",
+    "checkinsL": "check-in",
+    "rateL": "tamamlama",
+    "perfect": "✦ 9 kusursuz gün",
+    "names": ["Zeynep Demir", "Enes Kaya", "Selin Nur", "+5"]
+  },
+  "quote": {
+    "line": "Dün olmadı. Bugün buradasın."
+  },
+  "cta": {
+    "title": "Benimle var mısın?",
+    "sub": "İlk halkanı kurmak 30 saniye sürer.",
+    "button": "App Store'dan İndir",
+    "note": "İndirmek ücretsiz · Hesap yok · Reklam yok"
+  },
+  "soon": {
+    "title": "Yakında App Store'da",
+    "body": "Halkora son kontrollerden geçiyor. Yayına girer girmez buradan indirebileceksin.",
+    "ok": "Tamam"
+  },
+  "footer": {
+    "tagline": "Söz ver. Halka tutsun.",
+    "privacy": "Gizlilik",
+    "terms": "Kullanım Koşulları",
+    "support": "Destek",
+    "delete": "Hesap Silme",
+    "instagram": "Instagram",
+    "email": "support@halkora.app",
+    "rights": "© 2026 Halkora. Tüm hakları saklıdır."
+  }
+}

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="design_doc_mode" content="canvas">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#08090B; -webkit-font-smoothing:antialiased; }
+    a { color:#FF6B47; text-decoration:none; }
+    a:hover { color:#FF8A6B; }
+    @keyframes ringPulse { 0%,100% { opacity:0.9; } 50% { opacity:0.25; } }
+  </style>
+</helmet>
+
+<section style="font-family:'Satoshi',sans-serif; color:#F4F5F7; padding:64px; display:flex; flex-direction:column; gap:40px;">
+
+  <div style="max-width:800px;">
+    <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:13px; letter-spacing:0.18em; color:#FF6B47; text-transform:uppercase; margin-bottom:12px;">Halkora · Paylaşım Kartı</div>
+    <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:32px; letter-spacing:-0.02em; margin-bottom:10px;">Davet kartı (A) + İlerleme kartı (B) + üretim sheet'i</div>
+    <p style="font-size:15px; color:#9AA0AC; line-height:1.6; margin:0;">Story 1080×1920 (0.32 ölçek gösterim), üst/alt 250px metin-yasak bölge korunur. Boş halka "bitmemiş" değil "kurulmuş" okunur: tüm segmentler nötr, saat-12'de tek ember başlangıç işareti, merkezde başlangıç tarihi — halka bir sayaç değil, bir söz. Davet kodu görselde yok.</p>
+  </div>
+
+  <!-- ================= STORY CARDS ================= -->
+  <div style="display:flex; gap:40px; align-items:flex-start; flex-wrap:wrap;">
+
+    <!-- 1a — A: alone -->
+    <div id="1a" data-screen-label="A Davet — tek kişi" style="display:flex; flex-direction:column; gap:14px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1a</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">A · Davet — tek kişi · Story</span>
+      </div>
+      <div style="width:346px; height:614px; overflow:hidden; border-radius:12px; border:1px solid #262A33;">
+        <div style="width:1080px; height:1920px; transform:scale(0.32); transform-origin:top left; background:linear-gradient(180deg,#101116 0%,#0D0E11 45%); font-family:'Satoshi',sans-serif; color:#F4F5F7; display:flex; flex-direction:column; align-items:center; box-sizing:border-box; padding:300px 90px 290px; text-align:center;">
+          <div style="font-size:40px; color:#9AA0AC;">Enes bir halka kurdu</div>
+          <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:92px; letter-spacing:-0.02em; line-height:1.1; margin-top:24px;">Sabah Kulübü</div>
+          <div style="font-size:46px; color:#9AA0AC; margin-top:16px;">Her sabah 06:30'da uyan</div>
+
+          <div style="flex:1; display:flex; align-items:center;">
+            <div style="position:relative; width:560px; height:560px;">
+              <svg width="560" height="560" viewBox="0 0 560 560">
+                <sc-for list="{{ ringInviteL }}" as="s" hint-placeholder-count="15">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" stroke-linecap="round"></path>
+                </sc-for>
+                <circle cx="280" cy="42" r="13" fill="#FF6B47"></circle>
+              </svg>
+              <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:76px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">15 Ağustos</div>
+                <div style="font-size:42px; color:#9AA0AC; margin-top:8px;">başlıyor · 14 gün</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:64px; letter-spacing:-0.02em;">Benimle var mısın?</div>
+          <div style="font-size:36px; color:#5D6370; margin-top:20px;">Davet bağlantısı bu hikâyenin yanında</div>
+
+          <div style="display:flex; align-items:center; gap:14px; margin-top:56px;">
+            <svg width="36" height="36" viewBox="0 0 36 36">
+              <sc-for list="{{ ringMark }}" as="s" hint-placeholder-count="8">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+              </sc-for>
+            </svg>
+            <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:34px; letter-spacing:-0.01em; color:#9AA0AC;">halkora</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1b — A: group of four -->
+    <div id="1b" data-screen-label="A Davet — 4 kişi" style="display:flex; flex-direction:column; gap:14px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1b</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">A · Davet — 4 kişi · Story</span>
+      </div>
+      <div style="width:346px; height:614px; overflow:hidden; border-radius:12px; border:1px solid #262A33;">
+        <div style="width:1080px; height:1920px; transform:scale(0.32); transform-origin:top left; background:linear-gradient(180deg,#101116 0%,#0D0E11 45%); font-family:'Satoshi',sans-serif; color:#F4F5F7; display:flex; flex-direction:column; align-items:center; box-sizing:border-box; padding:300px 90px 290px; text-align:center;">
+          <div style="display:flex; align-items:center; gap:20px;">
+            <div style="display:flex;">
+              <sc-for list="{{ avatars4 }}" as="a" hint-placeholder-count="4">
+                <div style="width:72px; height:72px; border-radius:50%; background:{{ a.bg }}; border:5px solid #101116; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:28px; font-weight:600; color:#9AA0AC; margin-left:{{ a.ml }};">{{ a.t }}</div>
+              </sc-for>
+            </div>
+            <span style="font-size:40px; color:#9AA0AC;">Enes, Ayşe ve 2 kişi</span>
+          </div>
+          <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:92px; letter-spacing:-0.02em; line-height:1.1; margin-top:24px;">30 Gün Kitap Okuma</div>
+          <div style="font-size:46px; color:#9AA0AC; margin-top:16px;">Her gün 20 sayfa</div>
+
+          <div style="flex:1; display:flex; align-items:center;">
+            <div style="position:relative; width:540px; height:540px;">
+              <svg width="540" height="540" viewBox="0 0 540 540">
+                <sc-for list="{{ ringInviteM }}" as="s" hint-placeholder-count="15">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" stroke-linecap="round"></path>
+                </sc-for>
+                <circle cx="270" cy="41" r="13" fill="#FF6B47"></circle>
+              </svg>
+              <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:76px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">Yarın</div>
+                <div style="font-size:42px; color:#9AA0AC; margin-top:8px;">başlıyor · 14 gün</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:64px; letter-spacing:-0.02em;">Bize katılır mısın?</div>
+          <div style="font-size:36px; color:#5D6370; margin-top:20px;">Davet bağlantısı bu hikâyenin yanında</div>
+
+          <div style="display:flex; align-items:center; gap:14px; margin-top:56px;">
+            <svg width="36" height="36" viewBox="0 0 36 36">
+              <sc-for list="{{ ringMark }}" as="s" hint-placeholder-count="8">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+              </sc-for>
+            </svg>
+            <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:34px; letter-spacing:-0.01em; color:#9AA0AC;">halkora</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1c — B: mid-way -->
+    <div id="1c" data-screen-label="B İlerleme — 8/14" style="display:flex; flex-direction:column; gap:14px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1c</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">B · İlerleme — 8/14 · Story</span>
+      </div>
+      <div style="width:346px; height:614px; overflow:hidden; border-radius:12px; border:1px solid #262A33;">
+        <div style="width:1080px; height:1920px; transform:scale(0.32); transform-origin:top left; background:linear-gradient(180deg,#101116 0%,#0D0E11 45%); font-family:'Satoshi',sans-serif; color:#F4F5F7; display:flex; flex-direction:column; align-items:center; box-sizing:border-box; padding:300px 90px 290px; text-align:center;">
+          <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:92px; letter-spacing:-0.02em; line-height:1.1;">30 Gün Kitap Okuma</div>
+          <div style="font-size:46px; color:#9AA0AC; margin-top:16px;">Her gün 20 sayfa</div>
+
+          <div style="flex:1; display:flex; align-items:center;">
+            <div style="position:relative; width:580px; height:580px;">
+              <svg width="580" height="580" viewBox="0 0 580 580">
+                <sc-for list="{{ ringMid }}" as="s" hint-placeholder-count="15">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" stroke-linecap="round"></path>
+                </sc-for>
+              </svg>
+              <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:120px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">8/14</div>
+                <div style="font-size:44px; color:#9AA0AC; margin-top:4px;">birlikte</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:18px;">
+            <div style="display:flex;">
+              <sc-for list="{{ avatars5 }}" as="a" hint-placeholder-count="5">
+                <div style="width:64px; height:64px; border-radius:50%; background:{{ a.bg }}; border:5px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:24px; font-weight:600; color:{{ a.c }}; margin-left:{{ a.ml }};">{{ a.t }}</div>
+              </sc-for>
+            </div>
+            <span style="font-size:38px; color:#9AA0AC;">8 kişi, 8 gündür her gün</span>
+          </div>
+          <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:56px; letter-spacing:-0.02em; margin-top:32px;">Halka hâlâ açık — katılabilirsin</div>
+
+          <div style="display:flex; align-items:center; gap:14px; margin-top:56px;">
+            <svg width="36" height="36" viewBox="0 0 36 36">
+              <sc-for list="{{ ringMark }}" as="s" hint-placeholder-count="8">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+              </sc-for>
+            </svg>
+            <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:34px; letter-spacing:-0.01em; color:#9AA0AC;">halkora</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1d — B: finished -->
+    <div id="1d" data-screen-label="B İlerleme — 14/14" style="display:flex; flex-direction:column; gap:14px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1d</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">B · Bitiş — 14/14 · Story</span>
+      </div>
+      <div style="width:346px; height:614px; overflow:hidden; border-radius:12px; border:1px solid #262A33;">
+        <div style="width:1080px; height:1920px; transform:scale(0.32); transform-origin:top left; background:linear-gradient(180deg,#101116 0%,#0D0E11 45%); font-family:'Satoshi',sans-serif; color:#F4F5F7; display:flex; flex-direction:column; align-items:center; box-sizing:border-box; padding:300px 90px 290px; text-align:center;">
+          <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:100px; letter-spacing:-0.02em; line-height:1.12;">14 gün.<br>Birlikte.</div>
+
+          <div style="flex:1; display:flex; align-items:center;">
+            <div style="position:relative; width:580px; height:580px;">
+              <svg width="580" height="580" viewBox="0 0 580 580">
+                <sc-for list="{{ ringDone }}" as="s" hint-placeholder-count="15">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" stroke-linecap="round"></path>
+                </sc-for>
+              </svg>
+              <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:120px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; color:#FF6B47;">14/14</div>
+                <div style="font-size:44px; color:#9AA0AC; margin-top:4px;">30 Gün Kitap Okuma</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:44px; color:#9AA0AC;">8 kişi · 96 check-in · %86</div>
+          <div style="font-size:40px; color:#5D6370; margin-top:24px;">Halka kapandı. Yenisi yakında.</div>
+
+          <div style="display:flex; align-items:center; gap:14px; margin-top:56px;">
+            <svg width="36" height="36" viewBox="0 0 36 36">
+              <sc-for list="{{ ringMark }}" as="s" hint-placeholder-count="8">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+              </sc-for>
+            </svg>
+            <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:34px; letter-spacing:-0.01em; color:#9AA0AC;">halkora</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1e — square -->
+    <div id="1e" data-screen-label="Kare — Davet" style="display:flex; flex-direction:column; gap:14px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1e</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">Kare 1080×1080 · Davet (A)</span>
+      </div>
+      <div style="width:346px; height:346px; overflow:hidden; border-radius:12px; border:1px solid #262A33;">
+        <div style="width:1080px; height:1080px; transform:scale(0.32); transform-origin:top left; background:linear-gradient(180deg,#101116 0%,#0D0E11 55%); font-family:'Satoshi',sans-serif; color:#F4F5F7; display:flex; align-items:center; box-sizing:border-box; padding:80px; gap:56px;">
+          <div style="position:relative; width:380px; height:380px; flex-shrink:0;">
+            <svg width="380" height="380" viewBox="0 0 380 380">
+              <sc-for list="{{ ringSquare }}" as="s" hint-placeholder-count="15">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" stroke-linecap="round"></path>
+              </sc-for>
+              <circle cx="190" cy="30" r="10" fill="#FF6B47"></circle>
+            </svg>
+            <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+              <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:64px; letter-spacing:-0.02em;">Yarın</div>
+              <div style="font-size:36px; color:#9AA0AC; margin-top:6px;">14 gün</div>
+            </div>
+          </div>
+          <div style="min-width:0; flex:1;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div style="display:flex; flex-shrink:0;">
+                <sc-for list="{{ avatars4 }}" as="a" hint-placeholder-count="4">
+                  <div style="width:56px; height:56px; border-radius:50%; background:{{ a.bg }}; border:4px solid #101116; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:22px; font-weight:600; color:#9AA0AC; margin-left:{{ a.ml2 }};">{{ a.t }}</div>
+                </sc-for>
+              </div>
+              <span style="font-size:32px; color:#9AA0AC; white-space:nowrap;">Enes, Ayşe ve 2 kişi</span>
+            </div>
+            <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:66px; letter-spacing:-0.02em; line-height:1.12; margin-top:24px;">30 Gün Kitap Okuma</div>
+            <div style="font-size:38px; color:#9AA0AC; margin-top:14px;">Her gün 20 sayfa</div>
+            <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:50px; letter-spacing:-0.02em; margin-top:44px;">Bize katılır mısın?</div>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:56px;">
+              <svg width="30" height="30" viewBox="0 0 36 36">
+                <sc-for list="{{ ringMark }}" as="s" hint-placeholder-count="8">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+                </sc-for>
+              </svg>
+              <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; color:#9AA0AC;">halkora</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="max-width:346px; font-size:13px; color:#5D6370; line-height:1.6;">Kare için daveti (A) seçtim: kare format X/feed'de yaşar — linkin metin olarak yanında gittiği, yabancıların gördüğü yer. Büyüme anı davettir; ilerleme kartı çoğunlukla Stories'e gider.</div>
+    </div>
+
+    <!-- 1f — sheet -->
+    <div id="1f" data-screen-label="Paylaşım Sheet" style="display:flex; flex-direction:column; gap:14px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1f</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">Uygulama içi paylaşım sheet'i</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+          <div style="padding:64px 20px; opacity:0.3; filter:blur(2px);">
+            <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em;">30 Gün Kitap Okuma</div>
+            <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; height:180px; margin-top:20px;"></div>
+          </div>
+          <div style="position:absolute; inset:0; background:rgba(6,7,9,0.72);"></div>
+
+          <div style="position:absolute; left:0; right:0; bottom:0; background:#1D2027; border-radius:24px 24px 0 0; padding:14px 20px 40px;">
+            <div style="width:40px; height:4px; border-radius:2px; background:#3A3F4A; margin:0 auto 20px;"></div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+              <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:20px; letter-spacing:-0.02em;">Halkanı paylaş</div>
+              <div style="display:flex; background:#15171C; border:1px solid #262A33; border-radius:28px; padding:3px;">
+                <span style="font-size:13px; font-weight:700; background:#FF6B47; color:#0D0E11; border-radius:28px; padding:6px 14px;">Story</span>
+                <span style="font-size:13px; font-weight:500; color:#9AA0AC; padding:6px 14px;">Kare</span>
+              </div>
+            </div>
+
+            <!-- live preview -->
+            <div style="display:flex; justify-content:center; margin-bottom:20px;">
+              <div style="width:151px; height:269px; overflow:hidden; border-radius:12px; border:1px solid #262A33;">
+                <div style="width:1080px; height:1920px; transform:scale(0.14); transform-origin:top left; background:linear-gradient(180deg,#101116 0%,#0D0E11 45%); display:flex; flex-direction:column; align-items:center; box-sizing:border-box; padding:300px 90px 290px; text-align:center; color:#F4F5F7;">
+                  <div style="font-size:40px; color:#9AA0AC;">Enes, Ayşe ve 2 kişi</div>
+                  <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:92px; letter-spacing:-0.02em; line-height:1.1; margin-top:24px;">30 Gün Kitap Okuma</div>
+                  <div style="font-size:46px; color:#9AA0AC; margin-top:16px;">Her gün 20 sayfa</div>
+                  <div style="flex:1; display:flex; align-items:center;">
+                    <div style="position:relative; width:540px; height:540px;">
+                      <svg width="540" height="540" viewBox="0 0 540 540">
+                        <sc-for list="{{ ringInviteM }}" as="s" hint-placeholder-count="15">
+                          <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" stroke-linecap="round"></path>
+                        </sc-for>
+                        <circle cx="270" cy="41" r="13" fill="#FF6B47"></circle>
+                      </svg>
+                      <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                        <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:76px; letter-spacing:-0.02em;">Yarın</div>
+                        <div style="font-size:42px; color:#9AA0AC; margin-top:8px;">başlıyor · 14 gün</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:64px; letter-spacing:-0.02em;">Bize katılır mısın?</div>
+                </div>
+              </div>
+            </div>
+
+            <button style="width:100%; height:56px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Paylaş</button>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+              <button style="flex:1; height:48px; border-radius:28px; background:transparent; color:#F4F5F7; border:1px solid #262A33; font-family:'Satoshi',sans-serif; font-size:15px; font-weight:500; cursor:pointer;">Görseli kaydet</button>
+              <button style="flex:1; height:48px; border-radius:28px; background:transparent; color:#F4F5F7; border:1px solid #262A33; font-family:'Satoshi',sans-serif; font-size:15px; font-weight:500; cursor:pointer;">Bağlantıyı kopyala</button>
+            </div>
+            <div style="text-align:center; font-size:13px; color:#5D6370; margin-top:14px;">Davet bağlantısı görselin yanında metin olarak gider.</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <!-- segment legibility strip -->
+  <div style="max-width:800px; background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px;">
+    <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.12em; color:#5D6370; text-transform:uppercase; margin-bottom:16px;">Segment okunurluğu · 7 / 14 / 21 / 30</div>
+    <div style="display:flex; gap:32px; align-items:center; flex-wrap:wrap;">
+      <sc-for list="{{ legibility }}" as="r" hint-placeholder-count="4">
+        <div style="text-align:center;">
+          <svg width="96" height="96" viewBox="0 0 96 96">
+            <sc-for list="{{ r.segs }}" as="s" hint-placeholder-count="14">
+              <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" stroke-linecap="round"></path>
+            </sc-for>
+          </svg>
+          <div style="font-size:13px; color:#5D6370; margin-top:6px; font-variant-numeric:tabular-nums;">{{ r.label }}</div>
+        </div>
+      </sc-for>
+      <div style="flex:1; min-width:220px; font-size:14px; color:#9AA0AC; line-height:1.6;">21+ günde segment inceldikçe boşluk açısı sabit kalır (3°), kalınlık düşer — daire hiç bozulmaz. 30 segmentte uçlar yuvarlatılmış kalır; 200px thumbnail'da bile dolu/boş ayrımı okunur.</div>
+    </div>
+  </div>
+
+  <!-- build notes -->
+  <div style="max-width:800px; background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; font-size:14px; color:#9AA0AC; line-height:1.7;">
+    <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.12em; color:#5D6370; text-transform:uppercase; margin-bottom:10px;">Uygulama notu — tip ölçeği ve boşluk (1080 tuvalde)</div>
+    Başlık 92/101 semibold −2% (2 satıra sarar, 40 karakter sığar) · aksiyon 46 secondary · davet cümlesi 64 semibold · kim-var satırı 40 · meta 36–44 · wordmark 34. Halka: story'de 540–580px, stroke 34px, segment arası 3°, saat-12 başlangıç noktası 13px ember daire. Kenar boşluğu 90px; üst 300 / alt 290px doldurma Instagram'ın 250px yasak bölgesini karşılar. Kare: iki sütun (halka 380px + metin, başlık 66px), kenar 80px. Segment boşluğu: yuvarlak uçlar her ucu stroke/2 uzattığı için arc açıları bu kadar içeri alınır — 3° nefes boşluğu her boyutta görünür kalır. Tümü RN + react-native-svg ile birebir: yalnız arc path + lineCap round; tek arka plan gradyanı (#101116→#0D0E11, dikey). Format toggle'ı tuttum: Story birincil, ama X'e davet atan için kare gerçek bir ihtiyaç — tek formata indirmek paylaşım yüzeyi kaybettirir.
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;: 2100, &quot;height&quot;: 1900}
+}">
+class Component extends DCLogic {
+  pt(c, r, deg) {
+    const a = (deg * Math.PI) / 180;
+    return (c + r * Math.cos(a)).toFixed(2) + ' ' + (c + r * Math.sin(a)).toFixed(2);
+  }
+  ring(n, size, stroke, filled, gapDeg) {
+    const c = size / 2, r = (size - stroke) / 2 - (size > 200 ? stroke * 0.4 : 0), span = 360 / n;
+    const g = gapDeg ?? 3;
+    // round linecaps extend each end by stroke/2 — inset arc ends so gaps stay visible
+    const capDeg = ((stroke / 2) / r) * (180 / Math.PI);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a0 = -90 + i * span + g / 2 + capDeg;
+      const a1 = -90 + (i + 1) * span - g / 2 - capDeg;
+      const d = 'M ' + this.pt(c, r, a0) + ' A ' + r + ' ' + r + ' 0 0 1 ' + this.pt(c, r, a1);
+      out.push({ d, stroke: i < filled ? '#FF6B47' : '#3A3F4A', w: stroke });
+    }
+    return out;
+  }
+  renderVals() {
+    const av = (t, bg, ml, ml2, c) => ({ t, bg, ml, ml2, c: c || '#9AA0AC' });
+    return {
+      ringInviteL: this.ring(14, 560, 34, 0),
+      ringInviteM: this.ring(14, 540, 34, 0),
+      ringMid: this.ring(14, 580, 34, 8),
+      ringDone: this.ring(14, 580, 34, 14),
+      ringSquare: this.ring(14, 440, 28, 0),
+      ringMark: this.ring(8, 36, 4, 5, 8),
+      avatars4: [
+        av('EK', '#1D2027', '0', '0'), av('AY', '#262A33', '-18px', '-14px'),
+        av('MC', '#1D2027', '-18px', '-14px'), av('ZD', '#262A33', '-18px', '-14px'),
+      ],
+      avatars5: [
+        av('EK', '#1D2027', '0', '0'), av('AY', '#262A33', '-16px', '-12px'),
+        av('MC', '#1D2027', '-16px', '-12px'), av('ZD', '#262A33', '-16px', '-12px'),
+        av('+4', 'rgba(255,107,71,0.12)', '-16px', '-12px', '#FF6B47'),
+      ],
+      legibility: [
+        { label: '7 gün', segs: this.ring(7, 96, 9, 4, 4) },
+        { label: '14 gün', segs: this.ring(14, 96, 7, 8, 3.5) },
+        { label: '21 gün', segs: this.ring(21, 96, 5.5, 12, 3) },
+        { label: '30 gün', segs: this.ring(30, 96, 4, 17, 3) },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

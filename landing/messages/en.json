@@ -1,0 +1,222 @@
+{
+  "meta": {
+    "title": "halkora — Make a promise. The ring keeps it.",
+    "description": "Build a shared goal with friends. One tap a day to check in and watch the ring fill. No confetti — just you, your crew, and a closing ring."
+  },
+  "nav": {
+    "download": "Download on the App Store"
+  },
+  "hero": {
+    "eyebrow": "halkora",
+    "titleA": "Promises you make to yourself",
+    "titleB": "fade when you're alone.",
+    "titleAccent": "Not when friends are watching.",
+    "sub": "Set a shared goal, invite your crew. One tap a day to check in — the day's segment fills, and everyone sees it instantly.",
+    "primaryCta": "Download on the App Store",
+    "secondaryCta": "How it works",
+    "meta": "Free · No accounts · No ads",
+    "cardTitle": "30-Day Book Challenge",
+    "cardAction": "Today: read 20 pages",
+    "cardDone": "5/8 done",
+    "stake": "Stake: loser buys coffee",
+    "bubbleDone": "Enes checked in",
+    "dayLabel": "Day"
+  },
+  "marquee": {
+    "row1": [
+      "30-Day Book Challenge",
+      "6:30 AM Club",
+      "Sugar-Free 14 Days",
+      "10,000 Steps × 7 Days",
+      "20 Pages a Day",
+      "Cold Shower · 21 Days",
+      "Phone-Free Evenings",
+      "One Page a Day",
+      "8 Hours of Sleep",
+      "No Screens for 30 Mins"
+    ],
+    "row2": [
+      "2 Liters of Water",
+      "3 Runs a Week",
+      "Meditation · 10 Minutes",
+      "Lunchtime Walks",
+      "Language Practice · 15 Minutes",
+      "Gratitude Journal",
+      "10 Pages Before Bed",
+      "Take the Stairs",
+      "Wake Up Early, Win",
+      "Weekend Hikes"
+    ]
+  },
+  "manifesto": {
+    "kicker": "halkora principles",
+    "l1": "No notification floods.",
+    "l2": "No badge collections.",
+    "l3": "No confetti.",
+    "l4": "Just you, your crew, and a filling ring."
+  },
+  "how": {
+    "kicker": "01 · How it works",
+    "title": "Three steps. Then one tap a day.",
+    "s1": {
+      "title": "Start your ring",
+      "copy": "Pick a goal, write the daily action, set the duration. Takes 30 seconds.",
+      "fieldName": "Morning Club",
+      "fieldAction": "Wake at 6:30 every day",
+      "fieldDays": "14 days"
+    },
+    "s2": {
+      "title": "Invite your friends",
+      "copy": "A single invite link is enough. No account, no password, no email — just a name.",
+      "link": "halkora.app/j/8K2N",
+      "ready": "6 people ready"
+    },
+    "s3": {
+      "title": "One tap a day",
+      "copy": "Check in and the day's segment fills with ember. Your crew sees it instantly.",
+      "button": "Check in"
+    }
+  },
+  "ringDemo": {
+    "kicker": "02 · The signature ring",
+    "title": "How does the ring fill?",
+    "copy": "Keep scrolling. Every segment is a day; every day is a single tap.",
+    "scrollHint": "Scroll",
+    "action": "Today: read 20 pages",
+    "checkin": "Check in",
+    "done": "Done",
+    "dayLabel": "Day",
+    "m1": {
+      "title": "Day 1",
+      "copy": "You made a promise. The ring is set, everyone's in."
+    },
+    "m2": {
+      "title": "Day 7",
+      "copy": "You've come this far. You won't stop now."
+    },
+    "m3": {
+      "title": "Day 14",
+      "copy": "The ring closes. The stake settles."
+    }
+  },
+  "features": {
+    "kicker": "03 · Why it works",
+    "title": "No shaming. No judging. Just visibility.",
+    "stake": {
+      "title": "Put something on the line",
+      "copy": "The group places a small, friendly stake. The loser is clear — nobody gets shamed.",
+      "opt1": "Buys coffee",
+      "opt2": "Watches the group's movie pick"
+    },
+    "joker": {
+      "title": "Life happens",
+      "copy": "A missed day doesn't break the ring. Your joker day burns amber, and you move on."
+    },
+    "social": {
+      "title": "Everyone, at a glance",
+      "copy": "Every ring is open. See who showed up today and who's still pending.",
+      "now": "Today",
+      "waiting": "Pending"
+    },
+    "wave": {
+      "title": "Wave at the quiet ones",
+      "copy": "No nagging, no lectures. A gentle “we're here” in one tap.",
+      "button": "Wave 👋",
+      "status": "Quiet for 2 days"
+    },
+    "chat": {
+      "title": "A chat per ring",
+      "copy": "A simple day-by-day thread. No ads, no noise, no infinite scroll.",
+      "b1": "30 pages down today, the book finally opened up 📖",
+      "b2": "I'll do mine tonight, before sleep 💪",
+      "sys": "Enes checked in",
+      "day": "Day 7"
+    }
+  },
+  "story": {
+    "chip": "A real evening",
+    "l1": "Today's 20 pages are still unread.",
+    "rTime": "8:30 PM",
+    "rTitle": "Your ring is waiting.",
+    "rBody": "Today's check-in is still on you.",
+    "l2": "Phone in hand, eyelids getting heavy.",
+    "l3": "Right as you're about to give in — a buzz.",
+    "wTime": "10:14 PM",
+    "wTitle": "👋 Ela waved at you",
+    "wBody": "30-Day Book Challenge",
+    "closing": "Three minutes later, the book is in your hand. One more segment fills."
+  },
+  "widgets": {
+    "kicker": "04 · Widgets",
+    "chip": "New",
+    "title": "Now on your home screen.",
+    "sub": "See your ring without opening the app, check in with one tap. It lives on your home and lock screens now.",
+    "checkin": "Check in",
+    "smallName": "6:30 AM Club",
+    "mediumName": "30-Day Book Challenge",
+    "mediumAction": "Today: read 20 pages",
+    "mediumDay": "DAY 10/21",
+    "mediumDone": "4/8 done",
+    "mediumJoker": "1 joker left",
+    "sTitle": "Small · 2×2",
+    "sCopy": "One ring, one glance, one tap.",
+    "mTitle": "Medium · 4×2",
+    "mCopy": "Today's action and your crew's status, together.",
+    "lTitle": "Lock screen",
+    "lCopy": "Your ring is there every time you pick up your phone — you can't scroll past it.",
+    "note": "A completed widget goes quiet — no confetti; the filled ring is the reward."
+  },
+  "done": {
+    "chip": "Fourteen days later",
+    "title": "14 days. Together.",
+    "sub": "Book Club Challenge completed",
+    "s1": "people",
+    "s2": "check-ins",
+    "s3": "completed",
+    "perfect": "11 flawless days",
+    "perfectCopy": "Days when everyone checked in",
+    "closing": "Alone, it would've ended on day three. In the ring, it went all fourteen."
+  },
+  "share": {
+    "chip": "This is what you share when it's done",
+    "title": "Show your friends.",
+    "sub": "Every finished ring becomes a shareable card — four looks, one moment.",
+    "cardTitle": "30-Day Book Challenge",
+    "completed": "Completed together",
+    "together": "days, together",
+    "days": "14 days",
+    "people": "8 people",
+    "checkins": "96 check-ins",
+    "rate": "86%",
+    "daysL": "days",
+    "peopleL": "people",
+    "checkinsL": "check-ins",
+    "rateL": "completed",
+    "perfect": "✦ 9 flawless days",
+    "names": ["Zeynep Demir", "Enes Kaya", "Selin Nur", "+5"]
+  },
+  "quote": {
+    "line": "Yesterday didn't happen. You're here today."
+  },
+  "cta": {
+    "title": "Are you in?",
+    "sub": "Starting your first ring takes 30 seconds.",
+    "button": "Download on the App Store",
+    "note": "Free download · No accounts · No ads"
+  },
+  "soon": {
+    "title": "Coming soon to the App Store",
+    "body": "Halkora is going through its final checks. You'll be able to download it here the moment it ships.",
+    "ok": "Got it"
+  },
+  "footer": {
+    "tagline": "Make a promise. The ring keeps it.",
+    "privacy": "Privacy",
+    "terms": "Terms of Use",
+    "support": "Support",
+    "delete": "Delete Account",
+    "instagram": "Instagram",
+    "email": "support@halkora.app",
+    "rights": "© 2026 Halkora. All rights reserved."
+  }
+}
