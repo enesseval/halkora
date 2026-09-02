@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { AppText, Button, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { PendingCard, CompletedCard, UpcomingRow } from '@/components/ChallengeCard';
-import { SwipeableRow, SwipeAction } from '@/components/SwipeableRow';
+import { SwipeableRow, SwipeAction, closeOpenSwipeableRow } from '@/components/SwipeableRow';
 import { ProgressRing } from '@/components/ProgressRing';
 import { QuickStartSheet } from '@/components/QuickStartSheet';
 import { HomeSkeleton } from '@/components/HomeSkeleton';
@@ -243,6 +243,11 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 48 }}
+          // Touching anywhere else on the list puts an open row away, the way
+          // every iOS list does — it used to stay open until you swiped it
+          // back yourself.
+          onScrollBeginDrag={closeOpenSwipeableRow}
+          onTouchStart={closeOpenSwipeableRow}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
           }

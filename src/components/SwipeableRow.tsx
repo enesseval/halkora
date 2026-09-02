@@ -14,6 +14,23 @@ export interface SwipeAction {
   onPress: () => void;
 }
 
+/**
+ * The one row whose actions are currently showing, app-wide.
+ *
+ * Two rows open at once is not a state iOS ever puts you in, and it was
+ * reachable here: opening a second row left the first one sitting open
+ * behind it, and tapping anywhere else on the screen left it open too
+ * (saha testi bulgusu). A module-level reference is enough — there is only
+ * ever one list on screen, and "the open row" is genuinely one thing.
+ */
+let openRow: { close: () => void } | null = null;
+
+/** Closes whatever row is open. Screens call this from a background tap. */
+export function closeOpenSwipeableRow(): void {
+  openRow?.close();
+  openRow = null;
+}
+
 /** Full button size on a card row, and on a one-line row. */
 const SIZE = { full: 52, compact: 40 };
 /** Gap between buttons, and from the screen edge. */
@@ -21,14 +38,18 @@ const GAP = 4;
 /** Breathing room between the row itself and the first button. */
 const LEAD = 8;
 /**
- * Past this, letting go performs the destructive action outright instead of
- * parking the row open — the "swipe all the way to delete" every iOS list has.
- * Deliberately far: it must not be reachable by an ordinary swipe that meant
- * to reveal the buttons.
+ * How far past the open strip a drag has to go before letting go performs the
+ * destructive action outright — the "swipe all the way to delete" every iOS
+ * list has.
+ *
+ * Measured in the same units as `transX`, which is the finger's travel
+ * divided by `friction`. It used to sit at a flat 220 with an extra 90 of
+ * margin, numbers that could not be reached at all: `overshootFriction` was
+ * 8, so every point past the strip's own width cost EIGHT points of finger
+ * travel. Reaching 220 needed most of a metre. That is why the row "simply
+ * stopped, open, however hard you pulled" even after overshoot was turned on.
  */
-const FULL_SWIPE = 220;
-/** Extra travel past the last slot before a release counts as "delete it". */
-const FULL_SWIPE_MARGIN = 90;
+const FULL_SWIPE_MARGIN = 70;
 /** How far the edge button stretches once the full swipe is armed. */
 const FULL_SWIPE_GROWTH = 190;
 
@@ -61,6 +82,8 @@ export function SwipeableRow({
   compact?: boolean;
 }) {
   const ref = useRef<Swipeable>(null);
+  /** Stable identity for the registry above, so it survives re-renders. */
+  const handle = useRef({ close: () => ref.current?.close() });
   /** Set while the drag is past FULL_SWIPE, read when the gesture ends. */
   const armed = useRef(false);
   /** renderRightActions runs on every render; the listener must not stack. */
@@ -74,24 +97,25 @@ export function SwipeableRow({
     // Measured from where the buttons END, so the threshold scales with how
     // many actions the row has instead of being a number that happens to
     // work for two.
-    const fullSwipeAt = Math.max(
-      FULL_SWIPE,
-      LEAD + actions.length * (size + GAP) + FULL_SWIPE_MARGIN,
-    );
+    const fullSwipeAt = LEAD + actions.length * (size + GAP) + FULL_SWIPE_MARGIN;
 
     // Arm the full swipe from the same value the animation uses, so the
     // threshold and the visuals can never disagree.
     if (!watching.current) {
       watching.current = true;
       (dragX as unknown as RNAnimated.Value).addListener?.(({ value }) => {
-        const past = -value >= fullSwipeAt;
+        if (-value < fullSwipeAt || armed.current) return;
+        // A latch, not a live reading. Letting go springs the row back to the
+        // open position, which is BELOW the threshold — so writing the live
+        // comparison here cleared the flag again before onSwipeableWillOpen
+        // could read it, and the full swipe never fired even when it had
+        // genuinely been reached. Cleared when the gesture is resolved, not
+        // when the value dips.
+        armed.current = true;
         // A tap on the shoulder at the moment letting go would fire the
         // action, which is the whole reason Apple's version feels safe to
         // pull into rather than something you fall off.
-        if (past && !armed.current) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => {});
-        }
-        armed.current = past;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => {});
       });
     }
 
@@ -201,12 +225,18 @@ export function SwipeableRow({
       // swipe was unreachable, and with it the growing button: the row simply
       // stopped, open, however hard you pulled.
       overshootRight
-      overshootFriction={8}
+      // 1, not 8. Anything higher divides the overshoot by that factor, and
+      // the full-swipe threshold lives entirely inside the overshoot — at 8
+      // it was unreachable by any real gesture.
+      overshootFriction={1}
       friction={1.6}
       // The strip should be considered "open" while the buttons are visible,
       // rather than only after a long pull.
       rightThreshold={40}
       onSwipeableWillOpen={() => {
+        // Whoever is opening takes the slot; anyone else closes.
+        if (openRow && openRow !== handle.current) openRow.close();
+        openRow = handle.current;
         // Dragged all the way: do the last (destructive) action instead of
         // parking the row open, which is what every iOS list does.
         if (!armed.current) return;
@@ -218,6 +248,7 @@ export function SwipeableRow({
       }}
       onSwipeableClose={() => {
         armed.current = false;
+        if (openRow === handle.current) openRow = null;
       }}
     >
       {children}
