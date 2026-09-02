@@ -1,6 +1,7 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   cancelAnimation,
@@ -9,6 +10,8 @@ import Animated, {
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withSpring,
   withTiming,
   Easing,
@@ -29,7 +32,24 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
  * as broken — you let go before it fired and there was no way to know.
  */
 const UNDO_HOLD_MS = 750;
-const UNDO_RING_WIDTH = 3;
+/**
+ * 5, not 3. At three points the hold ring was a hairline you had to go
+ * looking for — the feedback existed and still read as "nothing is
+ * happening" (saha testi bulgusu — "telefonda da çok ince bir nokta var
+ * orayı yakalamak gerekiyor").
+ */
+const UNDO_RING_WIDTH = 5;
+
+/**
+ * How long the button stays closed after an action, showing what happened.
+ *
+ * Both check-in and undo used to change the button's contents the instant
+ * they were tapped, while the write was still in flight — nothing said the
+ * app had heard you, and nothing stopped a second tap landing on a button
+ * that was already busy. The circle now fills, a mark lands in it, and the
+ * whole thing is inert until it clears.
+ */
+const CONFIRM_MS = 1100;
 
 interface Props {
   size?: number;
@@ -66,12 +86,58 @@ export function CheckInButton({
     opacity: hold.value > 0 ? 1 : 0,
   }));
 
+  /**
+   * The confirmation overlay. `confirm` is what it says — a tick for a
+   * check-in, a turned-back arrow for an undo — and `fill` drives the circle
+   * that grows behind it. While either is set the button takes no input.
+   */
+  const [confirm, setConfirm] = useState<'done' | 'undone' | null>(null);
+  /**
+   * One timeline for the whole confirmation, 0 → 1 → 0. The circle and the
+   * mark are both read off it rather than animated separately, so they can
+   * never drift out of step with each other.
+   */
+  const confirmT = useSharedValue(0);
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Circle first, over the opening 60% of the timeline.
+  const fillStyle = useAnimatedStyle(() => {
+    const v = Math.min(confirmT.value / 0.6, 1);
+    return { transform: [{ scale: v }], opacity: v > 0 ? 1 : 0 };
+  });
+  // Mark second, landing in the circle once it's most of the way open.
+  const markStyle = useAnimatedStyle(() => {
+    const v = Math.max((confirmT.value - 0.45) / 0.55, 0);
+    return { transform: [{ scale: v }], opacity: v };
+  });
+
+  const runConfirm = (kind: 'done' | 'undone') => {
+    setConfirm(kind);
+    // Zero-length step back to 0 first, so a second run can't inherit where
+    // the last one stopped.
+    confirmT.value = withSequence(
+      withTiming(0, { duration: 0 }),
+      withTiming(1, { duration: 560, easing: Easing.out(Easing.cubic) }),
+      withDelay(CONFIRM_MS - 560, withTiming(0, { duration: 220 })),
+    );
+    if (clearTimer.current) clearTimeout(clearTimer.current);
+    clearTimer.current = setTimeout(() => setConfirm(null), CONFIRM_MS + 220);
+  };
+
+  useEffect(
+    () => () => {
+      if (clearTimer.current) clearTimeout(clearTimer.current);
+    },
+    [],
+  );
+
   const press = () => {
-    if (done) return;
+    if (done || confirm) return;
     scale.value = withSpring(0.97, { damping: 12, stiffness: 260 }, () => {
       scale.value = withSpring(1, { damping: 12, stiffness: 260 });
     });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    runConfirm('done');
     onCheckIn();
   };
 
@@ -79,11 +145,12 @@ export function CheckInButton({
     if (fired.current || !onUndo) return;
     fired.current = true;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    runConfirm('undone');
     onUndo();
   };
 
   const startHold = () => {
-    if (!done || !onUndo) return;
+    if (!done || !onUndo || confirm) return;
     fired.current = false;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     hold.value = 0;
@@ -143,6 +210,37 @@ export function CheckInButton({
             out of trouble, it just spills past the edge. So the type here
             neither follows the system size setting nor runs wider than the
             circle's own usable chord. */}
+        {/* The confirmation. Sits over whatever the button's contents happen
+            to be, so it doesn't matter that `done` has already flipped
+            underneath it — the circle fills, the mark lands, and the button
+            is inert until both clear. */}
+        {confirm ? (
+          <>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                {
+                  position: 'absolute',
+                  width: size,
+                  height: size,
+                  borderRadius: size / 2,
+                  backgroundColor: confirm === 'done' ? colors.ember : colors.bgElevated,
+                  borderWidth: confirm === 'done' ? 0 : hairline,
+                  borderColor: colors.strokeSubtle,
+                },
+                fillStyle,
+              ]}
+            />
+            <Animated.View pointerEvents="none" style={[{ position: 'absolute' }, markStyle]}>
+              <Feather
+                name={confirm === 'done' ? 'check' : 'rotate-ccw'}
+                size={Math.round(size * 0.34)}
+                color={confirm === 'done' ? colors.bgBase : colors.textSecondary}
+              />
+            </Animated.View>
+          </>
+        ) : null}
+
         {done ? (
           <Animated.View
             entering={FadeIn.duration(250)}
