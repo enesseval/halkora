@@ -71,14 +71,25 @@ export function ShareRingSheet({
   const link = inviteUrl(challenge.inviteCode);
   const scale = PREVIEW_W / (format === 'story' ? STORY_W : SQUARE);
 
-  const capture = async (): Promise<string> =>
-    captureRef(shotRef, {
+  const capture = async (): Promise<string> => {
+    const path = await captureRef(shotRef, {
       format: 'png',
       quality: 1,
       // The card is laid out at 360pt wide; capturing at the device's pixel
       // ratio is what makes a 3x phone produce the 1080px the design targets.
       result: 'tmpfile',
     });
+    // `tmpfile` hands back a bare filesystem path on iOS, with no scheme.
+    // Share.share({ url }) needs a real URL: given a plain path it treats the
+    // value as text, and an activity sheet built from text has no "Save
+    // Image" in it — which is exactly what was missing (saha testi bulgusu —
+    // "hala fotoğraflara kaydetme olayı yok"). No permission plumbing is
+    // needed beyond this; iOS asks for Photos access itself when the person
+    // taps Save.
+    return path.startsWith('file://') || path.startsWith('content://')
+      ? path
+      : `file://${path}`;
+  };
 
   /**
    * Image and link together.

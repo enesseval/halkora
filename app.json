@@ -10,18 +10,25 @@
     "backgroundColor": "#0D0E11",
     "ios": {
       "supportsTablet": true,
-      "associatedDomains": ["applinks:halkora.app"],
+      "associatedDomains": [
+        "applinks:halkora.app"
+      ],
       "bundleIdentifier": "com.halkora.app",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "appleTeamId": "82S9ART43D",
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
-        "CFBundleLocalizations": ["tr", "en"],
+        "CFBundleLocalizations": [
+          "tr",
+          "en"
+        ],
         "CFBundleDevelopmentRegion": "tr",
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.halkora.app.widget"]
+        "com.apple.security.application-groups": [
+          "group.com.halkora.app.widget"
+        ]
       }
     },
     "android": {
