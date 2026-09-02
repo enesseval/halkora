@@ -1,7 +1,7 @@
-import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { View } from 'react-native';
 import { colors, fonts } from '@/theme/tokens';
-import { AppText } from './ui';
+import { AppText, FixedType } from './ui';
 import { useT } from '@/i18n';
 import type { Challenge } from '@/data/types';
 
@@ -55,6 +55,12 @@ const TYPE_SQUARE = {
   meta: u(34),
 };
 
+/**
+ * Line-height factor for the ring's big numerals. Not a guess at Satoshi's
+ * metrics — a margin wide enough that it doesn't matter what they are.
+ */
+const RING_LINE = 1.3;
+
 const PAD = {
   edge: u(90),
   // Instagram's own UI covers the top and bottom ~250px of a story; these
@@ -67,8 +73,6 @@ const RING = {
   story: u(560),
   square: u(440),
   stroke: u(34),
-  /** The 12-o'clock mark on an unstarted ring: where it will begin. */
-  startDot: u(13),
 };
 
 /**
@@ -83,6 +87,19 @@ const RING = {
  * mapped onto those eight.
  */
 const LOGO_SEGMENTS = 8;
+/**
+ * The share ring's own geometry, matched to the app's.
+ *
+ * It used to borrow the wordmark's 12° gaps, and that is twice what
+ * ProgressRing draws on every screen (6°) — so the card's ring read as a
+ * different, airier object than the one people had been looking at all week
+ * (saha testi bulgusu — "parçaların arası çok açık, uygulamanın diğer
+ * noktalarında gösterdiğimiz görsellerle aynı değil"). The wordmark keeps
+ * the logo's spacing below; it IS the logo.
+ */
+const RING_GAP = 6;
+const RING_SPAN = 360 / 8 - RING_GAP;
+
 /** Straight from the wordmark below: 33° of arc, 12° of gap. */
 const LOGO_SPAN = 33;
 const LOGO_GAP = 12;
@@ -137,17 +154,17 @@ function ShareRing({
         {Array.from({ length: LOGO_SEGMENTS }, (_, i) => (
           <Path
             key={i}
-            d={arcPath(cx, cy, r, i * step + LOGO_GAP / 2, i * step + LOGO_GAP / 2 + LOGO_SPAN)}
+            d={arcPath(cx, cy, r, i * step + RING_GAP / 2, i * step + RING_GAP / 2 + RING_SPAN)}
             stroke={i < lit ? colors.ember : colors.waiting}
             strokeWidth={stroke}
-            strokeLinecap="round"
+            // Butt, like every other ring in the app — the home cards, the
+            // detail screen, the boot chase and the widget all draw square
+            // ends. Round ones here made the share card read as a different
+            // product's artwork.
+            strokeLinecap="butt"
             fill="none"
           />
         ))}
-        {/* Where day one will land. One dot of ember on an otherwise unlit
-            ring — the card's only colour, and what makes an unstarted ring
-            read as "about to begin" rather than blank. */}
-        {empty ? <Circle cx={cx} cy={cy - r} r={RING.startDot / 2} fill={colors.ember} /> : null}
       </Svg>
       {children}
     </View>
@@ -214,7 +231,7 @@ function Wordmark() {
             d={arcPath(u(17), u(17), u(13), i * 45 + LOGO_GAP / 2, i * 45 + LOGO_GAP / 2 + LOGO_SPAN)}
             stroke={colors.ember}
             strokeWidth={u(7)}
-            strokeLinecap="round"
+            strokeLinecap="butt"
             fill="none"
           />
         ))}
@@ -265,6 +282,22 @@ export function InviteCard({
   const done = challenge.days.filter((d) => d === 'done' || d === 'joker').length;
   const finished = challenge.status === 'completed';
   const alone = challenge.participants.length <= 1;
+  // A lobby ring has no start date yet, so the ring's centre showed the
+  // words "Kurucu başlatacak" at headline size — a long phrase crammed into
+  // a circle, with the one fact a stranger actually needs (how long this
+  // runs) pushed into the small line under it. For these the day count is
+  // the headline and the missing date is stated plainly instead.
+  const undated = challenge.status === 'lobby';
+  /**
+   * A ring whose join window has shut. The detail menu already hides "invite"
+   * for this, but the shared card still said "katılabilirsin" — an image
+   * inviting people into something they cannot enter (saha testi bulgusu —
+   * "sanki birini davet edebilecekmişim gibi").
+   */
+  const joinsClosed = !!challenge.firstDayJoinOnly && challenge.currentDay > 1;
+  /** The ring's big line, and the day counter that shares its slot. */
+  const counter = format === 'square' ? u(84) : u(112);
+  const headline = undated ? counter : format === 'square' ? u(52) : u(72);
   const owner = challenge.participants[0]?.name ?? '';
 
   const ringSize = format === 'story' ? RING.story : RING.square;
@@ -272,8 +305,9 @@ export function InviteCard({
   // In the square the ring is only 147pt across with the text beside it, and
   // "15 Ağustos'ta başlıyor" simply does not fit inside that circle — it spilled
   // out over the ring's own stroke. There the line moves up into the text
-  // column instead, where it has the width it needs.
-  const dateInsideRing = format === 'story';
+  // column instead, where it has the width it needs. An undated ring says
+  // "7 gün", which does fit, so it stays in the middle where the eye is.
+  const dateInsideRing = format === 'story' || undated;
 
   const ring = (
     <ShareRing size={ringSize} totalDays={challenge.totalDays} filledDays={done} empty={invite}>
@@ -282,16 +316,35 @@ export function InviteCard({
           <AppText
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: format === 'square' ? u(52) : u(72),
+              fontSize: headline,
+              // Explicit, because Satoshi's ascenders are taller than the
+              // line box React Native derives on its own — the top of "0/14"
+              // was sliced off in both formats, obviously in the story where
+              // the type is largest and subtly in the square. RING_LINE is
+              // deliberately generous: the ring has vertical room to spare,
+              // and a clipped glyph is a far worse error than a loose line.
+              lineHeight: headline * RING_LINE,
               color: colors.textPrimary,
-              letterSpacing: -0.5,
+              letterSpacing: undated ? -1 : -0.5,
               textAlign: 'center',
             }}
           >
-            {challenge.startsLabel ?? challenge.startsWhen ?? ''}
+            {undated
+              ? t.shareCard.dayCount(challenge.totalDays)
+              : (challenge.startsLabel ?? challenge.startsWhen ?? '')}
           </AppText>
-          <AppText style={{ fontFamily: fonts.bodyRegular, fontSize: type.meta, color: colors.textTertiary, marginTop: u(10) }}>
-            {t.shareCard.startsIn(challenge.totalDays)}
+          <AppText
+            numberOfLines={2}
+            style={{
+              fontFamily: fonts.bodyRegular,
+              fontSize: type.meta,
+              color: colors.textTertiary,
+              marginTop: u(10),
+              maxWidth: ringSize * 0.72,
+              textAlign: 'center',
+            }}
+          >
+            {undated ? t.shareCard.startSoon : t.shareCard.startsIn(challenge.totalDays)}
           </AppText>
         </View>
       ) : (
@@ -299,9 +352,11 @@ export function InviteCard({
           <AppText
             style={{
               fontFamily: fonts.displaySemibold,
-              fontSize: format === 'square' ? u(84) : u(112),
+              fontSize: counter,
+              lineHeight: counter * RING_LINE,
               color: finished ? colors.ember : colors.textPrimary,
               letterSpacing: -1,
+              textAlign: 'center',
             }}
           >
             {done}/{challenge.totalDays}
@@ -417,7 +472,9 @@ export function InviteCard({
             : t.shareCard.askGroup
           : finished
             ? t.shareCard.closed
-            : t.shareCard.stillOpen}
+            : joinsClosed
+              ? t.shareCard.joinClosed
+              : t.shareCard.stillOpen}
       </AppText>
 
       <AppText
@@ -441,8 +498,12 @@ export function InviteCard({
     </View>
   );
 
+  // Both formats are a fixed w x h box captured to an image, so nothing in
+  // them may follow the system text-size setting — the box cannot grow with
+  // the text, so scaled type overflows the card that gets shared.
   if (format === 'square') {
     return (
+      <FixedType>
       <View style={{ width: w, height: h, overflow: 'hidden' }}>
         <Backdrop w={w} h={h} />
         <View
@@ -462,10 +523,12 @@ export function InviteCard({
           </View>
         </View>
       </View>
+      </FixedType>
     );
   }
 
   return (
+    <FixedType>
     <View style={{ width: w, height: h, overflow: 'hidden' }}>
       <Backdrop w={w} h={h} />
       <View
@@ -483,5 +546,6 @@ export function InviteCard({
         {foot}
       </View>
     </View>
+    </FixedType>
   );
 }

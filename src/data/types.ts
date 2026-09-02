@@ -34,6 +34,11 @@ export interface Message {
   dayNumber: number;
   reactions: Reaction[];
   mine?: boolean;
+  /** ISO timestamp from the server. Absent on a local optimistic bubble and
+   * on mock data. The chat merge needs it to tell "the server no longer
+   * returns this message" (blocked author) apart from "this response is
+   * simply older than the message" — see useChallengeMessages. */
+  createdAt?: string;
 }
 
 export type StakeMode = 'direct' | 'vote';
@@ -74,11 +79,6 @@ export interface StakeOutcome {
   collectiveTarget?: number;
 }
 
-export interface Momentum {
-  last3: number[]; // e.g. [6, 4, 2]
-  total: number; // group size
-  daysTogether: number; // "9 gün birlikte devam ettiniz."
-}
 
 export interface Challenge {
   id: string;
@@ -116,8 +116,15 @@ export interface Challenge {
    * (docs/db-stake-v2.sql §2). `undefined` for a challenge that ran its
    * natural course. */
   endedOnDay?: number;
+  /** The owner ended this ring for everyone instead of it running its course.
+   * It behaves like a completed ring everywhere that matters, but calling it
+   * "completed" on a card claims something that didn't happen. */
+  wasClosed?: boolean;
   hasMissedYesterday: boolean;
-  missedAcknowledged?: boolean;
+  /** The day number this ring's missed-day gate was last dismissed on. Keyed
+   * by day rather than a bare boolean so dismissing it today doesn't also
+   * dismiss it for a day missed next week. */
+  missedAckDay?: number;
   inviteCode: string;
   scheduleSummary: string; // "Her gün 20 sayfa · 14 gün"
   startsWhen: string; // "Yarın başlıyor"
@@ -136,7 +143,6 @@ export interface Challenge {
   stake?: Stake;
   participants: Participant[];
   messages: Message[];
-  momentum?: Momentum;
   // finish/E9
   finishStats?: { people: number; checkins: number; completionPct: number };
   // Halkora Pro — gelişmiş istatistikler (Faz 4). Yalnızca tamamlanmış

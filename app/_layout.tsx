@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
+import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
 import { colors } from '@/theme/tokens';
 import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
@@ -38,13 +39,15 @@ if (Platform.OS !== 'web') {
  * Only enforced when Supabase is configured; otherwise the app stays on the
  * Phase-1 mock layer so nothing breaks mid-migration.
  */
-function useProtectedRoute() {
+function useProtectedRoute(navigatorMounted: boolean) {
   const { ready, configured, isSignedIn, needsOnboarding } = useAuth();
   const segments = useSegments();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
+    // Nothing to navigate until the Stack is on screen — see RootNavigator.
+    if (!navigatorMounted) return;
     if (!ready || !configured) return;
     const inAuthGroup = segments[0] === '(auth)';
     const atOnboarding = segments.some((s) => s === 'onboarding');
@@ -79,7 +82,7 @@ function useProtectedRoute() {
         });
       }
     }
-  }, [ready, configured, isSignedIn, needsOnboarding, segments, pathname, router]);
+  }, [navigatorMounted, ready, configured, isSignedIn, needsOnboarding, segments, pathname, router]);
 }
 
 /**
@@ -87,24 +90,39 @@ function useProtectedRoute() {
  * straight to the challenge it's about — `data.challengeId` is set by the
  * `notify` Edge Function (docs/PHASE2-SUPABASE.md "Ek I").
  */
-function useNotificationDeepLink(ready: boolean) {
+function useNotificationDeepLink(navigatorMounted: boolean) {
   const router = useRouter();
   const handled = useRef(false);
 
   useEffect(() => {
     // Native-only: expo-notifications' web shim doesn't implement
     // getLastNotificationResponseAsync and throws if called.
-    if (!ready || Platform.OS === 'web') return;
+    //
+    // Gated on the navigator being mounted, not merely on auth being ready.
+    // A tapped notification resolves as soon as the session does, which is
+    // well before the boot screen's own minimum beat is over — and while that
+    // beat runs, RootNavigator renders BootSplash INSTEAD of the Stack. So
+    // this used to push a route at a navigator that did not exist yet.
+    if (!navigatorMounted || Platform.OS === 'web') return;
 
     const go = (data: unknown) => {
       const d = data as { challengeId?: string; inviteCode?: string } | undefined;
-      // An invite recipient isn't a participant yet — RLS blocks
-      // /challenge/{id}, so this routes to the public join-preview screen
-      // instead (docs/PHASE2-SUPABASE.md "Ek O" follow-up).
+      // dismissTo, not push. Every tap used to stack another screen: three
+      // notifications meant three ring screens to back out of one at a time,
+      // and tapping a notification for the ring you were already looking at
+      // put a second copy of it on top of the first (saha testi bulgusu —
+      // "3 kere girersem tek tek 3 ayrı halka detayını gördükten sonra ana
+      // ekrana erişebiliyorum").
+      //
+      // dismissTo pops back to that route if it is already in the stack and
+      // swaps its params, and pushes only when it isn't there. So the stack
+      // stays Home + one ring, however many notifications get tapped, and
+      // one back press always reaches Home. Same call the join flow already
+      // uses for the same reason (app/join/[code].tsx).
       if (d?.inviteCode) {
-        router.push(`/join/${d.inviteCode}`);
+        router.dismissTo(`/join/${d.inviteCode}`);
       } else if (d?.challengeId) {
-        router.push(`/challenge/${d.challengeId}`);
+        router.dismissTo(`/challenge/${d.challengeId}`);
       }
     };
 
@@ -118,8 +136,23 @@ function useNotificationDeepLink(ready: boolean) {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       go(response.notification.request.content.data);
     });
-    return () => sub.remove();
-  }, [ready, router]);
+
+    // An invite that ARRIVES while the app is open should light the bell then
+    // and there, without waiting for the next poll and without depending on
+    // the invites table having been added to the realtime publication. The
+    // push already reached this device, so it is the most reliable signal
+    // available (saha testi bulgusu — "bildirim geliyor ama zil aktif
+    // olmuyor").
+    const received = Notifications.addNotificationReceivedListener((n) => {
+      const d = n.request.content.data as { inviteCode?: string } | undefined;
+      if (d?.inviteCode) queryClient.invalidateQueries({ queryKey: RECEIVED_INVITES_KEY });
+    });
+
+    return () => {
+      sub.remove();
+      received.remove();
+    };
+  }, [navigatorMounted, router]);
 }
 
 /** Reads the persisted language choice (or detects the device's) once, before
@@ -172,10 +205,24 @@ function RootNavigator() {
   // ring never actually finished a visible cycle (saha testi bulgusu).
   const bootDelayDone = useMinBootDelay(2600);
   useAuthInit();
-  useProtectedRoute();
+
+  /**
+   * Whether the <Stack> below is actually on screen.
+   *
+   * The two branches under this render BootSplash and ConfigErrorScreen
+   * INSTEAD of the Stack, so for as long as either holds there is no
+   * navigator for router.push/replace to act on. Both hooks that navigate
+   * wait for this rather than for their own readiness, which they used to —
+   * and a notification tap is the one path where those two moments are far
+   * enough apart to matter, because it navigates the instant the session
+   * resolves while the boot screen still has seconds of its beat to run.
+   */
+  const navigatorMounted = localeReady && bootDelayDone && configured && ready;
+
+  useProtectedRoute(navigatorMounted);
   useSyncPushToken();
   useSyncLocale();
-  useNotificationDeepLink(ready);
+  useNotificationDeepLink(navigatorMounted);
 
   // Avoid a flash of Home before the persisted session is restored, or of
   // default-locale copy before the saved/detected language is applied — and
@@ -232,13 +279,32 @@ export default function RootLayout() {
     'Satoshi-Bold': require('../assets/fonts/Satoshi-Bold.ttf'),
   });
 
+  /**
+   * A bound on the font gate.
+   *
+   * Below this, `return null` means the native splash stays up — and that
+   * splash carries no image and no name, so a stall there is a plain dark
+   * rectangle with nothing happening on it. That is what a notification
+   * cold-start was reported as landing on. Whatever holds it up, sitting
+   * there forever is never the right answer: after this long the app renders
+   * with whatever fonts iOS has, which is a worse-looking app rather than no
+   * app at all.
+   */
+  const [fontsTimedOut, setFontsTimedOut] = useState(false);
   useEffect(() => {
-    if (loaded || error) {
+    const timer = setTimeout(() => setFontsTimedOut(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const canRender = loaded || !!error || fontsTimedOut;
+
+  useEffect(() => {
+    if (canRender) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [loaded, error]);
+  }, [canRender]);
 
-  if (!loaded && !error) return null;
+  if (!canRender) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

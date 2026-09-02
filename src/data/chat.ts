@@ -56,6 +56,7 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
     dayNumber: m.day_number,
     reactions: Array.from(countsByMsg.get(m.id) ?? new Map()).map(([emoji, count]) => ({ emoji, count })),
     mine: m.user_id === user?.id,
+    createdAt: m.created_at,
   }));
 }
 
@@ -108,20 +109,71 @@ export async function insertSystemMessage(
   if (error) throw error;
 }
 
-export async function insertReaction(messageId: string, emoji: string): Promise<void> {
+/**
+ * One reaction per person per message, and tapping the one you already gave
+ * takes it back.
+ *
+ * The old insert-only version was unique on (message, user, emoji), so the
+ * same person could stack every emoji in the picker onto one message and
+ * take none of them off — a row of counters one person could run up on their
+ * own (saha testi bulgusu — "bir mesaja sadece bir tane tepki açılabilmeli.
+ * şuanda spam için önü açık").
+ */
+export async function setReaction(messageId: string, emoji: string): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
   const user = session?.user;
   if (!user) throw new Error(getDict().errors.sessionMissing);
+
+  const { data: mine } = await supabase
+    .from('message_reactions')
+    .select('emoji')
+    .eq('message_id', messageId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (mine) {
+    const { error } = await supabase
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', user.id);
+    if (error) throw error;
+    // Same emoji again means "take it back", so stop here.
+    if (mine.emoji === emoji) return;
+  }
+
   const { error } = await supabase
     .from('message_reactions')
     .insert({ message_id: messageId, user_id: user.id, emoji });
-  // 23505 = unique violation (already reacted with this emoji) — not an error the user needs to see.
+  // 23505 — two taps racing each other; the outcome they wanted already holds.
   if (error && error.code !== '23505') throw error;
 }
 
-export async function insertNudge(challengeId: string, toUserId: string, message?: string): Promise<void> {
+/**
+ * Deletes one of your own messages. The RLS policy is what actually enforces
+ * "your own" — this only decides what the UI offers.
+ */
+export async function deleteMessage(messageId: string): Promise<void> {
+  const { error } = await supabase.from('messages').delete().eq('id', messageId);
+  if (error) throw error;
+}
+
+/**
+ * Returns false when the DB's own "one nudge per person per day" limit
+ * (docs/PHASE2-SUPABASE.md "Ek K") had already been reached — not an error,
+ * but the caller has to know: it must not post a second identical system
+ * message to the chat, and the person deserves to be told rather than shown
+ * a "Sallandı ✓" for something that didn't happen (saha testi bulgusu —
+ * "2.de icon yanında sallandı yazıyor ama ne sohbete ne de bildirime
+ * düşmüyor").
+ */
+export async function insertNudge(
+  challengeId: string,
+  toUserId: string,
+  message?: string,
+): Promise<boolean> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -130,8 +182,7 @@ export async function insertNudge(challengeId: string, toUserId: string, message
   const { error } = await supabase
     .from('nudges')
     .insert({ challenge_id: challengeId, from_user: user.id, to_user: toUserId, message });
-  // 23505 = unique violation — the DB's own "one nudge per person per day"
-  // limit (docs/PHASE2-SUPABASE.md "Ek K") already tripped; not a real error,
-  // the UI already shows the nudge as sent.
-  if (error && error.code !== '23505') throw error;
+  if (error?.code === '23505') return false;
+  if (error) throw error;
+  return true;
 }

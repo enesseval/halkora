@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, runOnJS } from 'react-native-reanimated';
 import ViewShot from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { colors, fonts, hairline, radius } from '@/theme/tokens';
@@ -85,23 +84,49 @@ export default function ShareScreen() {
   const shareText = () =>
     Share.share({ message: t.complete.shareMessage(challenge.title, challenge.totalDays) }).catch(() => {});
 
+  /**
+   * Same two corrections ShareRingSheet already carries, which this screen
+   * never got.
+   *
+   * It went through expo-sharing, and that presents a document-interaction
+   * controller: apps only, no "Save Image", no system actions at all. React
+   * Native's Share presents the real activity sheet, which has them — and
+   * needs a URL with a scheme, which `tmpfile` does not hand back on iOS.
+   *
+   * And it presented from inside this screen. iOS puts the activity sheet up
+   * from the root view controller, which sits BEHIND this route, so
+   * dismissing it left a presentation the app never recovered from. Leave
+   * first, then present a beat later.
+   */
   const share = async () => {
     if (sharing) return;
     setSharing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    try {
-      const capture = shotRef.current?.capture;
-      if (Platform.OS === 'web' || !capture || !(await Sharing.isAvailableAsync())) {
-        await shareText();
-        return;
-      }
-      const uri = await capture();
-      await Sharing.shareAsync(uri, { mimeType: 'image/png' });
-    } catch {
-      await shareText();
-    } finally {
+    const capture = shotRef.current?.capture;
+    if (Platform.OS === 'web' || !capture) {
       setSharing(false);
+      await shareText();
+      return;
     }
+    let uri: string;
+    try {
+      uri = await capture();
+    } catch {
+      setSharing(false);
+      await shareText();
+      return;
+    }
+    setSharing(false);
+    close();
+    const url = uri.startsWith('file://') || uri.startsWith('content://') ? uri : `file://${uri}`;
+    setTimeout(() => {
+      Share.share({
+        message: t.complete.shareMessage(challenge.title, challenge.totalDays),
+        url,
+      }).catch(() => {
+        // Cancelling is a normal thing to do, not an error.
+      });
+    }, 250);
   };
 
   const activeId = TEMPLATE_IDS[activeIndex];

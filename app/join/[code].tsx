@@ -50,7 +50,7 @@ export default function JoinScreen() {
     setErr(null);
     try {
       const id = await join(code ?? '', name.trim());
-      router.replace(`/challenge/${id}`);
+      router.dismissTo(`/challenge/${id}`);
     } catch (e) {
       setErr(friendlyErrorMessage(e) || t.errors.messageFailedGeneric);
       setJoining(false);
@@ -115,8 +115,15 @@ export default function JoinScreen() {
           <Button
             label={t.join.goToRing}
             onPress={() =>
+              // dismissTo, because this screen must not survive the trip and
+              // the ring must not be opened twice. It pops back to the ring if
+              // it is already in the stack — which it is when you tapped your
+              // own invite from inside it — and replaces this screen with it
+              // when it isn't. Either way: one screen for the ring, none for
+              // the invite, and one back to leave. navigate pushed a second
+              // copy and left this screen underneath it.
               preview.challengeId
-                ? router.replace(`/challenge/${preview.challengeId}`)
+                ? router.dismissTo(`/challenge/${preview.challengeId}`)
                 : router.replace('/')
             }
           />

@@ -3,7 +3,8 @@ import { Alert, Modal, Pressable, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { Challenge, Momentum } from '@/data/types';
+import { useLayout } from '@/theme/layout';
+import { Challenge } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
 import type { ReportReason } from '@/data/moderation';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -55,6 +56,7 @@ function SheetOverlay({
   children: ReactNode;
 }) {
   const keyboardHeight = useKeyboardHeight();
+  const { sideGutter } = useLayout();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -81,7 +83,12 @@ function SheetOverlay({
         entering={FadeIn.duration(180)}
         style={{ flex: 1, backgroundColor: colors.scrim }}
       >
-        <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}>
+        <View
+          style={[
+            { flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight },
+            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+          ]}
+        >
           <Pressable style={{ flex: 1 }} onPress={onClose} />
           {children}
         </View>
@@ -212,128 +219,24 @@ export function MissedDaySheet({
             }}
           />
         ) : null}
+        {/* The way past this. It covers the whole screen, so without it the
+            only exits were checking in or spending a joker — and someone who
+            opened the app to read the chat was held here until they did one
+            of the two. Saying "not now" is a legitimate answer to having
+            missed a day. */}
+        <AppText
+          variant="secondary"
+          color={colors.textTertiary}
+          style={{ textAlign: 'center', paddingVertical: 10 }}
+          onPress={onDismiss}
+        >
+          {t.detail.missedNotNow}
+        </AppText>
       </View>
     </Animated.View>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* E10 — Momentum bottom sheet (scrim + slide up)                       */
-/* ------------------------------------------------------------------ */
-export function MomentumSheet({
-  momentum,
-  onRestart,
-  onEndEarly,
-  onClose,
-}: {
-  momentum: Momentum;
-  onRestart: () => void;
-  onEndEarly: () => void;
-  onClose: () => void;
-}) {
-  const { t } = useT();
-  const startDay = momentum.daysTogether - momentum.last3.length + 1;
-  return (
-    <Animated.View
-      entering={FadeIn.duration(200)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
-    >
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <Animated.View
-        entering={SlideInDown.duration(280)}
-        style={{
-          backgroundColor: colors.bgSurface,
-          borderTopLeftRadius: radius.sheet,
-          borderTopRightRadius: radius.sheet,
-          borderWidth: hairline,
-          borderColor: colors.strokeSubtle,
-          paddingHorizontal: spacing.screenX,
-          paddingTop: 12,
-          paddingBottom: 36,
-        }}
-      >
-        <View
-          style={{
-            alignSelf: 'center',
-            width: 40,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: colors.strokeSubtle,
-            marginBottom: 20,
-          }}
-        />
-        <AppText variant="screenTitle" style={{ fontSize: 24 }}>
-          {t.detail.momentumTitle}
-        </AppText>
-        <AppText variant="secondary" style={{ marginTop: 8 }}>
-          {t.detail.momentumSubtitle}
-        </AppText>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            marginTop: 20,
-            backgroundColor: colors.bgElevated,
-            borderRadius: radius.card,
-            borderWidth: hairline,
-            borderColor: colors.strokeSubtle,
-            padding: 16,
-            gap: 12,
-            alignItems: 'center',
-          }}
-        >
-          {momentum.last3.map((n, i) => (
-            <View key={i} style={{ alignItems: 'center', flex: 1 }}>
-              <AppText variant="meta" color={colors.textTertiary} tabular>
-                {t.detail.momentumDay(startDay + i)}
-              </AppText>
-              <AppText
-                tabular
-                style={{ fontFamily: fonts.displayBold, fontSize: 22, color: colors.textPrimary, marginTop: 4 }}
-              >
-                {n}
-              </AppText>
-              <AppText variant="meta" color={colors.textTertiary} tabular>
-                {t.detail.momentumOutOf(momentum.total)}
-              </AppText>
-            </View>
-          ))}
-          <View style={{ flex: 1.4, paddingLeft: 8 }}>
-            <AppText variant="secondary" color={colors.textSecondary}>
-              {t.detail.momentumFootnote}
-            </AppText>
-          </View>
-        </View>
-
-        <View style={{ gap: 12, marginTop: 20 }}>
-          <Button label={t.detail.restart} onPress={onRestart} />
-          <Button label={t.detail.endEarly} variant="secondary" onPress={onEndEarly} />
-        </View>
-
-        <AppText
-          variant="meta"
-          color={colors.textTertiary}
-          tabular
-          style={{ textAlign: 'center', marginTop: 18 }}
-        >
-          {t.detail.daysTogether(momentum.daysTogether)}
-        </AppText>
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Ayarlar — görünen isim düzenleme (saha testi bulgusu, ROADMAP "MVP-öncesi") */
 /* ------------------------------------------------------------------ */
 export function NameSheet({
   visible,
@@ -448,6 +351,7 @@ export function UsernameSheet({
   const [value, setValue] = useState(current ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -459,11 +363,24 @@ export function UsernameSheet({
 
   if (!visible) return null;
 
-  // Strip anything the server would reject anyway, live — friendlier than
-  // letting an invalid character through and rejecting it after Save.
-  const sanitize = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
+  /**
+   * Nothing typed here is rewritten.
+   *
+   * This field used to strip disallowed characters as you typed. That is
+   * correct about what the server accepts and wrong about how a text field
+   * behaves: React Native's TextInput is controlled, so the native view shows
+   * the character for a frame before our value is written back over it, and
+   * every rejected keystroke flickered. The rule is stated instead — the text
+   * stays exactly as typed, the field marks itself invalid, and Save is closed
+   * until it isn't. maxLength is the one exception, because the native input
+   * enforces it without ever rewriting anything.
+   */
+  const VALID = /^[a-z0-9_]+$/;
+  const badChars = value.length > 0 && !VALID.test(value);
+  const tooShort = value.length > 0 && !badChars && value.length < 3;
+  const invalid = badChars || tooShort;
 
-  const canSave = value.length >= 3 && value !== current && !saving;
+  const canSave = value.length >= 3 && !invalid && value !== current && !saving;
 
   const submit = async () => {
     if (!canSave) return;
@@ -498,7 +415,7 @@ export function UsernameSheet({
             backgroundColor: colors.bgElevated,
             borderRadius: radius.pill,
             borderWidth: hairline,
-            borderColor: error ? colors.joker : colors.strokeSubtle,
+            borderColor: error || invalid ? colors.joker : colors.strokeSubtle,
             paddingHorizontal: 16,
             height: 52,
           }}
@@ -509,7 +426,7 @@ export function UsernameSheet({
           <TextInput
             ref={inputRef}
             value={value}
-            onChangeText={(raw) => setValue(sanitize(raw))}
+            onChangeText={setValue}
             placeholder={t.settings.usernamePlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
@@ -520,6 +437,12 @@ export function UsernameSheet({
             style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 16 }}
           />
         </View>
+
+        {invalid && !error ? (
+          <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+            {badChars ? t.settings.usernameCharInvalid : t.settings.usernameTooShort}
+          </AppText>
+        ) : null}
 
         {error ? (
           <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
@@ -542,16 +465,27 @@ export function UsernameSheet({
 /* ------------------------------------------------------------------ */
 /* Detay ekranı — kurucu ayarları (Faz 3C, docs "Ek O3")               */
 /* ------------------------------------------------------------------ */
+/**
+ * Same caps as creating a ring (app/(main)/create.tsx). Without them the
+ * owner could edit past a limit the create screen enforces, which is the
+ * same string ending up somewhere it doesn't fit by a different door.
+ */
+const TITLE_MAX = 40;
+const ACTION_MAX = 60;
+const STAKE_MAX = 60;
+
 function EditField({
   label,
   value,
   onChangeText,
   placeholder,
+  maxLength,
 }: {
   label: string;
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
+  maxLength?: number;
 }) {
   return (
     <View style={{ marginTop: 16 }}>
@@ -563,6 +497,7 @@ function EditField({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textTertiary}
+        maxLength={maxLength}
         style={{
           height: 50,
           backgroundColor: colors.bgElevated,
@@ -660,17 +595,24 @@ export function OwnerSettingsSheet({
           {t.detail.ownerSettingsTitle}
         </AppText>
 
-        <EditField label={t.detail.ownerSettingsTitleLabel} value={title} onChangeText={setTitle} />
+        <EditField
+          label={t.detail.ownerSettingsTitleLabel}
+          value={title}
+          onChangeText={setTitle}
+          maxLength={TITLE_MAX}
+        />
         <EditField
           label={t.detail.ownerSettingsDailyActionLabel}
           value={dailyAction}
           onChangeText={setDailyAction}
+          maxLength={ACTION_MAX}
         />
         <EditField
           label={t.detail.ownerSettingsStakeLabel}
           value={stakeText}
           onChangeText={setStakeText}
           placeholder={t.detail.ownerSettingsStakePlaceholder}
+          maxLength={STAKE_MAX}
         />
 
         {error ? (
@@ -722,19 +664,23 @@ export function NudgeMessageSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.scrim,
+          justifyContent: 'flex-end',
+          zIndex: 30,
+        },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
     >
       <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onClose} />
 
@@ -869,19 +815,23 @@ export function JokerDaySheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.scrim,
+          justifyContent: 'flex-end',
+          zIndex: 30,
+        },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
     >
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -938,21 +888,25 @@ export function JokerDaySheet({
  */
 export function WidgetHintSheet({ onClose }: { onClose: () => void }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const steps = [t.widgetHint.step1, t.widgetHint.step2, t.widgetHint.step3];
 
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: colors.scrim,
-        justifyContent: 'flex-end',
-        zIndex: 30,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.scrim,
+          justifyContent: 'flex-end',
+          zIndex: 30,
+        },
+        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
+      ]}
     >
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}

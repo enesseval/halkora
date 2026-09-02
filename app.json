@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "associatedDomains": ["applinks:halkora.app"],
       "bundleIdentifier": "com.halkora.app",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "appleTeamId": "82S9ART43D",
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,

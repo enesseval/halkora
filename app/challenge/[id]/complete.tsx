@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useChallenge, useChallengeActions, useChallengesQuery, useCreateGate } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { AppText, Avatar, Button, Card, Screen, SectionLabel } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { RingScreenSkeleton } from '@/components/Skeleton';
@@ -65,7 +65,7 @@ export default function CompleteScreen() {
     try {
       await actions.settleStake();
     } catch (e) {
-      Alert.alert(t.complete.settleFailed, friendlyErrorMessage(e));
+      alertOnce(t.complete.settleFailed, friendlyErrorMessage(e));
     } finally {
       setSettling(false);
     }

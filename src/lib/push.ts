@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
@@ -45,7 +46,13 @@ async function ensureAndroidChannel(): Promise<void> {
  * permission refused, etc). Push is a nice-to-have, never a blocker — this
  * intentionally never throws.
  */
-export async function registerForPushToken(): Promise<string | null> {
+export interface PushRegistration {
+  token: string;
+  /** 'development' | 'production' | null — see apnsEnvironment(). */
+  environment: string | null;
+}
+
+export async function registerForPushToken(): Promise<PushRegistration | null> {
   if (Platform.OS === 'web') return null; // native-only feature; expo-notifications' web shim is partial
   try {
     await ensureAndroidChannel();
@@ -62,8 +69,35 @@ export async function registerForPushToken(): Promise<string | null> {
     if (!projectId) return null;
 
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
-    return token;
+    return { token, environment: await apnsEnvironment() };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Which APNs service this build's token belongs to: 'development' (sandbox)
+ * or 'production'.
+ *
+ * expo-notifications asks expo-application this same question to decide which
+ * service to register the token against, and falls back to production if the
+ * answer doesn't come — silently. That fallback is exactly how a sandbox
+ * token ends up registered for production, which APNs answers with
+ * BadEnvironmentKeyInToken and nothing on this side ever sees. Recording the
+ * answer next to the token makes a wrong one visible in one query instead of
+ * being a mystery that costs a day.
+ */
+async function apnsEnvironment(): Promise<string | null> {
+  if (Platform.OS !== 'ios') return null;
+  try {
+    // A build with no embedded provisioning profile answers null here. That
+    // is a different fact from "we never asked", and a null column cannot
+    // tell them apart — which is exactly the state §11.8 found the two test
+    // devices in. Record the distinction instead of collapsing it.
+    return (await Application.getIosPushNotificationServiceEnvironmentAsync()) ?? 'unknown';
+  } catch {
+    // The native module isn't in this build (prebuild not re-run after
+    // expo-application became a direct dependency), or the call failed.
+    return 'unavailable';
   }
 }

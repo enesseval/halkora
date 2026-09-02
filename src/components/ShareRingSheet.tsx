@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { Alert, Modal, Pressable, Share, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { AppText, Button } from './ui';
 import { InviteCard, STORY_H, STORY_W, SQUARE, type InviteCardFormat } from './InviteCard';
 import { inviteUrl } from '@/lib/invite';
@@ -63,6 +63,7 @@ export function ShareRingSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const [format, setFormat] = useState<InviteCardFormat>('story');
   const [busy, setBusy] = useState(false);
   const shotRef = useRef<View>(null);
@@ -70,53 +71,94 @@ export function ShareRingSheet({
   const link = inviteUrl(challenge.inviteCode);
   const scale = PREVIEW_W / (format === 'story' ? STORY_W : SQUARE);
 
-  const capture = async (): Promise<string> =>
-    captureRef(shotRef, {
+  const capture = async (): Promise<string> => {
+    const path = await captureRef(shotRef, {
       format: 'png',
       quality: 1,
       // The card is laid out at 360pt wide; capturing at the device's pixel
       // ratio is what makes a 3x phone produce the 1080px the design targets.
       result: 'tmpfile',
     });
+    // `tmpfile` hands back a bare filesystem path on iOS, with no scheme.
+    // Share.share({ url }) needs a real URL: given a plain path it treats the
+    // value as text, and an activity sheet built from text has no "Save
+    // Image" in it — which is exactly what was missing (saha testi bulgusu —
+    // "hala fotoğraflara kaydetme olayı yok"). No permission plumbing is
+    // needed beyond this; iOS asks for Photos access itself when the person
+    // taps Save.
+    return path.startsWith('file://') || path.startsWith('content://')
+      ? path
+      : `file://${path}`;
+  };
 
+  /**
+   * Image and link together.
+   *
+   * It used to send the image through expo-sharing and drop the link on the
+   * clipboard, which left the recipient with a picture and nothing to tap —
+   * the card even had to explain that the link was "beside this story". React
+   * Native's own Share takes both a `url` and a `message`, so Messages and
+   * WhatsApp get the picture with the invite under it, in one go. Instagram
+   * and X ignore the text, which is the right trade: they were never going to
+   * carry a tappable link anyway.
+   *
+   * The sheet closes BEFORE the system sheet opens. iOS presents the activity
+   * controller from the root view controller, which sits behind this Modal, so
+   * dismissing it by tapping outside left the app with a presentation it
+   * thought was still up and nothing on screen responding.
+   */
   const doShare = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBusy(true);
+    let uri: string;
     try {
-      const uri = await capture();
-      // The link goes as text beside the image — never printed on it, so a
-      // screenshot of the story can't let a stranger into the group.
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: challenge.title });
-        // The iOS share sheet carries one item; the link follows so it can be
-        // pasted wherever the image lands.
-        await Clipboard.setStringAsync(link);
-      } else {
-        await Share.share({ message: t.invite.shareMessage(challenge.title, link) });
-      }
+      uri = await capture();
     } catch {
-      // Cancelling the share sheet lands here too — nothing to report.
-    } finally {
       setBusy(false);
+      return;
     }
+    setBusy(false);
+    onClose();
+    // A frame for the Modal to actually come down before the system sheet
+    // takes over — presenting into a window still being dismissed is the
+    // other half of the same freeze.
+    setTimeout(() => {
+      Share.share({ message: t.invite.shareMessage(challenge.title, link), url: uri }).catch(() => {
+        // Cancelling is a normal thing to do, not an error.
+      });
+    }, 250);
   };
 
+  /**
+   * Saving to the camera roll needs a permission this app asks for nowhere
+   * else, so the system sheet stands in for it — it offers "Save Image"
+   * using a permission iOS already manages.
+   *
+   * It goes through React Native's Share rather than expo-sharing, which is
+   * what "Save Image" was missing from: expo-sharing hands the file to a
+   * document-interaction sheet, whose job is opening the file in another app,
+   * so it lists apps and no system actions at all. Share presents the real
+   * activity controller, and a lone image file URL is what makes iOS offer to
+   * save it.
+   */
   const doSave = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBusy(true);
+    let uri: string;
     try {
-      const uri = await capture();
-      // Saving to the camera roll needs a permission this app doesn't ask for
-      // anywhere else, so the share sheet stands in for it: it offers "Save
-      // Image" itself, using a permission iOS already manages.
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png' });
-      }
+      uri = await capture();
     } catch {
-      Alert.alert(t.shareCard.savedFailed);
-    } finally {
       setBusy(false);
+      Alert.alert(t.shareCard.savedFailed);
+      return;
     }
+    setBusy(false);
+    onClose();
+    setTimeout(() => {
+      // No message: a share sheet holding only an image is the one that
+      // offers to save it. Adding text turns it into a "send this" sheet.
+      Share.share({ url: uri }).catch(() => {});
+    }, 250);
   };
 
   /**
@@ -143,7 +185,7 @@ export function ShareRingSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim }}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
 
           <Animated.View

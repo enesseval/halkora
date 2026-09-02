@@ -16,9 +16,9 @@ const STEP_MS = 260;
  * as an intentional beat, never a random flash). Reuses the same
  * ProgressRing the rest of the app renders for real challenge progress —
  * a bespoke dashed-circle spinner here read as a completely unrelated
- * visual language (saha testi bulgusu). Segments chase around the ring
- * (today → done), pause once fully lit, then reset — purely decorative,
- * no real progress data involved.
+ * visual language (saha testi bulgusu). Segments light up one after another,
+ * pause once the ring is full, then reset — purely decorative, no real
+ * progress data involved.
  */
 export function BootSplash() {
   const [days, setDays] = useState<SegmentState[]>(() => Array(TOTAL).fill('empty'));
@@ -28,10 +28,14 @@ export function BootSplash() {
     const id = setInterval(() => {
       i = (i + 1) % (TOTAL + 2);
       const next: SegmentState[] = Array(TOTAL).fill('empty');
-      for (let d = 0; d < TOTAL; d++) {
-        if (d < i - 1) next[d] = 'done';
-        else if (d === i - 1) next[d] = 'today';
-      }
+      // Every lit segment is lit the same. The chase used to put 'today' at
+      // the head of it, and 'today' is drawn at partial opacity because in a
+      // real ring it means "not done yet" — here it meant nothing, and it
+      // showed as a half-coloured segment permanently leading a row of solid
+      // ones. That reads as a rendering fault, not a design. Motion comes
+      // from segments arriving one after another; it doesn't need a segment
+      // caught in between.
+      for (let d = 0; d < i; d++) next[d] = 'done';
       setDays(next);
     }, STEP_MS);
     return () => clearInterval(id);

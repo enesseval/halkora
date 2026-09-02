@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
+import { useLayout } from '@/theme/layout';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { dismissInvite, fetchReceivedInvites, type ReceivedInvite } from '@/data/invites';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { useT } from '@/i18n';
 import { AppText } from './ui';
 
@@ -20,23 +22,30 @@ import { AppText } from './ui';
  * invite was gone with no trace anywhere in the app. Now the notification is
  * the nudge and this is the record.
  */
+export const RECEIVED_INVITES_KEY = ['invites', 'received'] as const;
+
 export function useReceivedInvites(): { invites: ReceivedInvite[]; reload: () => void } {
-  const [invites, setInvites] = useState<ReceivedInvite[]>([]);
+  const queryClient = useQueryClient();
+  // Fetched once on mount before this, which meant a push could land, be
+  // tapped, be dismissed — and the bell still wouldn't be there until the app
+  // was killed and reopened. It also meant an invite you'd just accepted kept
+  // its place in the list. The same poll and the same focus behaviour the
+  // challenge list already gets fixes both without inventing a mechanism.
+  const { data } = useQuery({
+    queryKey: RECEIVED_INVITES_KEY,
+    queryFn: fetchReceivedInvites,
+    enabled: isSupabaseConfigured,
+    refetchInterval: isSupabaseConfigured ? 60_000 : false,
+    // An unreachable invite list must never interrupt Home; the bell simply
+    // doesn't appear, and the next poll tries again.
+    retry: 1,
+  });
 
   const reload = useCallback(() => {
-    if (!isSupabaseConfigured) return;
-    fetchReceivedInvites()
-      .then(setInvites)
-      // Silent: an unreachable invite list must never interrupt Home. The
-      // bell simply doesn't appear.
-      .catch(() => {});
-  }, []);
+    queryClient.invalidateQueries({ queryKey: RECEIVED_INVITES_KEY });
+  }, [queryClient]);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
-
-  return { invites, reload };
+  return { invites: data ?? [], reload };
 }
 
 export function InvitesSheet({
@@ -49,6 +58,7 @@ export function InvitesSheet({
   onChanged: () => void;
 }) {
   const { t } = useT();
+  const { sideGutter } = useLayout();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -66,7 +76,7 @@ export function InvitesSheet({
       await dismissInvite(invite.id);
       onChanged();
     } catch (e) {
-      Alert.alert(t.invites.declineFailed, friendlyErrorMessage(e));
+      alertOnce(t.invites.declineFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -75,7 +85,7 @@ export function InvitesSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: colors.scrim }}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
 
           <Animated.View
@@ -208,7 +218,21 @@ export function InvitesBell({ count, onPress }: { count: number; onPress: () => 
           justifyContent: 'center',
         }}
       >
-        <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.bgBase }}>
+        {/* Explicit lineHeight matching the badge, and no font scaling: a
+            digit in a 16pt circle has nowhere to go. Left to its own line
+            box, Satoshi's asymmetric ascent/descent parks it low and slightly
+            off-centre (saha testi bulgusu — "bildirim zili içindeki sayı
+            konumu hatalı"). */}
+        <AppText
+          allowFontScaling={false}
+          style={{
+            fontFamily: fonts.bodyMedium,
+            fontSize: 10,
+            lineHeight: 16,
+            textAlign: 'center',
+            color: colors.bgBase,
+          }}
+        >
           {count > 9 ? '9+' : count}
         </AppText>
       </View>

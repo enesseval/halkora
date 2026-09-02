@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { getDict } from '@/i18n';
 
@@ -64,9 +65,25 @@ export function isErrorCode(e: unknown, code: string): boolean {
  */
 export function isNetworkError(e: unknown): boolean {
   if (e instanceof TypeError) return true;
+  // supabase-js wraps an unreachable Edge Function in a FunctionsFetchError
+  // whose message is "Failed to send a request to the Edge Function" — none
+  // of the patterns below match it, so being offline while checking in put
+  // that sentence in front of the user verbatim (saha testi bulgusu —
+  // "hata mesajı var ama anlamlı değil").
+  if (e && typeof e === 'object' && 'name' in e) {
+    const name = (e as { name?: unknown }).name;
+    if (name === 'FunctionsFetchError') return true;
+    // Our own 12s timeout in src/lib/supabase.ts aborts the request; without
+    // this the person is shown the word "Aborted".
+    if (name === 'AbortError') return true;
+  }
   if (e && typeof e === 'object' && 'message' in e) {
     const m = (e as { message?: unknown }).message;
-    if (typeof m === 'string') return /network request failed|failed to fetch|network error/i.test(m);
+    if (typeof m === 'string') {
+      return /network request failed|failed to fetch|network error|failed to send a request to the edge function/i.test(
+        m,
+      );
+    }
   }
   return false;
 }
@@ -105,6 +122,30 @@ export function friendlyErrorMessage(e: unknown): string {
   if (isNetworkError(e)) return getDict().errors.checkConnection;
   if (isPermissionError(e)) return getDict().errors.generic;
   return errMessage(e);
+}
+
+/**
+ * Shows an alert, but never a second copy of one that is already on screen.
+ *
+ * Going offline fails several things at once — a poll, a refresh, whatever
+ * was tapped — and each one used to raise its own dialog, so the same "check
+ * your connection" line stacked up and had to be dismissed one at a time
+ * (saha testi bulgusu — "defalarca güncellenemedi/bağlantı yok alerti
+ * çıktı"). Keyed on title+body, so two genuinely different failures still
+ * both get through.
+ */
+let alertOnScreen: string | null = null;
+
+export function alertOnce(title: string, body?: string): void {
+  const key = `${title}::${body ?? ''}`;
+  if (alertOnScreen === key) return;
+  alertOnScreen = key;
+  Alert.alert(
+    title,
+    body,
+    [{ text: getDict().common.done, onPress: () => { alertOnScreen = null; } }],
+    { onDismiss: () => { alertOnScreen = null; } },
+  );
 }
 
 /** Pull the real `{ error }` JSON body out of a failed Edge Function call. */
