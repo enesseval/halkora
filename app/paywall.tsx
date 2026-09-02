@@ -18,7 +18,7 @@ import {
   type Plans,
 } from '@/lib/purchases';
 import { awaitProUnlock } from '@/hooks/useAuth';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 import type { SegmentState } from '@/data/types';
 
@@ -207,7 +207,7 @@ export default function Paywall() {
         await onEntitled();
         return;
       }
-      Alert.alert(t.pro.purchaseFailed, friendlyErrorMessage(e));
+      alertOnce(t.pro.purchaseFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -221,7 +221,7 @@ export default function Paywall() {
       if (ok) await onEntitled();
       else Alert.alert(t.pro.restoreNoneTitle, t.pro.restoreNoneBody);
     } catch (e) {
-      if (!isCancelled(e)) Alert.alert(t.pro.restoreFailed, friendlyErrorMessage(e));
+      if (!isCancelled(e)) alertOnce(t.pro.restoreFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(false);
     }

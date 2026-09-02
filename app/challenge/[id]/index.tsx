@@ -32,7 +32,7 @@ import {
 } from '@/hooks';
 import type { Message, Participant } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
 import { setActiveChallengeId } from '@/lib/push';
 import { fetchPendingInvites } from '@/data/invites';
@@ -443,7 +443,7 @@ export default function DetailScreen() {
             // (useChallengeMessages).
             retryChat();
           } catch (e) {
-            Alert.alert(t.moderation.blockFailed, friendlyErrorMessage(e));
+            alertOnce(t.moderation.blockFailed, friendlyErrorMessage(e));
           }
         },
       },
@@ -470,7 +470,7 @@ export default function DetailScreen() {
         { text: t.moderation.blockConfirm, style: 'destructive', onPress: () => confirmBlock(m) },
       ]);
     } catch (e) {
-      Alert.alert(t.moderation.reportFailed, friendlyErrorMessage(e));
+      alertOnce(t.moderation.reportFailed, friendlyErrorMessage(e));
     }
   };
 
@@ -524,7 +524,7 @@ export default function DetailScreen() {
             await actions.leaveChallenge(t.detail.systemLeft(myName));
             goHomeAfterExit();
           } catch (e) {
-            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+            alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
             setLeaving(false);
           }
         },
@@ -558,7 +558,7 @@ export default function DetailScreen() {
             await actions.leaveChallenge(t.detail.systemLeft(myName));
             goHomeAfterExit();
           } catch (e) {
-            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+            alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
           }
         },
       });
@@ -577,7 +577,7 @@ export default function DetailScreen() {
                 await actions.closeChallenge(t.detail.systemClosed(myName));
                 goHomeAfterExit();
               } catch (e) {
-                Alert.alert(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
+                alertOnce(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
               }
             },
           },
@@ -672,7 +672,7 @@ export default function DetailScreen() {
     try {
       await actions.startChallenge();
     } catch (e) {
-      Alert.alert(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
+      alertOnce(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
     } finally {
       setStarting(false);
     }
@@ -690,7 +690,7 @@ export default function DetailScreen() {
       await actions.startChallenge(iso);
       setShowLobbyDatePicker(false);
     } catch (e) {
-      Alert.alert(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
+      alertOnce(t.detail.lobbyStartFailed, friendlyErrorMessage(e));
     } finally {
       setStarting(false);
     }
@@ -1039,6 +1039,10 @@ export default function DetailScreen() {
             ListHeaderComponent={header}
             contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
+            // Scrolling the thread puts an open bubble menu away — it floats
+            // over the conversation now, so leaving it up while the messages
+            // move under it would be worse than the old inline version.
+            onScrollBeginDrag={() => setOpenBubbleId(null)}
             onScroll={handleListScroll}
             scrollEventThrottle={100}
             refreshControl={

@@ -32,7 +32,7 @@ import {
   insertSystemMessage,
 } from '@/data/chat';
 import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
-import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError } from '@/lib/errors';
+import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError, alertOnce } from '@/lib/errors';
 import { router } from 'expo-router';
 import {
   ME_ID,
@@ -419,7 +419,7 @@ export function useCheckIn(id: string) {
         .catch((e) => {
           undo(id); // roll back the optimistic update
           syncWidgetSnapshot(useMockStore.getState().challenges);
-          Alert.alert(t.errors.checkInFailed, friendlyErrorMessage(e));
+          alertOnce(t.errors.checkInFailed, friendlyErrorMessage(e));
         });
     }
   };
@@ -440,7 +440,7 @@ export function useCheckIn(id: string) {
         // instead, and say why.
         checkIn(id);
         syncWidgetSnapshot(useMockStore.getState().challenges);
-        Alert.alert(t.errors.undoFailed, friendlyErrorMessage(e));
+        alertOnce(t.errors.undoFailed, friendlyErrorMessage(e));
       });
   };
 
@@ -669,7 +669,7 @@ export function useChallengeActions(id: string) {
           } catch {
             // best-effort resync; the alert below still tells the user it failed
           }
-          Alert.alert(t.errors.jokerFailed, friendlyErrorMessage(e));
+          alertOnce(t.errors.jokerFailed, friendlyErrorMessage(e));
         });
     }
   };
@@ -688,7 +688,7 @@ export function useChallengeActions(id: string) {
         return true;
       } catch (e) {
         removeMessageMock(id, localId); // roll back — it never actually sent
-        Alert.alert(t.errors.messageFailed, friendlyErrorMessage(e));
+        alertOnce(t.errors.messageFailed, friendlyErrorMessage(e));
         return false;
       }
     }
@@ -706,14 +706,14 @@ export function useChallengeActions(id: string) {
     }
     setReaction(messageId, emoji)
       .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
-      .catch((e) => Alert.alert(t.errors.reactFailed, friendlyErrorMessage(e)));
+      .catch((e) => alertOnce(t.errors.reactFailed, friendlyErrorMessage(e)));
   };
 
   const doDeleteMessage = (messageId: string) => {
     if (!isSupabaseConfigured) return;
     deleteMessage(messageId)
       .then(() => queryClient.invalidateQueries({ queryKey: messagesKey(id) }))
-      .catch((e) => Alert.alert(t.errors.deleteMessageFailed, friendlyErrorMessage(e)));
+      .catch((e) => alertOnce(t.errors.deleteMessageFailed, friendlyErrorMessage(e)));
   };
 
   const doNudge = (participantId: string, recipientName: string, message: string) => {
@@ -749,7 +749,7 @@ export function useChallengeActions(id: string) {
         // until the next 60s poll: `nudged` is derived from the server's own
         // rows, so a refetch is what tells the truth here.
         queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
-        Alert.alert(t.errors.nudgeFailed, friendlyErrorMessage(e));
+        alertOnce(t.errors.nudgeFailed, friendlyErrorMessage(e));
       });
   };
 
@@ -776,7 +776,7 @@ export function useChallengeActions(id: string) {
     if (isSupabaseConfigured) {
       endChallengeEarly(id)
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))
-        .catch((e) => Alert.alert(t.errors.endEarlyFailed, friendlyErrorMessage(e)));
+        .catch((e) => alertOnce(t.errors.endEarlyFailed, friendlyErrorMessage(e)));
     }
   };
 
@@ -953,7 +953,7 @@ export function useCreateChallenge() {
           if (isNetworkError(e)) {
             Alert.alert(t.errors.offlineTitle, t.errors.checkConnection);
           } else {
-            Alert.alert(t.errors.createFailed, friendlyErrorMessage(e));
+            alertOnce(t.errors.createFailed, friendlyErrorMessage(e));
           }
           return null;
         }

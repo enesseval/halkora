@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { queryClient } from '@/lib/queryClient';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
 import { useLayout } from '@/theme/layout';
 import { fetchBlocked, unblockUser, type BlockedPerson } from '@/data/moderation';
-import { friendlyErrorMessage } from '@/lib/errors';
+import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { useT } from '@/i18n';
 import { AppText } from './ui';
 
@@ -49,7 +49,7 @@ export function BlockedSheet({ onClose }: { onClose: () => void }) {
       // gets invalidated; they're small and only the open one refetches.
       queryClient.invalidateQueries({ queryKey: ['messages'] });
     } catch (e) {
-      Alert.alert(t.moderation.unblockFailed, friendlyErrorMessage(e));
+      alertOnce(t.moderation.unblockFailed, friendlyErrorMessage(e));
     } finally {
       setBusy(null);
     }

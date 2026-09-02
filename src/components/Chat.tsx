@@ -87,6 +87,11 @@ export function MessageBubble({
       ) : null}
 
       <Pressable
+        // A plain tap on the bubble dismisses its own menu — the smallest
+        // "somewhere else" there is, and it costs nothing when no menu is up.
+        onPress={() => {
+          if (showPicker) setShowPicker(false);
+        }}
         onLongPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
           setShowPicker((v) => !v);
@@ -138,9 +143,17 @@ export function MessageBubble({
         <Animated.View
           entering={FadeIn.duration(150)}
           style={{
+            // Floats over the conversation instead of sitting in it. Laid out
+            // inline, opening the menu pushed every message below it down and
+            // shoved the thread around under your finger (saha testi bulgusu
+            // — "alttaki içerikleri kaydırmamalı, üstüne binmeli"). Anchored
+            // to the bubble's own edge so it still reads as belonging to it.
+            position: 'absolute',
+            bottom: -6,
+            [mine ? 'right' : 'left']: 0,
+            zIndex: 10,
             flexDirection: 'row',
             gap: 4,
-            marginTop: 6,
             backgroundColor: colors.bgElevated,
             borderWidth: hairline,
             borderColor: colors.strokeSubtle,
