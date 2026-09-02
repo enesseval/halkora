@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -152,9 +152,26 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
 
+  /**
+   * Same rule, and the same behaviour, as choosing your own username
+   * (UsernameSheet): what you typed stays on screen, the field marks itself
+   * invalid, and the button is closed. This field used to silently delete
+   * characters as they were typed — the exact thing that was fixed there and
+   * left unfixed here (saha testi bulgusu — "kullanıcı adı belirlerken özel
+   * karakterler input içinde kalıp hata veriyor, ama kişi davet ederken bu
+   * çalışmıyor").
+   */
+  const VALID = /^[a-z0-9_]+$/;
+  const typed = input.trim();
+  const badChars = typed.length > 0 && !VALID.test(typed);
+  const tooShort = typed.length > 0 && !badChars && typed.length < 3;
+  const invalid = badChars || tooShort;
+
   const submit = async () => {
-    const handle = input.trim().toLowerCase();
-    if (!handle || sending) return;
+    const handle = typed.toLowerCase();
+    if (!handle || invalid || sending) return;
+    // The answer arrives under the keyboard otherwise.
+    Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setSending(true);
     setStatus(null);
@@ -198,7 +215,7 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
           backgroundColor: colors.bgElevated,
           borderRadius: radius.pill,
           borderWidth: hairline,
-          borderColor: status?.kind === 'error' ? colors.joker : colors.strokeSubtle,
+          borderColor: status?.kind === 'error' || invalid ? colors.joker : colors.strokeSubtle,
           paddingHorizontal: 16,
           height: 52,
         }}
@@ -208,7 +225,7 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
         </AppText>
         <TextInput
           value={input}
-          onChangeText={(raw) => setInput(raw.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20))}
+          onChangeText={(raw) => setInput(raw.toLowerCase().slice(0, 20))}
           placeholder={t.invite.byHandlePlaceholder}
           placeholderTextColor={colors.textTertiary}
           autoCapitalize="none"
@@ -223,9 +240,14 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
           label={sending ? t.invite.byHandleSending : t.invite.byHandleSend}
           variant="secondary"
           onPress={submit}
-          disabled={!input.trim() || sending}
+          disabled={!typed || invalid || sending}
         />
       </View>
+      {invalid && !status ? (
+        <AppText variant="meta" color={colors.joker} style={{ marginTop: 8, textAlign: 'center' }}>
+          {badChars ? t.settings.usernameCharInvalid : t.settings.usernameTooShort}
+        </AppText>
+      ) : null}
       {status ? (
         <AppText
           variant="meta"

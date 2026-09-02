@@ -87,6 +87,19 @@ const RING = {
  * mapped onto those eight.
  */
 const LOGO_SEGMENTS = 8;
+/**
+ * The share ring's own geometry, matched to the app's.
+ *
+ * It used to borrow the wordmark's 12° gaps, and that is twice what
+ * ProgressRing draws on every screen (6°) — so the card's ring read as a
+ * different, airier object than the one people had been looking at all week
+ * (saha testi bulgusu — "parçaların arası çok açık, uygulamanın diğer
+ * noktalarında gösterdiğimiz görsellerle aynı değil"). The wordmark keeps
+ * the logo's spacing below; it IS the logo.
+ */
+const RING_GAP = 6;
+const RING_SPAN = 360 / 8 - RING_GAP;
+
 /** Straight from the wordmark below: 33° of arc, 12° of gap. */
 const LOGO_SPAN = 33;
 const LOGO_GAP = 12;
@@ -141,7 +154,7 @@ function ShareRing({
         {Array.from({ length: LOGO_SEGMENTS }, (_, i) => (
           <Path
             key={i}
-            d={arcPath(cx, cy, r, i * step + LOGO_GAP / 2, i * step + LOGO_GAP / 2 + LOGO_SPAN)}
+            d={arcPath(cx, cy, r, i * step + RING_GAP / 2, i * step + RING_GAP / 2 + RING_SPAN)}
             stroke={i < lit ? colors.ember : colors.waiting}
             strokeWidth={stroke}
             // Butt, like every other ring in the app — the home cards, the

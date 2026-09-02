@@ -37,7 +37,7 @@ import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
 import { setActiveChallengeId } from '@/lib/push';
 import { fetchPendingInvites } from '@/data/invites';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { AppText, AvatarStack, Button, IconButton } from '@/components/ui';
+import { AppText, AvatarStack, Button, IconButton, FixedType } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CheckInButton } from '@/components/CheckInButton';
 import { StakeBadge } from '@/components/StakeBadge';
@@ -103,7 +103,17 @@ function InfoChip({ emoji, label }: { emoji: string; label: string }) {
           justifyContent: 'center',
         }}
       >
-        <AppText style={{ fontSize: 11 }}>{emoji}</AppText>
+        {/* An emoji has its own metrics and sits low in a line box it was
+            never measured for, so in a fixed 18pt circle it lands off
+            centre (saha testi bulgusu — "joker hakkı ikonu içindeki, sadece
+            ilk gün ikonu içindeki resim konumu hatalı"). An explicit line
+            height the size of the circle puts it back. */}
+        <AppText
+          allowFontScaling={false}
+          style={{ fontSize: 11, lineHeight: 18, textAlign: 'center' }}
+        >
+          {emoji}
+        </AppText>
       </View>
       <AppText variant="secondary" color={colors.textSecondary}>
         {label}
@@ -513,23 +523,33 @@ export default function DetailScreen() {
   const confirmLeave = () => {
     if (leaving) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    Alert.alert(t.detail.leaveChallengeConfirmTitle, t.detail.leaveChallengeConfirmBody, [
-      { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.detail.leaveChallenge,
-        style: 'destructive',
-        onPress: async () => {
-          setLeaving(true);
-          try {
-            await actions.leaveChallenge(t.detail.systemLeft(myName));
-            goHomeAfterExit();
-          } catch (e) {
-            alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
-            setLeaving(false);
-          }
+    // An owner who is the only one here isn't leaving a group, they're
+    // closing one — leave_challenge closes the ring when there is nobody to
+    // hand it to. Asking "leave this ring?" described a different action
+    // from the one about to happen (saha testi bulgusu — "kapatmak mı
+    // istiyorsun demeli").
+    const closes = !!challenge.isOwner && challenge.participants.length <= 1;
+    Alert.alert(
+      closes ? t.detail.leaveClosesTitle : t.detail.leaveChallengeConfirmTitle,
+      closes ? t.detail.leaveClosesBody : t.detail.leaveChallengeConfirmBody,
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: closes ? t.detail.leaveCloses : t.detail.leaveChallenge,
+          style: 'destructive',
+          onPress: async () => {
+            setLeaving(true);
+            try {
+              await actions.leaveChallenge(t.detail.systemLeft(myName));
+              goHomeAfterExit();
+            } catch (e) {
+              alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+              setLeaving(false);
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   /**
@@ -802,14 +822,35 @@ export default function DetailScreen() {
           onRepairDayPress={setJokerDay}
           centerContent={
             isUpcoming ? (
-              <View style={{ alignItems: 'center' }}>
-                <AppText style={{ fontFamily: fonts.displaySemibold, fontSize: 17, color: colors.textSecondary }}>
-                  {t.detail.upcomingRing}
-                </AppText>
-                <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
-                  {challenge.startsWhen}
-                </AppText>
-              </View>
+              // Capped to the ring's clear inner width (L is 180 across with
+              // an 11pt stroke, so 158 inside) and held to the ring's own
+              // fixed type. Unbounded, the line ran straight over the
+              // segments either side (saha testi bulgusu — "henüz başlamadı
+              // yazısı halka dilimleri üstüne biniyor").
+              <FixedType>
+                <View style={{ alignItems: 'center', maxWidth: 126 }}>
+                  <AppText
+                    numberOfLines={2}
+                    style={{
+                      fontFamily: fonts.displaySemibold,
+                      fontSize: 16,
+                      lineHeight: 20,
+                      textAlign: 'center',
+                      color: colors.textSecondary,
+                    }}
+                  >
+                    {t.detail.upcomingRing}
+                  </AppText>
+                  <AppText
+                    variant="meta"
+                    color={colors.textTertiary}
+                    numberOfLines={2}
+                    style={{ marginTop: 4, textAlign: 'center' }}
+                  >
+                    {challenge.startsWhen}
+                  </AppText>
+                </View>
+              </FixedType>
             ) : (
               <CheckInButton
                 day={challenge.currentDay}

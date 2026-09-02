@@ -218,7 +218,21 @@ export function InvitesBell({ count, onPress }: { count: number; onPress: () => 
           justifyContent: 'center',
         }}
       >
-        <AppText style={{ fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.bgBase }}>
+        {/* Explicit lineHeight matching the badge, and no font scaling: a
+            digit in a 16pt circle has nowhere to go. Left to its own line
+            box, Satoshi's asymmetric ascent/descent parks it low and slightly
+            off-centre (saha testi bulgusu — "bildirim zili içindeki sayı
+            konumu hatalı"). */}
+        <AppText
+          allowFontScaling={false}
+          style={{
+            fontFamily: fonts.bodyMedium,
+            fontSize: 10,
+            lineHeight: 16,
+            textAlign: 'center',
+            color: colors.bgBase,
+          }}
+        >
           {count > 9 ? '9+' : count}
         </AppText>
       </View>
