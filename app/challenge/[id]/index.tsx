@@ -1055,30 +1055,41 @@ export default function DetailScreen() {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <FlashList
-            ref={listRef}
-            data={rows}
-            renderItem={renderItem}
-            keyExtractor={(item, i) =>
-              item.kind === 'participant'
-                ? `p-${item.p.id}`
-                : item.kind === 'message'
-                  ? `m-${item.m.id}`
-                  : `${item.kind}-${i}`
-            }
-            ListHeaderComponent={header}
-            contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
-            showsVerticalScrollIndicator={false}
-            // Scrolling the thread puts an open bubble menu away — it floats
-            // over the conversation now, so leaving it up while the messages
-            // move under it would be worse than the old inline version.
-            onScrollBeginDrag={() => setOpenBubbleId(null)}
-            onScroll={handleListScroll}
-            scrollEventThrottle={100}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
-            }
-          />
+          {/* Claims the touch ONLY while a bubble menu is open, so the first tap
+              anywhere puts it away and never reaches what is underneath.
+              Conditional on purpose: a responder that is always armed sits in the
+              path of every other gesture, which is how the swipe on Home came to
+              open the ring instead of revealing its actions. */}
+          <View
+            style={{ flex: 1 }}
+            onStartShouldSetResponder={() => openBubbleId !== null}
+            onResponderRelease={() => setOpenBubbleId(null)}
+          >
+            <FlashList
+              ref={listRef}
+              data={rows}
+              renderItem={renderItem}
+              keyExtractor={(item, i) =>
+                item.kind === 'participant'
+                  ? `p-${item.p.id}`
+                  : item.kind === 'message'
+                    ? `m-${item.m.id}`
+                    : `${item.kind}-${i}`
+              }
+              ListHeaderComponent={header}
+              contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
+              showsVerticalScrollIndicator={false}
+              // Scrolling the thread puts an open bubble menu away — it floats
+              // over the conversation now, so leaving it up while the messages
+              // move under it would be worse than the old inline version.
+              onScrollBeginDrag={() => setOpenBubbleId(null)}
+              onScroll={handleListScroll}
+              scrollEventThrottle={100}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
+              }
+            />
+          </View>
 
           {showJumpToLatest ? (
             <Pressable

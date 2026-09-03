@@ -145,11 +145,16 @@ export function MessageBubble({
           style={{
             // Floats over the conversation instead of sitting in it. Laid out
             // inline, opening the menu pushed every message below it down and
-            // shoved the thread around under your finger (saha testi bulgusu
-            // — "alttaki içerikleri kaydırmamalı, üstüne binmeli"). Anchored
-            // to the bubble's own edge so it still reads as belonging to it.
+            // shoved the thread around under your finger.
+            //
+            // BELOW the bubble, not over it: anchored to the bubble's own
+            // bottom edge it covered the message you had just long-pressed,
+            // which is the one thing that has to stay readable (saha testi
+            // bulgusu — "tam mesajın üzerinde açılıyor, mesaj gözükmüyor").
+            // It still overlays whatever is under it rather than pushing.
             position: 'absolute',
-            bottom: -6,
+            top: '100%',
+            marginTop: 4,
             [mine ? 'right' : 'left']: 0,
             zIndex: 10,
             flexDirection: 'row',
