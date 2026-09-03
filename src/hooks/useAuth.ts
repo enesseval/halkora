@@ -55,6 +55,21 @@ interface AuthState {
    * person edits or replaces it like any other text.
    */
   appleSuggestedName: string | null;
+  /**
+   * Has this session's profile row actually been READ yet?
+   *
+   * `name` being null means one of two completely different things: the
+   * profile says there is no name (so onboarding is genuinely needed), or we
+   * have not managed to read the profile at all. loadProfileName deliberately
+   * returns early on a failed fetch rather than clobbering known-good state,
+   * which leaves `name` at null — and the routing guard read that as "needs
+   * onboarding" and threw a signed-in user with a real account back into the
+   * name step (saha testi bulgusu — "uçak modundayken splash 2 kere gözüküp
+   * onboardinge atıyor").
+   *
+   * So the guard now waits for a real answer instead of assuming one.
+   */
+  profileLoaded: boolean;
 }
 
 const useAuthStore = create<AuthState>(() => ({
@@ -65,6 +80,7 @@ const useAuthStore = create<AuthState>(() => ({
   isPro: false,
   messagePreview: true,
   appleSuggestedName: null,
+  profileLoaded: false,
 }));
 
 /** "Selin" + "Nur" -> "Selin Nur"; nothing usable -> null. */
@@ -91,7 +107,14 @@ function clearPerAccountCaches(): void {
 
 async function loadProfileName(session: Session | null): Promise<void> {
   if (!session) {
-    useAuthStore.setState({ name: null, username: null, isPro: false, messagePreview: true });
+    useAuthStore.setState({
+      name: null,
+      username: null,
+      isPro: false,
+      messagePreview: true,
+      // Signed out is a real answer: there is no profile to wait for.
+      profileLoaded: true,
+    });
     return;
   }
   // RevenueCat is pointed at the Supabase user id here rather than at app
@@ -117,6 +140,7 @@ async function loadProfileName(session: Session | null): Promise<void> {
     username: data?.username ?? null,
     isPro: !!data?.is_pro,
     messagePreview: data?.notify_message_preview ?? true,
+    profileLoaded: true,
   });
 }
 
@@ -227,6 +251,8 @@ export function useAuthInit(): void {
       // Only refetch the profile when the user actually changes — TOKEN_REFRESHED
       // and other same-user events must not hammer the DB.
       if (session?.user.id !== prevUid) {
+        // A different user's profile has definitionally not been read yet.
+        useAuthStore.setState({ profileLoaded: false });
         // A different signed-in user landing while the previous one's data is
         // still cached (any account-switch path that skips our own signOut/
         // deleteAccount actions) must never see the old account's challenges.
@@ -557,6 +583,7 @@ export function useAuth() {
   const isPro = useAuthStore((s) => s.isPro);
   const messagePreview = useAuthStore((s) => s.messagePreview);
   const appleSuggestedName = useAuthStore((s) => s.appleSuggestedName);
+  const profileLoaded = useAuthStore((s) => s.profileLoaded);
   return {
     ready,
     session,
@@ -568,7 +595,10 @@ export function useAuth() {
     isPro,
     messagePreview,
     appleSuggestedName,
-    needsOnboarding: !!session && !name,
+    // Only once the profile has actually been read. Without profileLoaded a
+    // failed fetch — being offline is the everyday case — looks identical to
+    // "this account has no name yet".
+    needsOnboarding: !!session && profileLoaded && !name,
     signInAnonymously,
     signInWithApple,
     linkAppleIdentity,

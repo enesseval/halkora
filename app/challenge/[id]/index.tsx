@@ -62,7 +62,6 @@ import {
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
-import { useLayout } from '@/theme/layout';
 
 type Row =
   | { kind: 'participant'; p: Participant }
@@ -126,7 +125,6 @@ export default function DetailScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const router = useRouter();
   const { t } = useT();
-  const { sideGutter } = useLayout();
   const { name } = useAuth();
   const challenge = useChallenge(id);
 
@@ -362,10 +360,7 @@ export default function DetailScreen() {
     if (loading) {
       return (
         <SafeAreaView
-          style={[
-            { flex: 1, backgroundColor: colors.bgBase },
-            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-          ]}
+          style={{ flex: 1, backgroundColor: colors.bgBase }}
           edges={['top']}
         >
           {backButton}
@@ -378,10 +373,7 @@ export default function DetailScreen() {
     if (firstLoadError) {
       return (
         <SafeAreaView
-          style={[
-            { flex: 1, backgroundColor: colors.bgBase },
-            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-          ]}
+          style={{ flex: 1, backgroundColor: colors.bgBase }}
           edges={['top']}
         >
           {backButton}
@@ -1054,11 +1046,8 @@ export default function DetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
-      {/* Detail doesn't go through <Screen>, so it needs the same measure cap
-          applied by hand — otherwise the chat runs the full width of an iPad
-          while every other screen is centred (src/theme/layout.ts). */}
       <SafeAreaView
-        style={[{ flex: 1 }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}
+        style={{ flex: 1 }}
         edges={['top']}
       >
         {topBar}

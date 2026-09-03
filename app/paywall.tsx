@@ -5,7 +5,6 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { useLayout } from '@/theme/layout';
 import { AppText, Button } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useT } from '@/i18n';
@@ -251,7 +250,6 @@ export default function Paywall() {
   // moment the price changes and is wrong for every non-Turkish storefront,
   // sitting directly under a price the store localized correctly. Kept only
   // as the fallback for a store that doesn't compute one.
-  const { sideGutter } = useLayout();
 
   const annualNote = plans.annual?.perMonth
     ? t.pro.annualPerMonth(plans.annual.perMonth)
@@ -260,10 +258,7 @@ export default function Paywall() {
   return (
     <Animated.View
       entering={FadeIn.duration(180)}
-      style={[
-        { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
-        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-      ]}
+      style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' }}
     >
       {/* tap outside to dismiss */}
       <Pressable style={{ flex: 1 }} onPress={close} />

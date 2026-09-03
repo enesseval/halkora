@@ -193,7 +193,11 @@ export default function HomeScreen() {
   const { refreshing, refresh } = useRefreshChallenges();
   const [showStart, setShowStart] = useState(false);
 
-  const goDetail = (id: string) => router.push(`/challenge/${id}`);
+  const goDetail = (id: string) => {
+    // Opening a ring is also the most common "somewhere else" tap.
+    closeOpenSwipeableRow();
+    router.push(`/challenge/${id}`);
+  };
   const goComplete = (id: string) => router.push(`/challenge/${id}/complete`);
 
   // A poll/pull-to-refresh failing after we already have real data shouldn't
@@ -243,11 +247,17 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 48 }}
-          // Touching anywhere else on the list puts an open row away, the way
-          // every iOS list does — it used to stay open until you swiped it
-          // back yourself.
+          // Scrolling puts an open row away, the way every iOS list does.
+          //
+          // There was an onTouchStart here doing the same on any touch. It is
+          // gone: a JS touch responder on the scroll container sits directly
+          // in the path of the gesture handler that drives the swipe, and a
+          // swipe that fails to activate resolves as a tap on the card —
+          // which opens the ring instead of revealing its actions (saha testi
+          // bulgusu — "halka silmek için sağdan sola kaydırma yaptığımda
+          // halka detayına giriyor"). Tapping another row closes the open one
+          // through goDetail below instead, which costs nothing.
           onScrollBeginDrag={closeOpenSwipeableRow}
-          onTouchStart={closeOpenSwipeableRow}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
           }

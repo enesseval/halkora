@@ -4,7 +4,6 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { queryClient } from '@/lib/queryClient';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
-import { useLayout } from '@/theme/layout';
 import { fetchBlocked, unblockUser, type BlockedPerson } from '@/data/moderation';
 import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { useT } from '@/i18n';
@@ -21,7 +20,6 @@ export function BlockedSheet({ onClose }: { onClose: () => void }) {
   const { t } = useT();
   const [people, setPeople] = useState<BlockedPerson[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const { sideGutter } = useLayout();
 
   useEffect(() => {
     let alive = true;
@@ -61,7 +59,7 @@ export function BlockedSheet({ onClose }: { onClose: () => void }) {
         entering={FadeIn.duration(180)}
         style={{ flex: 1, backgroundColor: colors.scrim }}
       >
-        <View style={[{ flex: 1, justifyContent: 'flex-end' }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
           <Animated.View
             entering={SlideInDown.duration(260)}
