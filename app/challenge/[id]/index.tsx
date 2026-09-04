@@ -577,7 +577,6 @@ export default function DetailScreen() {
     }
     buttons.push({
       text: t.detail.closeChallenge,
-      style: 'destructive',
       onPress: () => {
         Alert.alert(t.detail.closeChallengeConfirmTitle, t.detail.closeChallengeConfirmBody, [
           { text: t.common.cancel, style: 'cancel' },
@@ -590,6 +589,29 @@ export default function DetailScreen() {
                 goHomeAfterExit();
               } catch (e) {
                 alertOnce(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
+              }
+            },
+          },
+        ]);
+      },
+    });
+    // Delete used to live only behind the owner-settings sheet, so the two
+    // exits disagreed about what "sil" even meant. Both offer all three now.
+    buttons.push({
+      text: t.detail.deleteChallenge,
+      style: 'destructive',
+      onPress: () => {
+        Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
+          { text: t.common.cancel, style: 'cancel' },
+          {
+            text: t.detail.deleteChallenge,
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await actions.deleteChallenge();
+                goHomeAfterExit();
+              } catch (e) {
+                alertOnce(t.detail.deleteChallengeFailed, friendlyErrorMessage(e));
               }
             },
           },

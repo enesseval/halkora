@@ -345,7 +345,7 @@ export const en: Dictionary = {
     changedStake: (stake: string) => `📝 Stake updated: ${stake}`,
     ownerExitTitle: 'Leaving this ring?',
     ownerExitBody:
-      "Closing it ends the ring for everyone — nobody can check in again, but the history and stats stay with each member. If you just leave, the ring carries on and the earliest member becomes its owner.",
+      "Closing it ends the ring for everyone — nobody can check in again, but the history and stats stay with each member. If you just leave, the ring carries on and the earliest member becomes its owner. Deleting removes the ring and everything in it, for good.",
     closeChallenge: 'Close the ring',
     closeChallengeConfirmTitle: 'Close this ring?',
     closeChallengeConfirmBody:

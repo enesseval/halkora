@@ -353,7 +353,7 @@ export const tr = {
     // Kurucu silmeye bastığında: kapat / çık / gerçekten sil
     ownerExitTitle: 'Bu halkadan çıkmak mı istiyorsun?',
     ownerExitBody:
-      'Halkayı kapatırsan herkes için biter — kimse yeni check-in yapamaz, ama geçmiş ve istatistikler herkeste kalır. Sadece sen çıkarsan halka devam eder ve kurucu en eski üyeye geçer.',
+      'Halkayı kapatırsan herkes için biter — kimse yeni check-in yapamaz, ama geçmiş ve istatistikler herkeste kalır. Sadece sen çıkarsan halka devam eder ve kurucu en eski üyeye geçer. Silersen halka ve tüm geçmişi kalıcı olarak gider.',
     closeChallenge: 'Halkayı kapat',
     closeChallengeConfirmTitle: 'Halka kapatılsın mı?',
     closeChallengeConfirmBody:

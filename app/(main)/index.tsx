@@ -97,7 +97,6 @@ function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
     }
     buttons.push({
       text: t.detail.closeChallenge,
-      style: 'destructive',
       onPress: async () => {
         busy.current = true;
         try {
@@ -107,6 +106,33 @@ function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
         } finally {
           busy.current = false;
         }
+      },
+    });
+    // The third answer, and the one this button's own label promised. Without
+    // it "Sil" only ever closed the ring — which reads as deleted in chat
+    // ("X halkayı kapattı") while the ring is still there, no longer in lobby,
+    // so starting it later fails as "already started" (saha testi bulgusu).
+    buttons.push({
+      text: t.detail.deleteChallenge,
+      style: 'destructive',
+      onPress: () => {
+        Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
+          { text: t.common.cancel, style: 'cancel' },
+          {
+            text: t.detail.deleteChallenge,
+            style: 'destructive',
+            onPress: async () => {
+              busy.current = true;
+              try {
+                await actions.deleteChallenge();
+              } catch (e) {
+                Alert.alert(t.detail.deleteChallengeFailed, friendlyErrorMessage(e));
+              } finally {
+                busy.current = false;
+              }
+            },
+          },
+        ]);
       },
     });
     Alert.alert(t.detail.ownerExitTitle, t.detail.ownerExitBody, buttons);
