@@ -225,7 +225,13 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
         </AppText>
         <TextInput
           value={input}
-          onChangeText={(raw) => setInput(raw.toLowerCase().slice(0, 20))}
+          onChangeText={(raw) => {
+            setInput(raw.toLowerCase().slice(0, 20));
+            // "Bu kişi bulunamadı" / "zaten davet ettin" answered the handle
+            // that was submitted; the moment it changes the answer is about
+            // something that is no longer on screen.
+            if (status) setStatus(null);
+          }}
           placeholder={t.invite.byHandlePlaceholder}
           placeholderTextColor={colors.textTertiary}
           autoCapitalize="none"
@@ -235,14 +241,10 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
           style={{ flex: 1, color: colors.textPrimary, fontFamily: fonts.bodyMedium, fontSize: 15 }}
         />
       </View>
-      <View style={{ marginTop: 10 }}>
-        <Button
-          label={sending ? t.invite.byHandleSending : t.invite.byHandleSend}
-          variant="secondary"
-          onPress={submit}
-          disabled={!typed || invalid || sending}
-        />
-      </View>
+      {/* Directly under the field, not under the button: this screen doesn't
+          scroll, and a message below the button lands under the open keyboard
+          — which is exactly where the answer to what you just typed must not
+          be (saha testi bulgusu). */}
       {invalid && !status ? (
         <AppText variant="meta" color={colors.joker} style={{ marginTop: 8, textAlign: 'center' }}>
           {badChars ? t.settings.usernameCharInvalid : t.settings.usernameTooShort}
@@ -257,6 +259,14 @@ function InviteByHandle({ challenge }: { challenge: Challenge }) {
           {status.text}
         </AppText>
       ) : null}
+      <View style={{ marginTop: 10 }}>
+        <Button
+          label={sending ? t.invite.byHandleSending : t.invite.byHandleSend}
+          variant="secondary"
+          onPress={submit}
+          disabled={!typed || invalid || sending}
+        />
+      </View>
     </View>
   );
 }

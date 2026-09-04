@@ -68,6 +68,18 @@ export function ShareRingSheet({
 
   const link = inviteUrl(challenge.inviteCode);
   const scale = PREVIEW_W / (format === 'story' ? STORY_W : SQUARE);
+  /**
+   * A finished or closed ring has nothing to invite anyone to. Sharing one is
+   * showing a result, not handing out a way in — so the link is left out of
+   * the message entirely and the two link-only actions go with it (saha testi
+   * bulgusu — "kapalı halkanın paylaşımında link hâlâ gidiyor ve 'bağlantı
+   * gönderildi' yazıyor"). Anyone who followed it would only reach the
+   * "bu halka kapandı" screen.
+   */
+  const over = challenge.status === 'completed';
+  const message = over
+    ? t.complete.shareMessage(challenge.title, challenge.totalDays)
+    : t.invite.shareMessage(challenge.title, link);
 
   const capture = async (): Promise<string> => {
     const path = await captureRef(shotRef, {
@@ -121,7 +133,7 @@ export function ShareRingSheet({
     // takes over — presenting into a window still being dismissed is the
     // other half of the same freeze.
     setTimeout(() => {
-      Share.share({ message: t.invite.shareMessage(challenge.title, link), url: uri }).catch(() => {
+      Share.share({ message, url: uri }).catch(() => {
         // Cancelling is a normal thing to do, not an error.
       });
     }, 250);
@@ -168,7 +180,7 @@ export function ShareRingSheet({
   const doShareLink = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
-      await Share.share({ message: t.invite.shareMessage(challenge.title, link) });
+      await Share.share({ message });
     } catch {
       // Cancelling lands here too — nothing to report.
     }
@@ -288,13 +300,17 @@ export function ShareRingSheet({
 
             {/* A row so SecondaryAction's flex:1 fills the width — the same
                 outlined pill as below, just on its own line. */}
-            <View style={{ flexDirection: 'row', marginTop: 10 }}>
-              <SecondaryAction label={t.shareCard.shareLink} onPress={doShareLink} disabled={busy} />
-            </View>
+            {over ? null : (
+              <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                <SecondaryAction label={t.shareCard.shareLink} onPress={doShareLink} disabled={busy} />
+              </View>
+            )}
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
               <SecondaryAction label={t.shareCard.saveImage} onPress={doSave} disabled={busy} />
-              <SecondaryAction label={t.shareCard.copyLink} onPress={doCopy} disabled={busy} />
+              {over ? null : (
+                <SecondaryAction label={t.shareCard.copyLink} onPress={doCopy} disabled={busy} />
+              )}
             </View>
 
             <AppText
@@ -302,7 +318,7 @@ export function ShareRingSheet({
               color={colors.textTertiary}
               style={{ textAlign: 'center', marginTop: 14 }}
             >
-              {t.shareCard.linkNote}
+              {over ? t.shareCard.linkNoteClosed : t.shareCard.linkNote}
             </AppText>
           </Animated.View>
         </View>

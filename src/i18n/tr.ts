@@ -37,7 +37,7 @@ export const tr = {
     ongoing: 'Devam ediyor',
     lobbyWaiting: 'Kurucu başlatacak',
     tomorrowSixAm: 'Yarın 06:00',
-    newChallengeFallback: 'Yeni Challenge',
+    newChallengeFallback: 'Yeni halka',
     completeYourGoalFallback: 'hedefini tamamla',
     dailyGoalFallback: 'Günlük hedef',
   },
@@ -78,17 +78,17 @@ export const tr = {
       MESSAGE_BLOCKED_SEXUAL: 'Mesaj gönderilmedi: cinsel içerikli bir ifade var. Halkalar herkese açık bir ortam.',
       MESSAGE_BLOCKED_VIOLENCE: 'Mesaj gönderilmedi: şiddet ya da tehdit içeren bir ifade var. Bu tür içerik hesabının kapatılmasına yol açabilir.',
       BLOCKED_USER: 'Bu kişiyi engellemişsin. Mesaj göndermek için Ayarlar\u2019dan engeli kaldırman gerekiyor.',
-      JOIN_WINDOW_CLOSED: "Bu challenge'a katılım süresi doldu — yalnızca ilk gün katılım açıktı.",
+      JOIN_WINDOW_CLOSED: 'Bu halkaya katılım süresi doldu — yalnızca ilk gün katılım açıktı.',
       CHALLENGE_CLOSED: 'Bu halka kapandı. Davet bağlantısı artık geçerli değil.',
       BEFORE_YOU_JOINED: 'O gün sen halkada değildin — joker sadece katıldıktan sonraki günler için kullanılabilir.',
-      NOT_A_MEMBER: "Bu challenge'in üyesi değilsin.",
+      NOT_A_MEMBER: 'Bu halkanın üyesi değilsin.',
       SESSION_MISSING: 'Oturum bulunamadı.',
-      CHALLENGE_ID_REQUIRED: 'challenge_id gerekli.',
+      CHALLENGE_ID_REQUIRED: 'Halka bilgisi eksik.',
       INVALID_SESSION: 'Geçersiz oturum.',
-      CHALLENGE_NOT_FOUND: 'Challenge bulunamadı.',
-      NOT_A_PARTICIPANT: "Bu challenge'a katılımcı değilsin.",
-      CHALLENGE_NOT_STARTED: 'Bu challenge henüz başlamadı.',
-      CHALLENGE_ENDED: 'Bu challenge sona erdi.',
+      CHALLENGE_NOT_FOUND: 'Halka bulunamadı.',
+      NOT_A_PARTICIPANT: 'Bu halkaya katılımcı değilsin.',
+      CHALLENGE_NOT_STARTED: 'Bu halka henüz başlamadı.',
+      CHALLENGE_ENDED: 'Bu halka sona erdi.',
       NOTHING_TO_MAKE_UP: 'Telafi edilecek bir gün yok.',
       DAY_ALREADY_MARKED: 'O gün zaten işaretli.',
       NO_JOKERS_LEFT: 'Joker hakkın kalmadı.',
@@ -160,14 +160,14 @@ export const tr = {
   start: {
     greeting: (first: string) => `Güzel, ${first}.\nNasıl başlıyoruz?`,
     nameFallback: 'sen',
-    createTitle: 'Challenge başlat',
+    createTitle: 'Halka başlat',
     createSubtitle: 'Hedefi sen koy, grubunu çağır. 2 dakika sürer.',
     joinTitle: 'Davetle katıl',
     joinSubtitle: 'Arkadaşın link mi gönderdi? Buradan gir.',
     footnote: 'İkisini de sonra yapabilirsin — şimdilik göz at',
     joinHeaderTitle: 'Davetle katıl',
     whatToDo: 'Ne yapmak istersin?',
-    createTitleShort: 'Challenge oluştur',
+    createTitleShort: 'Halka oluştur',
     createSubtitleShort: 'Hedefi sen koy, grubunu çağır.',
     joinSubtitleShort: 'Bir kod veya link girerek katıl.',
     linkPlaceholder: 'Davet linki veya kod',
@@ -175,7 +175,7 @@ export const tr = {
     inviteReady: 'Davet hazır',
     codeLabel: (code: string) => `Kod: ${code}`,
     detailHint: 'Detay ve katılımcıları bir sonraki ekranda görürsün.',
-    joinThisChallenge: "Bu challenge'a katıl",
+    joinThisChallenge: 'Bu halkaya katıl',
     codeTooShort: (n: number) => `Kod eksik · ${n} karakter girdin`,
     codeTooLong: (n: number) => `Kod çok uzun · ${n} karakter girdin`,
     clipboardNotCode: 'Panondaki içerik bir davet kodu değil. Kodu ya da davet bağlantısını kopyalayıp tekrar dene.',
@@ -190,9 +190,9 @@ export const tr = {
     // "Tamamlandı" (yukarıdaki) aslında "bugün check-in yaptığın" demek —
     // bu ayrı bölüm gerçekten BİTMİŞ (çok günlü) halkalar için.
     history: 'Geçmiş',
-    challengesLoadFailed: "Challenge'ların yüklenemedi.",
+    challengesLoadFailed: 'Halkaların yüklenemedi.',
     emptyTitle: 'Henüz bir halkan yok.',
-    emptySubtitle: 'Bir challenge kur, grubunu çağır — ya da bir davetle katıl.',
+    emptySubtitle: 'Bir halka kur, grubunu çağır — ya da bir davetle katıl.',
     emptyCta: 'İlk halkanı kur',
     donePct: (done: number, total: number) => `${done}/${total} tamamladı`,
     peopleReady: (n: number) => `${n} kişi hazır`,
@@ -202,7 +202,7 @@ export const tr = {
 
   create: {
     titles: ['Ne yapacaksınız?', 'Kaç gün?', 'Joker hakkı', 'Bahis'],
-    challengeName: 'Challenge adı',
+    challengeName: 'Halka adı',
     challengeNamePlaceholder: '30 Gün Kitap Okuma',
     dailyActionLabel: 'Günlük eylem',
     dailyActionPlaceholder: 'ör. 20 sayfa oku',
@@ -251,7 +251,7 @@ export const tr = {
     stakeCustomLabel: 'Kendi bahsini yaz',
     stakeCustomPlaceholder: 'Kendi bahsini yaz...',
     creating: 'Oluşturuluyor…',
-    createCta: "Challenge'ı oluştur",
+    createCta: 'Halkayı oluştur',
   },
 
   settings: {
@@ -294,7 +294,7 @@ export const tr = {
     deleting: 'Siliniyor…',
     deleteConfirmTitle: 'Hesabını sil?',
     deleteConfirmBody:
-      "Bu geri alınamaz. Katılımcılığın, check-in'lerin, mesajların kalıcı olarak silinir. Kurduğun challenge'lar grubun diğer üyeleri için kalmaya devam eder.",
+      "Bu geri alınamaz. Katılımcılığın, check-in'lerin, mesajların kalıcı olarak silinir. Kurduğun halkalar grubun diğer üyeleri için kalmaya devam eder.",
     legalSection: 'Yasal',
     legalTerms: 'Kullanım Şartları',
     legalPrivacy: 'Gizlilik Politikası',
@@ -304,8 +304,8 @@ export const tr = {
   },
 
   detail: {
-    notFound: 'Challenge bulunamadı.',
-    loadFailed: 'Challenge yüklenemedi.',
+    notFound: 'Halka bulunamadı.',
+    loadFailed: 'Halka yüklenemedi.',
     notStarted: 'Dün olmadı.\nBugün buradasın.',
     upcomingRing: 'Henüz başlamadı',
     menuShare: 'Halkayı paylaş',
@@ -391,14 +391,14 @@ export const tr = {
 
   invite: {
     heading: 'Hazır. Şimdi grubunu çağır.',
-    startsWhen: (when: string) => `Challenge ${when}.`,
+    startsWhen: (when: string) => `Halka ${when}.`,
     joinClosed: 'Katılım yalnızca ilk gün açıktı, artık kapalı.',
     participantsCount: (n: number) => `Katılanlar · ${n}`,
     linkOpen: 'Davet linki açık...',
     justNow: 'az önce',
     minutesAgo: (n: number) => `${n} dk`,
     shareInvite: 'Daveti paylaş',
-    shareMessage: (title: string, link: string) => `"${title}" challenge'ına katıl: ${link}`,
+    shareMessage: (title: string, link: string) => `"${title}" halkasına katıl: ${link}`,
     byHandleTitle: 'Kullanıcı adıyla davet et',
     byHandlePlaceholder: 'kullaniciadi',
     byHandleSend: 'Gönder',
@@ -412,7 +412,7 @@ export const tr = {
 
   complete: {
     loadFailed: 'Yüklenemedi.',
-    notFound: 'Challenge bulunamadı.',
+    notFound: 'Halka bulunamadı.',
     title: (n: number) => `${n} gün. Birlikte.`,
     subtitle: (title: string) => `${title} tamamlandı`,
     statPeople: 'kişi',
@@ -607,6 +607,8 @@ export const tr = {
     saveImage: 'Görseli kaydet',
     copyLink: 'Bağlantıyı kopyala',
     linkNote: 'Görselle birlikte davet bağlantısı da gider — Mesajlar ve WhatsApp ikisini de taşır, Instagram ve X yalnızca görseli alır.',
+    // Kapanmış halkada davet bağlantısı gönderilmez: kimse katılamaz.
+    linkNoteClosed: 'Halka kapandı — yalnızca görsel gider, davet bağlantısı gönderilmez.',
     saved: 'Görsel kaydedildi',
     savedFailed: 'Görsel kaydedilemedi',
     copied: 'Bağlantı kopyalandı',
@@ -667,10 +669,10 @@ export const tr = {
   mock: {
     templates: {
       book: { label: 'Kitap okuma', action: '20 sayfa oku', title: '30 Gün Kitap Okuma' },
-      run: { label: 'Koşu', action: '3 km koş', title: 'Koşu Challenge' },
+      run: { label: 'Koşu', action: '3 km koş', title: 'Koşu Halkası' },
       earlyRise: { label: 'Erken kalkma', action: "06:30'da kalk", title: 'Sabah Kulübü' },
       meditation: { label: 'Meditasyon', action: '10 dk medite et', title: 'Meditasyon 21 Gün' },
-      noSugar: { label: 'Şekersiz', action: 'Şeker yok', title: 'Şekersiz Challenge' },
+      noSugar: { label: 'Şekersiz', action: 'Şeker yok', title: 'Şekersiz Halka' },
     },
     stakePresets: {
       coffee: 'Kahve ısmarlar',

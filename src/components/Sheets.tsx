@@ -495,9 +495,22 @@ function EditField({
 }) {
   return (
     <View style={{ marginTop: 16 }}>
-      <AppText variant="meta" color={colors.textTertiary} style={{ marginBottom: 8 }}>
-        {label}
-      </AppText>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
+        <AppText variant="meta" color={colors.textTertiary} style={{ flex: 1 }}>
+          {label}
+        </AppText>
+        {/* Same counter the create screen grew — the owner edits the same
+            strings under the same caps. */}
+        {maxLength && value.length > 0 ? (
+          <AppText
+            variant="meta"
+            tabular
+            color={value.length >= maxLength ? colors.ember : colors.textTertiary}
+          >
+            {value.length}/{maxLength}
+          </AppText>
+        ) : null}
+      </View>
       <TextInput
         value={value}
         onChangeText={onChangeText}

@@ -579,6 +579,8 @@ export const en: Dictionary = {
     saveImage: 'Save image',
     copyLink: 'Copy link',
     linkNote: 'The invite link travels with the image — Messages and WhatsApp carry both, Instagram and X take the picture only.',
+    // A closed ring sends no invite link: nobody can join it.
+    linkNoteClosed: 'The ring is closed — only the image is shared, without an invite link.',
     saved: 'Image saved',
     savedFailed: "Couldn't save the image",
     copied: 'Link copied',
