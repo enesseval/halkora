@@ -16,6 +16,9 @@ export interface Participant {
   silentDays?: number; // consecutive quiet days (>=2 shows "El salla")
   nudged?: boolean;
   completedDays?: number; // for the finish/E9 leaderboard (x/total)
+  /** This person's real ring, day by day — same shape as Challenge.days.
+   * Absent only in mock data, where the row falls back to deriving one. */
+  days?: SegmentState[];
 }
 
 export interface Reaction {

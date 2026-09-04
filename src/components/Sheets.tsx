@@ -377,6 +377,17 @@ export function UsernameSheet({
 
   const canSave = value.length >= 3 && !invalid && value !== current && !saving;
 
+  /**
+   * "Bu kullanıcı adı zaten alınmış" is an answer about the text that was
+   * submitted. It used to survive every keystroke after it — including
+   * clearing the field — so the sheet kept accusing a username that was no
+   * longer on screen. Editing invalidates the answer.
+   */
+  const onChange = (next: string) => {
+    setValue(next);
+    if (error) setError(null);
+  };
+
   const submit = async () => {
     if (!canSave) return;
     setSaving(true);
@@ -421,7 +432,7 @@ export function UsernameSheet({
           <TextInput
             ref={inputRef}
             value={value}
-            onChangeText={setValue}
+            onChangeText={onChange}
             placeholder={t.settings.usernamePlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
