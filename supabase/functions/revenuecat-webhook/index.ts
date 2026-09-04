@@ -20,6 +20,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
  * Events that mean "this person should have Pro right now", and the ones that
  * mean they shouldn't.
  *
+ * TRANSFER is handled separately below — it is the restore path, and its
+ * payload has a different shape.
+ *
  * CANCELLATION is deliberately NOT in the revoking list: cancelling stops the
  * renewal, it does not end the period already paid for. Someone who cancels on
  * day 2 of a month keeps Pro until day 30 — taking it away immediately would
@@ -54,6 +57,56 @@ Deno.serve(async (req) => {
     const event = payload?.event ?? {};
     const type: string = event.type ?? '';
 
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+
+    // An anonymous RevenueCat id (starts with $RCAnonymousID) is not a
+    // Supabase user and would fail the uuid cast; skip those rather than throw.
+    const real = (ids: unknown): string[] =>
+      (Array.isArray(ids) ? ids : [ids])
+        .filter((v): v is string => typeof v === 'string' && v.length > 0)
+        .filter((v) => !v.startsWith('$RCAnonymousID'));
+
+    /** Writes one verdict and reports whether the DB accepted it. */
+    const write = async (ids: string[], isPro: boolean): Promise<boolean> => {
+      if (ids.length === 0) return true;
+      const { error } = await admin.from('profiles').update({ is_pro: isPro }).in('id', ids);
+      if (error) {
+        console.error('revenuecat-webhook: update failed', error);
+        return false;
+      }
+      console.log('revenuecat-webhook', type, ids.join(','), '→ is_pro', isPro);
+      return true;
+    };
+
+    /**
+     * TRANSFER is what "Satın alımları geri yükle" actually produces.
+     *
+     * When an Apple Account's receipt is already attached to some other
+     * RevenueCat app user id — a reinstall, a deleted-and-recreated account,
+     * a second account on the same phone — restoring moves it, and RevenueCat
+     * reports the move as TRANSFER. That event carries `transferred_to` /
+     * `transferred_from` arrays and NO `app_user_id`, so this function used to
+     * log "no app_user_id" and write nothing: the person had a live
+     * subscription, the app saw the entitlement, and profiles.is_pro stayed
+     * false forever (buglar #4 / 14.7).
+     */
+    if (type === 'TRANSFER') {
+      const to = real(event.transferred_to);
+      const from = real(event.transferred_from).filter((id) => !to.includes(id));
+      // The entitlement now belongs to `to`. Granting first means a mistake in
+      // the other direction can never leave a paying person without Pro.
+      const okTo = await write(to, true);
+      const okFrom = await write(from, false);
+      if (!okTo || !okFrom) return new Response('update failed', { status: 500 });
+      if (to.length === 0 && from.length === 0) {
+        console.log('revenuecat-webhook: TRANSFER with no usable ids');
+      }
+      return new Response('ok', { status: 200 });
+    }
+
     // app_user_id is the Supabase user id, because that is what the app passes
     // to Purchases.configure(). If it ever isn't, there is nothing to update
     // and guessing would be worse than stopping.
@@ -67,32 +120,17 @@ Deno.serve(async (req) => {
     if (GRANTS.has(type)) isPro = true;
     else if (REVOKES.has(type)) isPro = false;
     else {
-      // TRANSFER, BILLING_ISSUE, SUBSCRIBER_ALIAS and the rest carry no verdict
-      // on their own. Acknowledged so RevenueCat stops retrying, ignored
-      // otherwise — the next real event settles it.
+      // BILLING_ISSUE, SUBSCRIBER_ALIAS and the rest carry no verdict on their
+      // own. Acknowledged so RevenueCat stops retrying, ignored otherwise —
+      // the next real event settles it.
       return new Response('ok', { status: 200 });
     }
 
-    // An anonymous RevenueCat id (starts with $RCAnonymousID) is not a
-    // Supabase user and would fail the uuid cast; skip it rather than throw.
-    if (userId.startsWith('$RCAnonymousID')) {
-      console.log('revenuecat-webhook: anonymous id, nothing to update');
-      return new Response('ok', { status: 200 });
-    }
-
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
-    const { error } = await admin.from('profiles').update({ is_pro: isPro }).eq('id', userId);
-    if (error) {
+    if (!await write(real(userId), isPro)) {
       // 500 on purpose: RevenueCat retries, and a database blip shouldn't cost
       // someone the Pro they paid for.
-      console.error('revenuecat-webhook: update failed', error);
       return new Response('update failed', { status: 500 });
     }
-
-    console.log('revenuecat-webhook', type, userId, '→ is_pro', isPro);
     return new Response('ok', { status: 200 });
   } catch (e) {
     console.error('revenuecat-webhook', e);
