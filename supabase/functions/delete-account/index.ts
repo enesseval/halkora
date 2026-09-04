@@ -102,6 +102,19 @@ Deno.serve(async (req) => {
           .maybeSingle();
         const ownerName = (owner?.name as string) ?? (tr ? 'bir üye' : 'a member');
         await admin.from('challenges').update({ owner_id: nextOwner }).eq('id', challengeId);
+        // Out of the ring BEFORE the note is written, not with the bulk delete
+        // further down. `notify` pushes a system message to every participant
+        // except its author, and its author here is the NEW owner — so while
+        // this row still existed, the person who had just deleted their own
+        // account got a push telling them who the ring's owner is now (saha
+        // testi bulgusu — "ben zaten silmişim bana neden bildirim geliyor").
+        // pick_new_owner above already ignores this user, so removing the row
+        // here changes nothing else.
+        await admin
+          .from('participants')
+          .delete()
+          .eq('challenge_id', challengeId)
+          .eq('user_id', userId);
         await admin.from('messages').insert({
           challenge_id: challengeId,
           user_id: nextOwner,
