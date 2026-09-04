@@ -524,7 +524,18 @@ export function useChallengeMessages(id: string | undefined) {
     const keptIds = new Set(kept.filter(stillOnServer).map((m) => m.id));
     const refreshed = kept.filter(stillOnServer).map((m) => byId.get(m.id) ?? m);
     const brandNew = data.filter((m) => !keptIds.has(m.id));
-    setMessages(id, [...refreshed, ...brandNew]);
+    // Oldest first, by the server's own timestamp — not "whatever was on
+    // screen, then whatever is new". Appending put a message written while an
+    // optimistic bubble was still unconfirmed AFTER that bubble, and put the
+    // bubble's own confirmed row after everything that had arrived in the
+    // meantime. The more two people talked at once, the more the thread
+    // drifted out of order (saha testi bulgusu — "mesaj sırası karışık").
+    // A bubble with no timestamp yet is the one still being sent, so it
+    // belongs at the end. Array.sort is stable, so equal times keep the
+    // order the server returned them in.
+    const at = (m: (typeof refreshed)[number]) =>
+      m.createdAt ? Date.parse(m.createdAt) : Number.MAX_SAFE_INTEGER;
+    setMessages(id, [...refreshed, ...brandNew].sort((a, b) => at(a) - at(b)));
   }, [data, dataUpdatedAt, id, setMessages]);
 
   return {
@@ -968,9 +979,17 @@ export function useJoin() {
   const joinByCode = useMockStore((s) => s.joinByCode);
   const setChallenges = useMockStore((s) => s.setChallenges);
   const queryClient = useQueryClient();
+  const { t } = useT();
+  const { name: myName } = useAuth();
   return async (code: string, name: string): Promise<string> => {
     if (isSupabaseConfigured) {
-      const id = await joinChallengeByCode(code); // throws with a real message on failure
+      // Someone arriving used to be announced by nothing at all — they just
+      // appeared in the participant list (saha testi bulgusu, 10.11). Every
+      // other membership change already writes a line in the chat.
+      const id = await joinChallengeByCode(
+        code,
+        t.detail.systemJoined(myName?.trim() || name.trim() || t.common.person),
+      ); // throws with a real message on failure
       // The joined challenge is brand new to this device's store. A plain
       // invalidateQueries() only refetches *active* (mounted) queries — Home
       // isn't mounted while we're on the join screen, so it would silently

@@ -354,6 +354,7 @@ export const en: Dictionary = {
     ownerLeave: 'Just leave it',
     lastMemberMustClose: "There's nobody else in this ring — close it instead of leaving.",
     systemClosed: (name: string) => `${name} closed the ring.`,
+    systemJoined: (name: string) => `${name} joined the ring.`,
     systemLeft: (name: string) => `${name} left the ring.`,
     systemNewOwner: (name: string) => `${name} is the ring's owner now.`,
     deleteChallenge: 'Delete ring',

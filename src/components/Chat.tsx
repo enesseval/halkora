@@ -1,12 +1,56 @@
 
+import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { colors, hairline, radius, type } from '@/theme/tokens';
 import { Message } from '@/data/types';
 import { REACTION_EMOJIS } from '@/hooks';
 import { useT } from '@/i18n';
 import { AppText } from './ui';
+
+/** How far the thread slides left to show the times beside it. */
+export const TIME_REVEAL_W = 58;
+
+/**
+ * One row of the conversation, with its time parked just off the right edge.
+ *
+ * The clock used to appear nowhere at all, and putting it under every bubble
+ * would double the height of a thread of one-word replies. So it lives where
+ * WhatsApp puts it: outside the screen until you drag the thread left, shared
+ * by every row at once (`revealX` is one value for the whole list, which is
+ * what makes them move together rather than one at a time).
+ */
+export function ChatRow({
+  revealX,
+  time,
+  children,
+}: {
+  revealX: SharedValue<number>;
+  /** Absent for a day divider — a whole day has no single time. */
+  time?: string;
+  children: ReactNode;
+}) {
+  const slide = useAnimatedStyle(() => ({ transform: [{ translateX: revealX.value }] }));
+  return (
+    <Animated.View
+      style={[{ flexDirection: 'row', alignItems: 'center', width: '100%' }, slide]}
+    >
+      {/* Full width, and not allowed to shrink: the time column is meant to
+          overflow past the right edge, not to squeeze the message. */}
+      <View style={{ width: '100%', flexShrink: 0 }}>{children}</View>
+      <View
+        style={{ width: TIME_REVEAL_W, flexShrink: 0, alignItems: 'center', justifyContent: 'center' }}
+      >
+        {time ? (
+          <AppText variant="meta" tabular color={colors.textTertiary}>
+            {time}
+          </AppText>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+}
 
 /** Centered "Gün 7" divider between chat days. */
 export function DayDivider({ day }: { day: number }) {

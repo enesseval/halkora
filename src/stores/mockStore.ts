@@ -190,6 +190,11 @@ export const useMockStore = create<MockState>((set, get) => ({
           dayNumber: c.currentDay,
           reactions: [],
           mine: true,
+          // Optimistic bubbles used to carry no time at all, which left the
+          // merge below with nothing to sort them by and the thread with
+          // nothing to show when the times are revealed. This is replaced by
+          // the server's own value the moment the real row arrives.
+          createdAt: new Date().toISOString(),
         };
         return { ...c, messages: [...c.messages, msg] };
       }),

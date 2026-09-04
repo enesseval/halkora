@@ -52,6 +52,14 @@ export function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
+/** Clock string "21:04" for an ISO timestamp, in the reader's own timezone. */
+export function clockOf(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 /** Clock string "21:04" for the current time. */
 export function nowClock(): string {
   const d = new Date();

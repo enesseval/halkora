@@ -363,6 +363,7 @@ export const tr = {
     lastMemberMustClose: 'Halkada başka kimse yok — çıkmak yerine halkayı kapatabilirsin.',
     // Sohbete düşen sistem satırları
     systemClosed: (name: string) => `${name} halkayı kapattı.`,
+    systemJoined: (name: string) => `${name} halkaya katıldı.`,
     systemLeft: (name: string) => `${name} halkadan ayrıldı.`,
     systemNewOwner: (name: string) => `Halkanın kurucusu artık ${name}.`,
     deleteChallenge: 'Halkayı sil',
