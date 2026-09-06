@@ -3,7 +3,6 @@ import { Alert, Modal, Pressable, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { useLayout } from '@/theme/layout';
 import { Challenge } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
 import type { ReportReason } from '@/data/moderation';
@@ -56,7 +55,6 @@ function SheetOverlay({
   children: ReactNode;
 }) {
   const keyboardHeight = useKeyboardHeight();
-  const { sideGutter } = useLayout();
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -84,10 +82,7 @@ function SheetOverlay({
         style={{ flex: 1, backgroundColor: colors.scrim }}
       >
         <View
-          style={[
-            { flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight },
-            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-          ]}
+          style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboardHeight }}
         >
           <Pressable style={{ flex: 1 }} onPress={onClose} />
           {children}
@@ -382,6 +377,17 @@ export function UsernameSheet({
 
   const canSave = value.length >= 3 && !invalid && value !== current && !saving;
 
+  /**
+   * "Bu kullanıcı adı zaten alınmış" is an answer about the text that was
+   * submitted. It used to survive every keystroke after it — including
+   * clearing the field — so the sheet kept accusing a username that was no
+   * longer on screen. Editing invalidates the answer.
+   */
+  const onChange = (next: string) => {
+    setValue(next);
+    if (error) setError(null);
+  };
+
   const submit = async () => {
     if (!canSave) return;
     setSaving(true);
@@ -426,7 +432,7 @@ export function UsernameSheet({
           <TextInput
             ref={inputRef}
             value={value}
-            onChangeText={setValue}
+            onChangeText={onChange}
             placeholder={t.settings.usernamePlaceholder}
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
@@ -489,9 +495,22 @@ function EditField({
 }) {
   return (
     <View style={{ marginTop: 16 }}>
-      <AppText variant="meta" color={colors.textTertiary} style={{ marginBottom: 8 }}>
-        {label}
-      </AppText>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
+        <AppText variant="meta" color={colors.textTertiary} style={{ flex: 1 }}>
+          {label}
+        </AppText>
+        {/* Same counter the create screen grew — the owner edits the same
+            strings under the same caps. */}
+        {maxLength && value.length > 0 ? (
+          <AppText
+            variant="meta"
+            tabular
+            color={value.length >= maxLength ? colors.ember : colors.textTertiary}
+          >
+            {value.length}/{maxLength}
+          </AppText>
+        ) : null}
+      </View>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -664,12 +683,10 @@ export function NudgeMessageSheet({
   onClose: () => void;
 }) {
   const { t } = useT();
-  const { sideGutter } = useLayout();
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={[
-        {
+      style={{
           position: 'absolute',
           top: 0,
           left: 0,
@@ -677,10 +694,7 @@ export function NudgeMessageSheet({
           bottom: 0,
           backgroundColor: colors.scrim,
           justifyContent: 'flex-end',
-          zIndex: 30,
-        },
-        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-      ]}
+          zIndex: 30 }}
     >
       <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onClose} />
 
@@ -815,12 +829,10 @@ export function JokerDaySheet({
   onClose: () => void;
 }) {
   const { t } = useT();
-  const { sideGutter } = useLayout();
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={[
-        {
+      style={{
           position: 'absolute',
           top: 0,
           left: 0,
@@ -828,10 +840,7 @@ export function JokerDaySheet({
           bottom: 0,
           backgroundColor: colors.scrim,
           justifyContent: 'flex-end',
-          zIndex: 30,
-        },
-        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-      ]}
+          zIndex: 30 }}
     >
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -888,14 +897,12 @@ export function JokerDaySheet({
  */
 export function WidgetHintSheet({ onClose }: { onClose: () => void }) {
   const { t } = useT();
-  const { sideGutter } = useLayout();
   const steps = [t.widgetHint.step1, t.widgetHint.step2, t.widgetHint.step3];
 
   return (
     <Animated.View
       entering={FadeIn.duration(160)}
-      style={[
-        {
+      style={{
           position: 'absolute',
           top: 0,
           left: 0,
@@ -903,10 +910,7 @@ export function WidgetHintSheet({ onClose }: { onClose: () => void }) {
           bottom: 0,
           backgroundColor: colors.scrim,
           justifyContent: 'flex-end',
-          zIndex: 30,
-        },
-        sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-      ]}
+          zIndex: 30 }}
     >
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}

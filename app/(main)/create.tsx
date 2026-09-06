@@ -360,9 +360,24 @@ function Field({
 }) {
   return (
     <View style={{ marginTop: 20 }}>
-      <AppText variant="meta" color={colors.textTertiary} style={{ marginBottom: 8 }}>
-        {label}
-      </AppText>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
+        <AppText variant="meta" color={colors.textTertiary} style={{ flex: 1 }}>
+          {label}
+        </AppText>
+        {/* The cap used to be invisible: typing simply stopped and nothing on
+            screen said why (saha testi bulgusu). It appears with the first
+            character and goes ember at the limit, so the wall is announced
+            before you hit it. */}
+        {maxLength && value.length > 0 ? (
+          <AppText
+            variant="meta"
+            tabular
+            color={value.length >= maxLength ? colors.ember : colors.textTertiary}
+          >
+            {value.length}/{maxLength}
+          </AppText>
+        ) : null}
+      </View>
       <TextInput
         value={value}
         onChangeText={onChangeText}

@@ -51,6 +51,9 @@ private struct WidgetCopy {
   let jokerLeft: (Int) -> String  // "1 joker kaldı"
   let joinedCount: (Int) -> String  // "5 kişi katıldı"
   let brand: String  // inline lock-screen prefix
+  /// Header for a widget with nothing in it at all. Not a label about rings,
+  /// because there are none — see the "Bugün" header below.
+  let brandFull: String  // "Halkora"
   let dayLong: (Int, Int) -> String  // "Gün 7/14"
   // "Bugün" ve "Seri" widget'ları
   let todayTitle: String  // "Bugün"
@@ -85,6 +88,7 @@ private let copyTr = WidgetCopy(
   jokerLeft: { n in "\(n) joker kaldı" },
   joinedCount: { n in "\(n) kişi katıldı" },
   brand: "Halka",
+  brandFull: "Halkora",
   dayLong: { c, t in "Gün \(c)/\(t)" },
   todayTitle: "Bugün",
   soonTitle: "Yakında",
@@ -113,6 +117,7 @@ private let copyEn = WidgetCopy(
   jokerLeft: { n in "\(n) joker left" },
   joinedCount: { n in "\(n) joined" },
   brand: "Halkora",
+  brandFull: "Halkora",
   dayLong: { c, t in "Day \(c)/\(t)" },
   todayTitle: "Today",
   soonTitle: "Soon",
@@ -662,9 +667,14 @@ struct ChallengeQuery: EntityQuery {
     loadActiveChallenges().map { ChallengeEntity(id: $0.challengeId, title: $0.title) }
   }
 
-  func defaultResult() async -> ChallengeEntity? {
-    try? await suggestedEntities().first
-  }
+  // No defaultResult() on purpose. Returning one makes WidgetKit hand the
+  // provider a `configuration.challenge` even when nobody ever opened Edit
+  // Widget — and the provider reads a non-nil challenge as "the person pinned
+  // this widget to one ring", which pins it AND turns off rotation. That is
+  // why the medium widget never showed its arrows or page dots however many
+  // rings existed (12.2.5-12.2.7). Unconfigured has to actually mean
+  // unconfigured; the provider already falls back to the first ring, so
+  // nothing goes blank without this.
 }
 
 struct SelectChallengeIntent: WidgetConfigurationIntent {
@@ -1053,7 +1063,16 @@ struct HalkoraSmallView: View {
         } else if s.checkedInToday(at: at) {
           Pill(label: c.doneLabel, settled: true)
         } else {
-          Pill(label: c.checkInCta)
+          // The only Pill in the whole file without a width bound: every
+          // other family calls .fixedSize(), this one keeps the component's
+          // own .frame(maxWidth: .infinity) so it fills the small card. That
+          // is right on an iPhone, where the card is ~155pt wide, and wrong
+          // on an iPad, where systemSmall is a good deal wider and the pill
+          // grew with it until it crowded the title and the day (saha testi
+          // bulgusu — "iPad'de check-in butonları çok büyük, içeriği
+          // kısıtlamış"). The cap is above anything an iPhone small widget
+          // can offer, so the phone layout is untouched.
+          Pill(label: c.checkInCta).frame(maxWidth: 180)
         }
       } else {
         // Nothing to do yet — the spec deliberately drops the pill here
@@ -1792,7 +1811,12 @@ struct HalkoraListView: View {
         // "Bugün" only when something is actually running today. With every
         // ring still upcoming the rows read "Yarın başlıyor", and a "Bugün"
         // above them stamps a day onto rings that haven't got one.
-        Text(activeCount > 0 ? c.todayTitle : c.soonTitle)
+        //
+        // With NO rings at all it is neither: "Yakında" promised something
+        // coming to a widget whose whole body says there is nothing (saha
+        // testi bulgusu — "hiç halka yokken yakında başlığı var"). The app's
+        // own name is the only true thing to put there.
+        Text(live.isEmpty ? c.brandFull : (activeCount > 0 ? c.todayTitle : c.soonTitle))
           .font(wTitle(15))
           .kerning(-0.3)
           .foregroundStyle(halkoraTextPrimary)
