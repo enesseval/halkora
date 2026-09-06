@@ -423,7 +423,6 @@ export const en: Dictionary = {
     stakeCollectiveFail: (total: number, target: number, text: string) =>
       `${total}/${target} — target missed. ${text}`,
     settleCta: 'Mark as paid',
-    settleCtaCollective: 'Mark as celebrated',
     settledLabel: '✓ Stake settled',
     settleFailed: "Couldn't mark it",
     rematchLobbyHint: 'A rematch opens as a lobby — your old ring gets invited, and you start with whoever shows up.',

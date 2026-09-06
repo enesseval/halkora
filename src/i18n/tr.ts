@@ -437,7 +437,6 @@ export const tr = {
     stakeCollectiveFail: (total: number, target: number, text: string) =>
       `${total}/${target} — hedef tutmadı. ${text}`,
     settleCta: 'Ödendi olarak işaretle',
-    settleCtaCollective: 'Kutlandı olarak işaretle',
     settledLabel: '✓ Bahis kapandı',
     settleFailed: 'İşaretlenemedi',
     rematchLobbyHint: 'Rövanş lobide açılır — eski halkana davet gider, kim gelirse onunla başlarsın.',
