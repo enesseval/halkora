@@ -110,6 +110,15 @@ export function CheckInButton({
     const v = Math.max((confirmT.value - 0.45) / 0.55, 0);
     return { transform: [{ scale: v }], opacity: v };
   });
+  // The button's own contents fade out under the growing circle and back in
+  // as it leaves. Without this the circle spends its first third smaller than
+  // the button, with the old label showing around and through it (saha testi
+  // bulgusu — "önde çıkan şey transparent olduğundan arkası gözükmeye devam
+  // ediyor"). Read off the same timeline, so it is a crossfade rather than
+  // two animations that have to be kept in step.
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(confirmT.value / 0.35, 1),
+  }));
 
   const runConfirm = (kind: 'done' | 'undone') => {
     setConfirm(kind);
@@ -130,6 +139,22 @@ export function CheckInButton({
     },
     [],
   );
+
+  // The write failed and the optimistic tick was rolled back. Cut the
+  // confirmation short instead of letting it play to the end and only then
+  // flipping back — the animation would be telling the person something had
+  // happened while the app already knew it hadn't (saha testi bulgusu —
+  // "animasyon tamamlanıyor, buton değişiyor daha sonra hata verip geri
+  // değişiyor").
+  useEffect(() => {
+    if (confirm !== 'done' || done) return;
+    // Only the animation is stopped here; the timer that was already running
+    // clears the state on its own a moment later. Setting state from inside
+    // an effect would be the wrong tool for something the timeline can say
+    // by itself.
+    cancelAnimation(confirmT);
+    confirmT.value = withTiming(0, { duration: 140 });
+  }, [done, confirm, confirmT]);
 
   const press = () => {
     if (done || confirm) return;
@@ -244,7 +269,7 @@ export function CheckInButton({
         {done ? (
           <Animated.View
             entering={FadeIn.duration(250)}
-            style={{ alignItems: 'center', maxWidth: size * 0.78 }}
+            style={[{ alignItems: 'center', maxWidth: size * 0.78 }, contentStyle]}
           >
             <AppText style={{ fontSize: 24, color: colors.ember, marginBottom: 2 }}>✓</AppText>
             <AppText
@@ -269,7 +294,7 @@ export function CheckInButton({
         ) : (
           <Animated.View
             entering={FadeIn.duration(200)}
-            style={{ alignItems: 'center', maxWidth: size * 0.78 }}
+            style={[{ alignItems: 'center', maxWidth: size * 0.78 }, contentStyle]}
           >
             <AppText
               style={{ fontFamily: fonts.displaySemibold, fontSize: 22, color: colors.bgBase }}

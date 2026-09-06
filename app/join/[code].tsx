@@ -99,16 +99,24 @@ export default function JoinScreen() {
 
   // Checked before joinClosed: someone who is already in shouldn't be told the
   // invite expired. It didn't expire for them — they're past it.
+  //
+  // If the ring has ALSO closed, that is the more useful half of the answer
+  // and it wins the copy: opening your own closed ring's link and being told
+  // "zaten varsın" says nothing about why nothing works any more (saha testi
+  // bulgusu). The way back in stays either way — that's the whole reason this
+  // branch runs before the closed one.
   if (preview.alreadyJoined) {
     return (
       <Screen edges={['top', 'bottom']}>
         {closeButton}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <AppText variant="screenTitle" style={{ fontSize: 22, textAlign: 'center' }}>
-            {t.join.alreadyInTitle}
+            {preview.ringClosed ? t.join.ringClosedTitle : t.join.alreadyInTitle}
           </AppText>
           <AppText variant="secondary" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-            {t.join.alreadyInSubtitle(preview.title)}
+            {preview.ringClosed
+              ? t.join.ringClosedSubtitle(preview.title)
+              : t.join.alreadyInSubtitle(preview.title)}
           </AppText>
         </View>
         <View style={{ paddingBottom: spacing.section }}>

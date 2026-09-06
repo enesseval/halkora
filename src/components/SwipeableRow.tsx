@@ -242,8 +242,16 @@ export function SwipeableRow({
         if (!armed.current) return;
         armed.current = false;
         const last = actions[actions.length - 1];
-        ref.current?.close();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+        // One frame, and it is not a nicety. Swipeable's close() asks
+        // `rowState` where the row is coming FROM, and it fires this callback
+        // in the same tick as the setState that sets rowState — so closing
+        // here read the row as still CLOSED, snapped it to its closed
+        // position in a single frame, and then sprang from there to the same
+        // place. The row shut with no motion whatsoever (saha testi bulgusu —
+        // "kaydırma kapanışında animasyon yok, birden kapanıyor"). A frame
+        // later the state is committed and the spring has somewhere to go.
+        requestAnimationFrame(() => ref.current?.close());
         last?.onPress();
       }}
       onSwipeableClose={() => {

@@ -71,9 +71,20 @@ export async function amIParticipant(challengeId: string): Promise<boolean> {
   return !!data;
 }
 
-/** Adds the current user as a participant. Returns the challenge id. */
-export async function joinChallengeByCode(code: string): Promise<string> {
-  const { data, error } = await supabase.rpc('join_challenge_by_code', { p_code: code });
+/**
+ * Adds the current user as a participant. Returns the challenge id.
+ *
+ * `systemText` is the "… halkaya katıldı." line the group sees in chat,
+ * composed by the caller for the same reason leave_challenge's is: the
+ * database cannot reach the dictionaries. Always sent — `null` rather than
+ * omitted, so PostgREST (which picks an overload by the parameter names in
+ * the body) can only ever resolve to the two-argument function.
+ */
+export async function joinChallengeByCode(code: string, systemText?: string): Promise<string> {
+  const { data, error } = await supabase.rpc('join_challenge_by_code', {
+    p_code: code,
+    p_system_text: systemText ?? null,
+  });
   if (error) throw error;
   return data as string;
 }

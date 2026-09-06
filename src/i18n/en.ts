@@ -345,7 +345,7 @@ export const en: Dictionary = {
     changedStake: (stake: string) => `📝 Stake updated: ${stake}`,
     ownerExitTitle: 'Leaving this ring?',
     ownerExitBody:
-      "Closing it ends the ring for everyone — nobody can check in again, but the history and stats stay with each member. If you just leave, the ring carries on and the earliest member becomes its owner.",
+      "Closing it ends the ring for everyone — nobody can check in again, but the history and stats stay with each member. If you just leave, the ring carries on and the earliest member becomes its owner. Deleting removes the ring and everything in it, for good.",
     closeChallenge: 'Close the ring',
     closeChallengeConfirmTitle: 'Close this ring?',
     closeChallengeConfirmBody:
@@ -354,6 +354,7 @@ export const en: Dictionary = {
     ownerLeave: 'Just leave it',
     lastMemberMustClose: "There's nobody else in this ring — close it instead of leaving.",
     systemClosed: (name: string) => `${name} closed the ring.`,
+    systemJoined: (name: string) => `${name} joined the ring.`,
     systemLeft: (name: string) => `${name} left the ring.`,
     systemNewOwner: (name: string) => `${name} is the ring's owner now.`,
     deleteChallenge: 'Delete ring',
@@ -422,7 +423,6 @@ export const en: Dictionary = {
     stakeCollectiveFail: (total: number, target: number, text: string) =>
       `${total}/${target} — target missed. ${text}`,
     settleCta: 'Mark as paid',
-    settleCtaCollective: 'Mark as celebrated',
     settledLabel: '✓ Stake settled',
     settleFailed: "Couldn't mark it",
     rematchLobbyHint: 'A rematch opens as a lobby — your old ring gets invited, and you start with whoever shows up.',
@@ -579,6 +579,8 @@ export const en: Dictionary = {
     saveImage: 'Save image',
     copyLink: 'Copy link',
     linkNote: 'The invite link travels with the image — Messages and WhatsApp carry both, Instagram and X take the picture only.',
+    // A closed ring sends no invite link: nobody can join it.
+    linkNoteClosed: 'The ring is closed — only the image is shared, without an invite link.',
     saved: 'Image saved',
     savedFailed: "Couldn't save the image",
     copied: 'Link copied',

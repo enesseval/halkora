@@ -18,7 +18,12 @@ interface Props {
   canNudge?: boolean;
 }
 
-/** Build a plausible personal ring so each row reads individually. */
+/**
+ * Fallback ring for data that carries no per-day truth (the mock store).
+ * Assumes every day before today was covered, which is exactly why it must
+ * never be used when `participant.days` is there — it drew a full ring for
+ * people who had missed half the challenge (buglar #7).
+ */
 function personalDays(p: Participant, total: number, currentDay: number): SegmentState[] {
   const filled = p.checkedInToday ? currentDay : Math.max(currentDay - 1, 0);
   const explicit: SegmentState[] = [];
@@ -152,7 +157,7 @@ export function ParticipantRow({
 
       <ProgressRing
         totalDays={totalDays}
-        days={personalDays(participant, totalDays, currentDay)}
+        days={participant.days ?? personalDays(participant, totalDays, currentDay)}
         size="S"
       />
     </View>

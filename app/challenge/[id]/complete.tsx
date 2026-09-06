@@ -303,14 +303,15 @@ export default function CompleteScreen() {
               </AppText>
             </View>
             {canSettle ? (
+              // One label for both kinds. The collective one used to read
+              // "Kutlandı olarak işaretle" — but `canSettle` only lets this
+              // button exist when someone actually OWES the stake, which for
+              // a collective ring means the target was MISSED. So the only
+              // time it was ever shown was the one time "celebrated" was the
+              // wrong word (saha testi bulgusu — "kolektif altı halkada
+              // kutlandı diye bir şey var, bu nereden çıktı").
               <Button
-                label={
-                  settling
-                    ? t.common.continue
-                    : challenge.stakeOutcome?.kind === 'collective'
-                      ? t.complete.settleCtaCollective
-                      : t.complete.settleCta
-                }
+                label={settling ? t.common.continue : t.complete.settleCta}
                 variant="secondary"
                 onPress={doSettle}
                 disabled={settling}

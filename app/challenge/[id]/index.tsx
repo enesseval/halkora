@@ -16,7 +16,8 @@ import * as Haptics from 'expo-haptics';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import {
@@ -35,6 +36,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
 import { setActiveChallengeId } from '@/lib/push';
+import { clockOf } from '@/lib/day';
 import { fetchPendingInvites } from '@/data/invites';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { AppText, AvatarStack, Button, IconButton, FixedType } from '@/components/ui';
@@ -44,7 +46,7 @@ import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
 import { ShareRingSheet } from '@/components/ShareRingSheet';
 import { ParticipantRow } from '@/components/ParticipantRow';
-import { DayDivider, MessageBubble, SystemEvent } from '@/components/Chat';
+import { ChatRow, DayDivider, MessageBubble, SystemEvent, TIME_REVEAL_W } from '@/components/Chat';
 import {
   JokerDaySheet,
   MissedDaySheet,
@@ -62,7 +64,6 @@ import {
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
-import { useLayout } from '@/theme/layout';
 
 type Row =
   | { kind: 'participant'; p: Participant }
@@ -71,7 +72,7 @@ type Row =
   | { kind: 'chatError' }
   | { kind: 'chatDay'; day: number }
   | { kind: 'message'; m: Message }
-  | { kind: 'system'; id: string; text: string };
+  | { kind: 'system'; id: string; text: string; at?: string };
 
 /** Small "fact about this challenge" pill — same visual language as
  * StakeBadge (emoji-in-circle + text), used for joker allowance/remaining
@@ -126,7 +127,6 @@ export default function DetailScreen() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const router = useRouter();
   const { t } = useT();
-  const { sideGutter } = useLayout();
   const { name } = useAuth();
   const challenge = useChallenge(id);
 
@@ -162,6 +162,28 @@ export default function DetailScreen() {
   // Which chat bubble has its long-press menu open. One value for the whole
   // list, so opening a second menu closes the first.
   const [openBubbleId, setOpenBubbleId] = useState<string | null>(null);
+  /**
+   * How far the conversation is currently dragged left, revealing each row's
+   * time. One value for the whole list, so the rows move as one thread.
+   *
+   * The pan only claims genuinely horizontal drags — `activeOffsetX` keeps it
+   * out of the way of the list's own vertical scroll, which is the thing that
+   * must not be broken to add this. Letting go always springs it back: the
+   * times are something you peek at, not a mode you end up stuck in.
+   */
+  const revealX = useSharedValue(0);
+  // Not memoised: GestureDetector already reconciles the gesture it is given,
+  // and holding `revealX` in a hook's dependency list is what makes writing to
+  // it from these callbacks a lint error.
+  const timeReveal = Gesture.Pan()
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-14, 14])
+    .onChange((e) => {
+      revealX.value = Math.min(0, Math.max(-TIME_REVEAL_W, revealX.value + e.changeX));
+    })
+    .onFinalize(() => {
+      revealX.value = withTiming(0, { duration: 180 });
+    });
   // Guideline 1.2 — the message being reported, and the block confirmation.
   const [reportTarget, setReportTarget] = useState<Message | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -262,7 +284,7 @@ export default function DetailScreen() {
           lastDay = m.dayNumber;
         }
         if (m.kind === 'system') {
-          out.push({ kind: 'system', id: m.id, text: m.text });
+          out.push({ kind: 'system', id: m.id, text: m.text, at: m.createdAt });
         } else {
           out.push({ kind: 'message', m });
         }
@@ -362,10 +384,7 @@ export default function DetailScreen() {
     if (loading) {
       return (
         <SafeAreaView
-          style={[
-            { flex: 1, backgroundColor: colors.bgBase },
-            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-          ]}
+          style={{ flex: 1, backgroundColor: colors.bgBase }}
           edges={['top']}
         >
           {backButton}
@@ -378,10 +397,7 @@ export default function DetailScreen() {
     if (firstLoadError) {
       return (
         <SafeAreaView
-          style={[
-            { flex: 1, backgroundColor: colors.bgBase },
-            sideGutter > 0 ? { paddingHorizontal: sideGutter } : null,
-          ]}
+          style={{ flex: 1, backgroundColor: colors.bgBase }}
           edges={['top']}
         >
           {backButton}
@@ -475,10 +491,23 @@ export default function DetailScreen() {
       // Reporting and blocking are separate decisions, so the offer is made
       // rather than assumed — someone may want the content reviewed without
       // cutting the person out of the ring.
-      Alert.alert(t.moderation.reportSent, t.moderation.reportSentBody, [
-        { text: t.common.cancel, style: 'cancel' },
-        { text: t.moderation.blockConfirm, style: 'destructive', onPress: () => confirmBlock(m) },
-      ]);
+      //
+      // After a beat, and for the same reason the share sheet waits: the
+      // report sheet is a Modal in its own window, and an alert presented
+      // while that window is still coming down belongs to a view controller
+      // on its way out — so its buttons stop dismissing it and "Vazgeç" left
+      // the alert sitting there (saha testi bulgusu). The block confirmation
+      // waits too, because it is presented from THIS alert's own dismissal.
+      setTimeout(() => {
+        Alert.alert(t.moderation.reportSent, t.moderation.reportSentBody, [
+          { text: t.common.cancel, style: 'cancel' },
+          {
+            text: t.moderation.blockConfirm,
+            style: 'destructive',
+            onPress: () => setTimeout(() => confirmBlock(m), 250),
+          },
+        ]);
+      }, 300);
     } catch (e) {
       alertOnce(t.moderation.reportFailed, friendlyErrorMessage(e));
     }
@@ -585,7 +614,6 @@ export default function DetailScreen() {
     }
     buttons.push({
       text: t.detail.closeChallenge,
-      style: 'destructive',
       onPress: () => {
         Alert.alert(t.detail.closeChallengeConfirmTitle, t.detail.closeChallengeConfirmBody, [
           { text: t.common.cancel, style: 'cancel' },
@@ -598,6 +626,29 @@ export default function DetailScreen() {
                 goHomeAfterExit();
               } catch (e) {
                 alertOnce(t.detail.closeChallengeFailed, friendlyErrorMessage(e));
+              }
+            },
+          },
+        ]);
+      },
+    });
+    // Delete used to live only behind the owner-settings sheet, so the two
+    // exits disagreed about what "sil" even meant. Both offer all three now.
+    buttons.push({
+      text: t.detail.deleteChallenge,
+      style: 'destructive',
+      onPress: () => {
+        Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
+          { text: t.common.cancel, style: 'cancel' },
+          {
+            text: t.detail.deleteChallenge,
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await actions.deleteChallenge();
+                goHomeAfterExit();
+              } catch (e) {
+                alertOnce(t.detail.deleteChallengeFailed, friendlyErrorMessage(e));
               }
             },
           },
@@ -1015,20 +1066,30 @@ export default function DetailScreen() {
           </View>
         );
       case 'chatDay':
-        return <DayDivider day={item.day} />;
+        return (
+          <ChatRow revealX={revealX}>
+            <DayDivider day={item.day} />
+          </ChatRow>
+        );
       case 'system':
-        return <SystemEvent text={item.text} />;
+        return (
+          <ChatRow revealX={revealX} time={clockOf(item.at)}>
+            <SystemEvent text={item.text} />
+          </ChatRow>
+        );
       case 'message':
         return (
-          <MessageBubble
-            message={item.m}
-            onReact={(emoji) => actions.react(item.m.id, emoji)}
-            onReport={item.m.authorId ? () => setReportTarget(item.m) : undefined}
-            onBlock={item.m.authorId ? () => confirmBlock(item.m) : undefined}
-            onDelete={item.m.mine ? () => confirmDeleteMessage(item.m.id) : undefined}
-            openId={openBubbleId}
-            setOpenId={setOpenBubbleId}
-          />
+          <ChatRow revealX={revealX} time={clockOf(item.m.createdAt)}>
+            <MessageBubble
+              message={item.m}
+              onReact={(emoji) => actions.react(item.m.id, emoji)}
+              onReport={item.m.authorId ? () => setReportTarget(item.m) : undefined}
+              onBlock={item.m.authorId ? () => confirmBlock(item.m) : undefined}
+              onDelete={item.m.mine ? () => confirmDeleteMessage(item.m.id) : undefined}
+              openId={openBubbleId}
+              setOpenId={setOpenBubbleId}
+            />
+          </ChatRow>
         );
       case 'chatError':
         return (
@@ -1054,11 +1115,8 @@ export default function DetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgBase }}>
-      {/* Detail doesn't go through <Screen>, so it needs the same measure cap
-          applied by hand — otherwise the chat runs the full width of an iPad
-          while every other screen is centred (src/theme/layout.ts). */}
       <SafeAreaView
-        style={[{ flex: 1 }, sideGutter > 0 ? { paddingHorizontal: sideGutter } : null]}
+        style={{ flex: 1 }}
         edges={['top']}
       >
         {topBar}
@@ -1066,30 +1124,43 @@ export default function DetailScreen() {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <FlashList
-            ref={listRef}
-            data={rows}
-            renderItem={renderItem}
-            keyExtractor={(item, i) =>
-              item.kind === 'participant'
-                ? `p-${item.p.id}`
-                : item.kind === 'message'
-                  ? `m-${item.m.id}`
-                  : `${item.kind}-${i}`
-            }
-            ListHeaderComponent={header}
-            contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
-            showsVerticalScrollIndicator={false}
-            // Scrolling the thread puts an open bubble menu away — it floats
-            // over the conversation now, so leaving it up while the messages
-            // move under it would be worse than the old inline version.
-            onScrollBeginDrag={() => setOpenBubbleId(null)}
-            onScroll={handleListScroll}
-            scrollEventThrottle={100}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
-            }
-          />
+          {/* Claims the touch ONLY while a bubble menu is open, so the first tap
+              anywhere puts it away and never reaches what is underneath.
+              Conditional on purpose: a responder that is always armed sits in the
+              path of every other gesture, which is how the swipe on Home came to
+              open the ring instead of revealing its actions. */}
+          <GestureDetector gesture={timeReveal}>
+          <View
+            style={{ flex: 1 }}
+            onStartShouldSetResponder={() => openBubbleId !== null}
+            onResponderRelease={() => setOpenBubbleId(null)}
+          >
+            <FlashList
+              ref={listRef}
+              data={rows}
+              renderItem={renderItem}
+              keyExtractor={(item, i) =>
+                item.kind === 'participant'
+                  ? `p-${item.p.id}`
+                  : item.kind === 'message'
+                    ? `m-${item.m.id}`
+                    : `${item.kind}-${i}`
+              }
+              ListHeaderComponent={header}
+              contentContainerStyle={{ paddingHorizontal: spacing.screenX, paddingBottom: 16 }}
+              showsVerticalScrollIndicator={false}
+              // Scrolling the thread puts an open bubble menu away — it floats
+              // over the conversation now, so leaving it up while the messages
+              // move under it would be worse than the old inline version.
+              onScrollBeginDrag={() => setOpenBubbleId(null)}
+              onScroll={handleListScroll}
+              scrollEventThrottle={100}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ember} />
+              }
+            />
+          </View>
+          </GestureDetector>
 
           {showJumpToLatest ? (
             <Pressable

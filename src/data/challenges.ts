@@ -344,31 +344,59 @@ function mapRow(
     ? joinDayFor(startDate, row.timezone, deadline, myParticipant.joined_at)
     : 1;
 
-  // days[] reflects MY personal progress on this challenge's ring.
-  const explicit: SegmentState[] = [];
-  if (status !== 'upcoming') {
-    // How far the ring actually got. Ending early freezes it there: the days
-    // after that never arrived, so they stay empty instead of turning into
-    // missed days as the calendar keeps moving. Same number stakeOutcome
-    // counts against.
-    const elapsed =
-      status === 'completed'
-        ? Math.min(row.ended_on_day ?? currentDay, row.total_days)
-        : currentDay;
-    // A finished ring has no "today" — its last day is history like every
-    // other. Leaving it as 'today' left that segment breathing forever.
-    const lastSettled = status === 'completed' ? elapsed : currentDay - 1;
-    for (let i = 1; i <= lastSettled; i++) {
-      const c = myByDay.get(i);
-      // A check-in still wins if one somehow exists before the join day —
-      // showing a real day as blank would be the worse error of the two.
-      explicit.push(c ? (c.type === 'joker' ? 'joker' : 'done') : i < myJoinDay ? 'empty' : 'missed');
+  // How far the ring actually got. Ending early freezes it there: the days
+  // after that never arrived, so they stay empty instead of turning into
+  // missed days as the calendar keeps moving. Same number stakeOutcome
+  // counts against.
+  const elapsed =
+    status === 'completed'
+      ? Math.min(row.ended_on_day ?? currentDay, row.total_days)
+      : currentDay;
+  // A finished ring has no "today" — its last day is history like every
+  // other. Leaving it as 'today' left that segment breathing forever.
+  const lastSettled = status === 'completed' ? elapsed : currentDay - 1;
+
+  /**
+   * One person's ring on this challenge, day by day.
+   *
+   * Used for my own ring AND for every participant row. The rows used to draw
+   * a *plausible* ring instead — everyone assumed to have covered every day
+   * before today — so someone who had missed half the challenge still showed
+   * a full one (buglar #7). Every check-in for the whole ring is already
+   * loaded here; this just reads them per person, by the same rule.
+   */
+  const ringDaysFor = (byDay: Map<number, CheckInRow>, joinDay: number): SegmentState[] => {
+    const explicit: SegmentState[] = [];
+    if (status !== 'upcoming') {
+      for (let i = 1; i <= lastSettled; i++) {
+        const c = byDay.get(i);
+        // A check-in still wins if one somehow exists before the join day —
+        // showing a real day as blank would be the worse error of the two.
+        explicit.push(c ? (c.type === 'joker' ? 'joker' : 'done') : i < joinDay ? 'empty' : 'missed');
+      }
+      if (status !== 'completed') {
+        const todayCheckIn = byDay.get(currentDay);
+        explicit.push(todayCheckIn ? (todayCheckIn.type === 'joker' ? 'joker' : 'done') : 'today');
+      }
     }
-    if (status !== 'completed') {
-      const todayCheckIn = myByDay.get(currentDay);
-      explicit.push(todayCheckIn ? (todayCheckIn.type === 'joker' ? 'joker' : 'done') : 'today');
+    return buildDays(row.total_days, explicit);
+  };
+
+  /**
+   * Consecutive settled days this person let pass without covering them,
+   * counting back from yesterday and never past their own join day. Was never
+   * filled in from the server at all, so "N gündür sessiz" could not appear
+   * however quiet someone went.
+   */
+  const silentDaysFor = (byDay: Map<number, CheckInRow>, joinDay: number): number => {
+    if (status !== 'active') return 0;
+    let n = 0;
+    for (let d = currentDay - 1; d >= Math.max(joinDay, 1); d--) {
+      if (byDay.has(d)) break;
+      n++;
     }
-  }
+    return n;
+  };
 
   const meCheckedInToday = myByDay.has(currentDay);
   const myTodayCheckIn = myByDay.get(currentDay);
@@ -392,9 +420,12 @@ function mapRow(
   const participants: Participant[] = parts.map((p) => {
     const prof = profMap.get(p.user_id);
     const name = prof?.name ?? t.common.person;
-    const todayCi = checkIns.find((c) => c.participant_id === p.id && c.day_number === currentDay);
+    const mine = checkIns.filter((c) => c.participant_id === p.id);
+    const byDay = new Map(mine.map((c) => [c.day_number, c]));
+    const joinDay = joinDayFor(startDate, row.timezone, deadline, p.joined_at);
+    const todayCi = byDay.get(currentDay);
     // Every day this participant covered (done or joker) — the E9 leaderboard.
-    const completedDays = checkIns.filter((c) => c.participant_id === p.id).length;
+    const completedDays = mine.length;
     return {
       id: p.user_id,
       name,
@@ -403,6 +434,8 @@ function mapRow(
       checkedInToday: !!todayCi,
       checkinTime: todayCi ? hhmm(todayCi.created_at) : undefined,
       completedDays,
+      days: ringDaysFor(byDay, joinDay),
+      silentDays: silentDaysFor(byDay, joinDay),
       // Reflects the DB's real "one nudge per person per day" state (Ek K) —
       // not just an ephemeral optimistic flag — so it survives a refetch and
       // the UI can tell a genuine re-attempt apart from a fresh nudge.
@@ -486,7 +519,7 @@ function mapRow(
     dailyActionRaw: row.daily_action,
     totalDays: row.total_days,
     currentDay,
-    days: buildDays(row.total_days, explicit),
+    days: ringDaysFor(myByDay, myJoinDay),
     status,
     startsLabel: status === 'upcoming' ? startsWhen : undefined,
     meCheckedInToday,
