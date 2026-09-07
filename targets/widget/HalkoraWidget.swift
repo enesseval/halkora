@@ -667,14 +667,13 @@ struct ChallengeQuery: EntityQuery {
     loadActiveChallenges().map { ChallengeEntity(id: $0.challengeId, title: $0.title) }
   }
 
-  // No defaultResult() on purpose. Returning one makes WidgetKit hand the
-  // provider a `configuration.challenge` even when nobody ever opened Edit
-  // Widget — and the provider reads a non-nil challenge as "the person pinned
-  // this widget to one ring", which pins it AND turns off rotation. That is
-  // why the medium widget never showed its arrows or page dots however many
-  // rings existed (12.2.5-12.2.7). Unconfigured has to actually mean
-  // unconfigured; the provider already falls back to the first ring, so
-  // nothing goes blank without this.
+  /// A fresh widget shows the first ring rather than nothing, and — because
+  /// the provider treats a chosen challenge as pinned — each widget then
+  /// stands on its own. That independence is the point: see the rotation
+  /// note in HalkoraProvider.
+  func defaultResult() async -> ChallengeEntity? {
+    try? await suggestedEntities().first
+  }
 }
 
 struct SelectChallengeIntent: WidgetConfigurationIntent {
@@ -741,20 +740,18 @@ struct HalkoraProvider: AppIntentTimelineProvider {
       return dayBoundaryTimeline(for: picked)
     }
 
-    // Unconfigured + more than one halka -> auto-rotate. A Timeline can
-    // carry several future-dated entries in one go; WidgetKit switches
-    // between them locally as each date arrives, so only the one
-    // timeline(for:) call counts against the refresh budget, not each
-    // switch. Capped at 3 (matching the spec's "max 3 dots").
-    // More than one halka: the shared cursor decides which, and the nav
-    // control on the card moves it. No timer involved.
-    if all.count > 1 {
-      let shown = Array(all.prefix(3))
-      let index = wrapped(cursor(cursorHalka), shown.count)
-      return dayBoundaryTimeline(
-        for: shown[index], rotationCount: shown.count, rotationIndex: index)
-    }
-
+    // No rotation. Every per-ring widget stands on its own and is pointed at
+    // a ring through Edit Widget, which is how WidgetKit expects this to
+    // work and the only way each copy can differ.
+    //
+    // There used to be a shared cursor and a pair of arrows on the card.
+    // Both had to go: one cursor for every widget of every size meant
+    // stepping one widget forward stepped ALL of them (saha testi bulgusu —
+    // "bir widgetta halka değiştirince tüm widgetlarda değişiyor"), and the
+    // controls were taking room the small sizes did not have to spare
+    // ("düzenler tamamen bozulmuş, özellik eklemeye çalışırken
+    // sıkıştırmışsın"). Paging survives only in "Bugün · tüm halkalar",
+    // where it walks a LIST rather than choosing a ring.
     guard let single = all.first(where: { !$0.checkedInToday(at: Date()) }) ?? all.first else {
       // No halka at all — nothing to derive, so nothing to schedule; the
       // app's own reloadWidget() is the only thing that can change this.
@@ -789,9 +786,7 @@ struct HalkoraProvider: AppIntentTimelineProvider {
     {
       return picked
     }
-    guard all.count > 1 else { return all.first }
-    let shown = Array(all.prefix(3))
-    return shown[wrapped(cursor(cursorHalka), shown.count)]
+    return all.first
   }
 }
 
@@ -906,36 +901,6 @@ private struct Pill: View {
   }
 }
 
-/// Which halka of how many (spec 03). The spec asked for these to be
-/// near-invisible, which held while rotation took a quarter of an hour and
-/// read as a background detail. At a minute per halka the card visibly
-/// changes under you, and an indicator you can't see makes that look like a
-/// glitch rather than a rotation — so the active dot is ember and sized to
-/// be legible at arm's length. Never more than three.
-private struct RotationDots: View {
-  let count: Int
-  let index: Int
-  /// Lock Screen accessories are drawn monochrome; ember would come out as
-  /// plain white there, so those callers ask for the opacity treatment.
-  var monochrome: Bool = false
-
-  var body: some View {
-    HStack(spacing: 4) {
-      ForEach(0..<count, id: \.self) { i in
-        Capsule()
-          .fill(
-            i == index
-              ? (monochrome ? Color.white.opacity(0.9) : halkoraEmber)
-              : Color.white.opacity(monochrome ? 0.3 : 0.18)
-          )
-          // The active one stretches instead of only brightening, so its
-          // position is readable even in a glance too short to compare tones.
-          .frame(width: i == index ? 12 : 5, height: 5)
-      }
-    }
-  }
-}
-
 /// The nav control: previous, position, next. Deliberately UNFILLED — the
 /// spec reserves the filled capsule for check-in, and a second solid button
 /// would compete with the only one that matters.
@@ -1039,10 +1004,6 @@ struct HalkoraSmallView: View {
           }
         }
         Spacer(minLength: 0)
-        if entry.rotationCount > 1 {
-          RotationDots(count: entry.rotationCount, index: entry.rotationIndex)
-            .padding(.top, 4)
-        }
       }
 
       Spacer(minLength: 6)
@@ -1197,10 +1158,6 @@ struct HalkoraMediumView: View {
             }
           }
           Spacer(minLength: 0)
-          if entry.rotationCount > 1 {
-            NavControl(
-              scope: cursorHalka, count: entry.rotationCount, index: entry.rotationIndex)
-          }
         }
 
         Spacer(minLength: 8)
@@ -1361,10 +1318,6 @@ struct HalkoraLargeView: View {
           }
         }
         Spacer(minLength: 8)
-        if entry.rotationCount > 1 {
-          NavControl(
-            scope: cursorHalka, count: entry.rotationCount, index: entry.rotationIndex)
-        }
       }
 
       Spacer(minLength: 12)
@@ -1749,21 +1702,35 @@ private struct TodayRow: View {
       // a single dot carries what's left: covered or still owed.
       StatusDot(done: s.checkedInToday(at: at) || s.isCompleted(at: at))
 
+      // The check-in pill on the right is .fixedSize(), so it never gives
+      // ground — which means everything else has to say what it does when it
+      // runs out. Only the title had a lineLimit, so "Gün 7/14" and the
+      // "Yarın başlıyor" label wrapped to a second line and pushed the rows
+      // out of the card (saha testi bulgusu — "orta tüm de yazılar hep
+      // taşmış"). One line each, and the text column gets the space first.
       VStack(alignment: .leading, spacing: 1) {
         Text(s.title)
           .font(wTitle(13))
           .kerning(-0.26)
           .foregroundStyle(halkoraTextPrimary)
           .lineLimit(1)
+          .truncationMode(.tail)
         if s.isActive {
           Text(copy.dayLong(s.currentDay(at: at), s.totalDays))
             .font(wMeta(10))
             .monospacedDigit()
             .foregroundStyle(halkoraTextTertiary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
         } else if !s.startsLabel.isEmpty {
-          Text(s.startsLabel).font(wMeta(10)).foregroundStyle(halkoraTextTertiary)
+          Text(s.startsLabel)
+            .font(wMeta(10))
+            .foregroundStyle(halkoraTextTertiary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
         }
       }
+      .layoutPriority(1)
 
       Spacer(minLength: 6)
 
@@ -1820,6 +1787,8 @@ struct HalkoraListView: View {
           .font(wTitle(15))
           .kerning(-0.3)
           .foregroundStyle(halkoraTextPrimary)
+          .lineLimit(1)
+          .layoutPriority(1)
         if activeCount > 0 {
           Text(
             openCount == 0
@@ -1829,6 +1798,8 @@ struct HalkoraListView: View {
           .font(wMeta(10))
           .monospacedDigit()
           .foregroundStyle(openCount == 0 ? halkoraEmber : halkoraTextTertiary)
+          .lineLimit(1)
+          .minimumScaleFactor(0.8)
         }
         Spacer(minLength: 6)
         if pageCount > 1 {
@@ -1934,10 +1905,6 @@ struct HalkoraStreakView: View {
           .kerning(1.4)
           .foregroundStyle(halkoraTextTertiary)
         Spacer(minLength: 4)
-        if entry.rotationCount > 1 {
-          NavControl(
-            scope: cursorHalka, count: entry.rotationCount, index: entry.rotationIndex)
-        }
       }
 
       Spacer(minLength: 6)
