@@ -444,6 +444,7 @@ export const tr = {
     // dolu açılır, oluşunca eski katılımcılara otomatik davet gider
     // (app/(main)/create.tsx `rematchOf` parametresi).
     rematch: 'Yeni bir halka kur',
+    openRing: 'Halkaya git',
     shareResult: 'Sonucu paylaş',
     shareMessage: (title: string, totalDays: number) => `"${title}" tamamlandı — ${totalDays} gün, birlikte. 🔥`,
     // Paylaşım kartı (9:16 PNG — Instagram vb. için)

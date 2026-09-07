@@ -83,15 +83,25 @@ function useRowSwipeActions(challenge: Challenge): SwipeAction[] {
     if (others) {
       buttons.push({
         text: t.detail.ownerLeave,
-        onPress: async () => {
-          busy.current = true;
-          try {
-            await actions.leaveChallenge(t.detail.systemLeft(myName));
-          } catch (e) {
-            Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
-          } finally {
-            busy.current = false;
-          }
+        // Confirmed, like close and delete beside it — see the detail screen.
+        onPress: () => {
+          Alert.alert(t.detail.leaveChallengeConfirmTitle, t.detail.leaveChallengeConfirmBody, [
+            { text: t.common.cancel, style: 'cancel' },
+            {
+              text: t.detail.leaveChallenge,
+              style: 'destructive',
+              onPress: async () => {
+                busy.current = true;
+                try {
+                  await actions.leaveChallenge(t.detail.systemLeft(myName));
+                } catch (e) {
+                  Alert.alert(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+                } finally {
+                  busy.current = false;
+                }
+              },
+            },
+          ]);
         },
       });
     }

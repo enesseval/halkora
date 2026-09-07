@@ -365,11 +365,24 @@ export default function DetailScreen() {
   // mount, so a Detail screen left open past the challenge's actual end kept
   // showing a stale "waiting for tomorrow" view until backing out and back in
   // (saha testi bulgusu).
+  //
+  // ONLY on the transition. Firing on any completed ring meant a finished
+  // ring's detail could never be opened at all — tapping it from Geçmiş
+  // bounced straight past the screen and its chat, so the stake's own
+  // "Bahis kapandı" line was unreachable and the ring looked like it had
+  // been replaced by a summary (saha testi bulgusu — "halka bittiğinde
+  // detaya giremiyosun, direk sonuç ekranı geliyor, burda mesajlaşma kısmı
+  // yok"). The celebration is for the moment it ends, not for every visit
+  // afterwards; the finish screen carries its own way back in.
+  const sawUnfinished = useRef(false);
   useEffect(() => {
-    if (challenge?.status === 'completed') {
-      router.replace(`/challenge/${challenge.id}/complete`);
+    if (!challenge) return;
+    if (challenge.status !== 'completed') {
+      sawUnfinished.current = true;
+      return;
     }
-  }, [challenge?.status]);
+    if (sawUnfinished.current) router.replace(`/challenge/${challenge.id}/complete`);
+  }, [challenge?.status, challenge?.id]);
 
   if (!challenge) {
     // Not in the store yet — tell "still loading" and "genuinely failed" apart
@@ -602,15 +615,27 @@ export default function DetailScreen() {
     if (others) {
       buttons.push({
         text: t.detail.ownerLeave,
-        onPress: async () => {
-          try {
-            // Two lines, because two things happened: someone left, and the
-            // ring changed hands. The group needs both.
-            await actions.leaveChallenge(t.detail.systemLeft(myName));
-            goHomeAfterExit();
-          } catch (e) {
-            alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
-          }
+        // Confirmed like the other two. Leaving is not reversible either —
+        // your own check-in history goes with you — and it was the one option
+        // here that acted on a single tap.
+        onPress: () => {
+          Alert.alert(t.detail.leaveChallengeConfirmTitle, t.detail.leaveChallengeConfirmBody, [
+            { text: t.common.cancel, style: 'cancel' },
+            {
+              text: t.detail.leaveChallenge,
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  // Two lines, because two things happened: someone left, and
+                  // the ring changed hands. The group needs both.
+                  await actions.leaveChallenge(t.detail.systemLeft(myName));
+                  goHomeAfterExit();
+                } catch (e) {
+                  alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+                }
+              },
+            },
+          ]);
         },
       });
     }

@@ -584,27 +584,26 @@ export function OwnerSettingsSheet({
     }
   };
 
+  /**
+   * Straight to the caller's own exit flow — no confirmation of its own.
+   *
+   * There used to be one here, and it made leaving a ring a three-screen
+   * trip: an "are you sure" alert, then the çık/kapat/sil chooser the caller
+   * opens, then that option's own confirmation (saha testi bulgusu —
+   * "halkayı sile basıyorum 3 seçenekli açıklama ekranı geliyor, tekrar sil
+   * dediğimde yine alert çıkıyor"). The chooser already asks the question
+   * this alert was asking, and it asks it better: it names the three things
+   * that could be meant instead of assuming one.
+   */
   const confirmDelete = () => {
     if (deleting) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    Alert.alert(t.detail.deleteChallengeConfirmTitle, t.detail.deleteChallengeConfirmBody, [
-      { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.detail.deleteChallenge,
-        style: 'destructive',
-        onPress: async () => {
-          setDeleting(true);
-          try {
-            await onDelete();
-            // onDelete's caller navigates away on success — no onClose() here,
-            // the sheet unmounts along with the screen it's attached to.
-          } catch (e) {
-            setError(friendlyErrorMessage(e));
-            setDeleting(false);
-          }
-        },
-      },
-    ]);
+    setDeleting(true);
+    onDelete()
+      .catch((e) => setError(friendlyErrorMessage(e)))
+      // The chooser is an alert, not a screen: it comes back the moment it is
+      // shown, so the button must not stay locked behind it.
+      .finally(() => setDeleting(false));
   };
 
   return (

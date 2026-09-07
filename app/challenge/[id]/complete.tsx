@@ -7,7 +7,7 @@ import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useChallenge, useChallengeActions, useChallengesQuery, useCreateGate } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
-import { AppText, Avatar, Button, Card, Screen, SectionLabel } from '@/components/ui';
+import { AppText, Avatar, Button, Card, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
@@ -58,6 +58,13 @@ export default function CompleteScreen() {
   const someoneOwes =
     outcome?.kind === 'collective' ? outcome.collectiveHit === false : (outcome?.losers.length ?? 0) > 0;
   const canSettle = !!outcome && !settled && someoneOwes;
+
+  // Cold-started here (a push, or the ring vanishing under you) there may be
+  // nothing to go back TO, so Home is the floor.
+  const goHome = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
 
   const doSettle = async () => {
     if (settling) return;
@@ -112,8 +119,29 @@ export default function CompleteScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
+      {/* This screen had no way out at all. Reaching it because a ring you
+          were in was deleted or closed left you on a dead end — back-swipe
+          worked, but nothing on screen said so (saha testi bulgusu — "o
+          ekranda da çarpı vs. falan yok"). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 6 }}>
+        <IconButton size={38} onPress={goHome}>
+          <Feather name="x" size={18} color={colors.textPrimary} />
+        </IconButton>
+        <View style={{ flex: 1 }} />
+        {/* The ring itself is still there, chat and all — the finish screen is
+            a summary, not a replacement for it. */}
+        <Pressable
+          onPress={() => router.push(`/challenge/${challenge.id}?from=complete`)}
+          style={({ pressed }) => ({ paddingHorizontal: 10, paddingVertical: 8, opacity: pressed ? 0.6 : 1 })}
+        >
+          <AppText variant="secondary" color={colors.ember}>
+            {t.complete.openRing}
+          </AppText>
+        </Pressable>
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.section }}>
-        <View style={{ alignItems: 'center', marginTop: 24 }}>
+        <View style={{ alignItems: 'center', marginTop: 8 }}>
           <ProgressRing
             totalDays={challenge.totalDays}
             days={challenge.days}

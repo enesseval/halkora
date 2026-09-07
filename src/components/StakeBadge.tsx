@@ -17,6 +17,12 @@ export function StakeBadge({
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: align === 'center' ? 'center' : 'flex-start',
+        // The pill hugs its content, but it may not grow past its parent.
+        // Without this a settled stake naming a long participant list ran off
+        // the screen and was simply cut mid-word, with no ellipsis and no way
+        // to read the rest (saha testi bulgusu — "kaybeden kahve ısmarlar ---
+        // Edi yazıyor devamı yok").
+        maxWidth: '100%',
         gap: 8,
         backgroundColor: colors.bgElevated,
         borderColor: colors.strokeSubtle,
@@ -38,7 +44,7 @@ export function StakeBadge({
       >
         <AppText style={{ fontSize: 11 }}>🎲</AppText>
       </View>
-      <AppText variant="secondary" color={colors.textSecondary}>
+      <AppText variant="secondary" color={colors.textSecondary} style={{ flexShrink: 1 }}>
         {t.complete.stakeResult(text)}
       </AppText>
     </View>

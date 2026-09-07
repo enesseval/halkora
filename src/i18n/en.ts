@@ -427,6 +427,7 @@ export const en: Dictionary = {
     settleFailed: "Couldn't mark it",
     rematchLobbyHint: 'A rematch opens as a lobby — your old ring gets invited, and you start with whoever shows up.',
     rematch: 'Start a new ring',
+    openRing: 'Open the ring',
     shareResult: 'Share result',
     shareMessage: (title: string, totalDays: number) =>
       `"${title}" completed — ${totalDays} days, together. 🔥`,
