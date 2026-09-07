@@ -374,7 +374,7 @@ export default function HomeScreen() {
         </ScrollView>
       </Screen>
 
-      <QuickStartSheet visible={showStart} onClose={() => setShowStart(false)} />
+      {showStart ? <QuickStartSheet onClose={() => setShowStart(false)} /> : null}
 
       {showInvites ? (
         <InvitesSheet

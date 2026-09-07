@@ -3,7 +3,7 @@ import { useRef, type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
-import { colors, hairline, radius, type } from '@/theme/tokens';
+import { colors, hairline, radius } from '@/theme/tokens';
 import { Message } from '@/data/types';
 import { REACTION_EMOJIS } from '@/hooks';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';

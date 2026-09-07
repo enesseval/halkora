@@ -5,10 +5,10 @@
  * In Phase 2 the internals swap to TanStack Query + Supabase while these
  * hook signatures stay identical (optimistic check-in etc.).
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMockStore, CreateChallengeInput } from '@/stores/mockStore';
+import { useMockStore, firstName, CreateChallengeInput } from '@/stores/mockStore';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   insertChallenge,
@@ -32,7 +32,7 @@ import {
   insertSystemMessage,
 } from '@/data/chat';
 import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
-import { errMessage, friendlyErrorMessage, isErrorCode, isNetworkError, alertOnce } from '@/lib/errors';
+import { friendlyErrorMessage, isErrorCode, isNetworkError, alertOnce } from '@/lib/errors';
 import { router } from 'expo-router';
 import {
   ME_ID,
@@ -46,7 +46,6 @@ import {
 import { formatLongDate, waitingNames } from '@/lib/day';
 import { syncWidgetSnapshot } from '@/lib/widget';
 import { useAuth } from './useAuth';
-import { firstName } from '@/stores/mockStore';
 import { Challenge, Participant } from '@/data/types';
 import { useT } from '@/i18n';
 
@@ -88,7 +87,6 @@ export const MY_CHALLENGES_KEY = ['challenges', 'mine'] as const;
  */
 export function useChallengesQuery() {
   const setChallenges = useMockStore((s) => s.setChallenges);
-  const everHadData = useRef(false);
   /**
    * Ids the last response didn't contain. A ring is only dropped once it has
    * been missing TWICE — see the pruning note below.
@@ -110,7 +108,6 @@ export function useChallengesQuery() {
 
   useEffect(() => {
     if (isSupabaseConfigured && query.data) {
-      everHadData.current = true;
       const current = useMockStore.getState().challenges;
       const byId = new Map(query.data.map((c) => [c.id, c]));
       const currentIds = new Set(current.map((c) => c.id));
@@ -168,8 +165,11 @@ export function useChallengesQuery() {
 
   return {
     loading: isSupabaseConfigured && query.isLoading,
-    firstLoadError: isSupabaseConfigured && query.isError && !everHadData.current,
-    backgroundError: isSupabaseConfigured && query.isError && everHadData.current,
+    // `dataUpdatedAt` is 0 until the first successful fetch, so it answers
+    // "have we ever had data?" without a ref — and a ref read during render is
+    // exactly what react-hooks/refs is about.
+    firstLoadError: isSupabaseConfigured && query.isError && query.dataUpdatedAt === 0,
+    backgroundError: isSupabaseConfigured && query.isError && query.dataUpdatedAt > 0,
     error: query.error,
     refetch: query.refetch,
   };
@@ -465,7 +465,6 @@ export function messagesKey(id: string) {
  */
 export function useChallengeMessages(id: string | undefined) {
   const setMessages = useMockStore((s) => s.setChallengeMessages);
-  const everHadData = useRef(false);
   const { data, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: messagesKey(id ?? ''),
     queryFn: () => fetchMessages(id as string),
@@ -478,7 +477,6 @@ export function useChallengeMessages(id: string | undefined) {
   });
   useEffect(() => {
     if (!isSupabaseConfigured || !id || !data) return;
-    everHadData.current = true;
     const currentList = useMockStore.getState().challenges.find((c) => c.id === id)?.messages ?? [];
     const byId = new Map(data.map((m) => [m.id, m]));
 
@@ -541,7 +539,8 @@ export function useChallengeMessages(id: string | undefined) {
   return {
     // Only surface this the first time — if we already have messages showing,
     // a background poll failing shouldn't nag every 4s.
-    firstLoadError: isSupabaseConfigured && isError && !everHadData.current,
+    // Same as useChallengesQuery: 0 means nothing has ever landed.
+    firstLoadError: isSupabaseConfigured && isError && dataUpdatedAt === 0,
     error,
     retry: refetch,
   };
@@ -562,7 +561,10 @@ export function useChallengeMessages(id: string | undefined) {
  */
 function useRealtimeMyChallenges(): void {
   const queryClient = useQueryClient();
-  const instanceId = useRef(Math.random().toString(36).slice(2)).current;
+  // React's own per-instance identity. This used to be
+  // useRef(Math.random()).current, which is both an impure render and a ref
+  // read during render — useId is the supported way to say the same thing.
+  const instanceId = useId();
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const bump = () => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
@@ -604,7 +606,7 @@ export function useRealtimeChallenge(id: string | undefined) {
   // postgres_changes callbacks ... after subscribe()" when we .on() it
   // again. A per-mount unique suffix sidesteps the collision entirely —
   // realtime topic names don't need to be stable across mounts.
-  const instanceId = useRef(Math.random().toString(36).slice(2)).current;
+  const instanceId = useId();
   useEffect(() => {
     if (!isSupabaseConfigured || !id) return;
     const bump = (key: readonly unknown[]) => queryClient.invalidateQueries({ queryKey: key });
@@ -643,7 +645,10 @@ export function useRealtimeChallenge(id: string | undefined) {
 /** All challenge-scoped actions in one place. */
 export function useChallengeActions(id: string) {
   const { t } = useT();
-  const useJoker = useMockStore((s) => s.useJoker);
+  // Deliberately not named `useJoker`: it is a store action, but the linter
+  // reads any use-prefixed call as a hook and every call site as a
+  // rules-of-hooks violation. The local name is the only thing deciding that.
+  const applyJoker = useMockStore((s) => s.useJoker);
   const ackMissed = useMockStore((s) => s.ackMissed);
   const sendMessageMock = useMockStore((s) => s.sendMessage);
   const reactMock = useMockStore((s) => s.react);
@@ -661,7 +666,7 @@ export function useChallengeActions(id: string) {
   /** `dayNumber` omitted = yesterday (the missed-day gate); a number comes
    * from tapping that gap on the ring. */
   const doUseJoker = (dayNumber?: number) => {
-    useJoker(id, dayNumber); // optimistic: that segment flips to amber immediately
+    applyJoker(id, dayNumber); // optimistic: that segment flips to amber immediately
     if (isSupabaseConfigured && challenge) {
       insertCheckIn(id, 'joker', dayNumber) // day + allowance validated server-side
         .then(() => queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY }))

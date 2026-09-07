@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, fonts } from '@/theme/tokens';
 import { ProgressRing } from './ProgressRing';
+import { useT } from '@/i18n';
 import { AppText } from './ui';
 import type { SegmentState } from '@/data/types';
 
@@ -20,8 +21,22 @@ const STEP_MS = 260;
  * pause once the ring is full, then reset — purely decorative, no real
  * progress data involved.
  */
-export function BootSplash() {
+/** How long the ring may chase before the screen owes the reader an
+ * explanation. One full lap is 2.6s, so this lands just after it. */
+const SLOW_AFTER_MS = 3200;
+
+export function BootSplash({ canSpeak = false }: { canSpeak?: boolean }) {
+  const { t } = useT();
   const [days, setDays] = useState<SegmentState[]>(() => Array(TOTAL).fill('empty'));
+  // The chase loops forever by design, which is fine for a beat and awful for
+  // a wait: with nothing else on screen it reads as the splash restarting
+  // itself (saha testi bulgusu — "splash sürekli başa sarıp tekrar ediyor").
+  // Whatever is holding us up, saying so beats looping in silence.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     let i = 0;
@@ -57,6 +72,16 @@ export function BootSplash() {
           HALKORA
         </AppText>
       </Animated.View>
+
+      {/* Only once the dictionary is loaded — otherwise this would be the one
+          string in the app shown in a language the reader never chose. */}
+      {slow && canSpeak ? (
+        <Animated.View entering={FadeIn.duration(400)} style={{ marginTop: 14, paddingHorizontal: 40 }}>
+          <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
+            {t.errors.checkConnection}
+          </AppText>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

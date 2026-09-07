@@ -218,27 +218,47 @@ export function useAuthInit(): void {
     }
     let active = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      let session = data.session;
-      if (session) {
-        // getSession() only reads the locally cached JWT — it does not confirm
-        // the user still exists server-side. If the project's data was ever
-        // wiped (e.g. while resetting test data), a device can be left holding
-        // a session for a user row that's gone, which then surfaces later as a
-        // cryptic FK error (e.g. "participants_user_id_fkey") instead of a
-        // clean "please sign in again". Validate against the server up front.
-        const { error } = await supabase.auth.getUser();
-        if (error && sessionRejectedByServer(error)) {
-          await supabase.auth.signOut();
-          session = null;
-        }
-      }
-      if (!active) return;
+      const session = data.session;
       useAuthStore.setState({ session });
       syncWidgetSession(session);
-      await loadProfileName(session);
-      if (active) useAuthStore.setState({ ready: true });
+
+      // Ready HERE, on the cached session alone.
+      //
+      // Everything below this line goes to the network, and `ready` used to
+      // wait for all of it: getUser(), then loadProfileName(). Offline that
+      // is two requests each running to the 12s ceiling, so the boot screen
+      // sat there through its animation, looped it, and looped it again
+      // before the app would even mount — and only then did Home start its
+      // own load and eventually say "halkalar yüklenemedi" (saha testi
+      // bulgusu — "splash sürekli başa sarıp tekrar ediyor... zaman çok uzun
+      // kullanıcı bunu beklemez"). None of it decides whether the app can be
+      // shown: the session is already in hand, and `profileLoaded` (still
+      // false until the fetch lands) is what keeps the onboarding guard from
+      // firing on a profile we have not read yet.
+      useAuthStore.setState({ ready: true });
+
+      void (async () => {
+        if (session) {
+          // getSession() only reads the locally cached JWT — it does not
+          // confirm the user still exists server-side. If the project's data
+          // was ever wiped (e.g. while resetting test data), a device can be
+          // left holding a session for a user row that's gone, which then
+          // surfaces later as a cryptic FK error (e.g.
+          // "participants_user_id_fkey") instead of a clean "please sign in
+          // again". Validated here rather than before the app is shown: a
+          // wiped user is rare, being offline is not.
+          const { error } = await supabase.auth.getUser();
+          if (!active) return;
+          if (error && sessionRejectedByServer(error)) {
+            await supabase.auth.signOut();
+            return; // onAuthStateChange clears the rest.
+          }
+        }
+        if (!active) return;
+        await loadProfileName(useAuthStore.getState().session);
+      })();
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {

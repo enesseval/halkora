@@ -1,3 +1,7 @@
+/* eslint-disable react-hooks/immutability --
+ * `shakeX` is a Reanimated shared value; writing `.value` from a handler is
+ * the library's own API. See CheckInButton.tsx for the full note.
+ */
 import { Pressable, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';

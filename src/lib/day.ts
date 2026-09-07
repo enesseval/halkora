@@ -1,5 +1,5 @@
 import { SegmentState } from '@/data/types';
-import { getDict, getLocale, intlTag } from '@/i18n';
+import { getDict, intlTag } from '@/i18n';
 
 /**
  * Build a `days` array of a given length from a set of explicit states,

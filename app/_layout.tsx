@@ -228,7 +228,7 @@ function RootNavigator() {
   // default-locale copy before the saved/detected language is applied — and
   // hold the boot screen open for its own minimum beat on top of that.
   if (!localeReady || (configured && !ready) || !bootDelayDone) {
-    return <BootSplash />;
+    return <BootSplash canSpeak={localeReady} />;
   }
 
   if (!configured) {

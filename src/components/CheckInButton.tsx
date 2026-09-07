@@ -1,3 +1,11 @@
+/* eslint-disable react-hooks/immutability --
+ * Every animation here is a Reanimated shared value, and writing `.value` is
+ * that library's entire API — from event handlers, from effects, from
+ * worklets. react-hooks/immutability sees only "a value this hook was given
+ * is being mutated" and has no way to tell the two apart, so it fires on each
+ * one in turn. Scoped to this rule and this file rather than silenced
+ * per-line, which just moved the error to the next assignment.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';

@@ -8,13 +8,14 @@ import {
   RefreshControl,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
-import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -158,7 +159,12 @@ export default function DetailScreen() {
   const { firstLoadError: chatError, error: chatErrorDetail, retry: retryChat } = useChallengeMessages(id);
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
-  const [showOwnerSettings, setShowOwnerSettings] = useState(false);
+  // Home's swipe-to-edit action (saha testi bulgusu) lands here with ?edit=1
+  // to jump straight to the owner settings sheet instead of making the owner
+  // tap the gear icon a second time. Read at the initialiser rather than
+  // pushed in by an effect — the param is there on the very first render, and
+  // ownership is checked where the sheet is rendered.
+  const [showOwnerSettings, setShowOwnerSettings] = useState(edit === '1');
   // Which chat bubble has its long-press menu open. One value for the whole
   // list, so opening a second menu closes the first.
   // The whole anchor, not just an id: the menu is drawn over the list now
@@ -191,12 +197,7 @@ export default function DetailScreen() {
   const [leaving, setLeaving] = useState(false);
   const [nudgeTarget, setNudgeTarget] = useState<Participant | null>(null);
 
-  // Home's swipe-to-edit action (saha testi bulgusu) lands here with
-  // ?edit=1 to jump straight to the owner settings sheet instead of making
-  // the owner tap the gear icon a second time.
-  useEffect(() => {
-    if (edit === '1' && challenge?.isOwner) setShowOwnerSettings(true);
-  }, [edit, challenge?.isOwner]);
+
   const [starting, setStarting] = useState(false);
   const [showLobbyDatePicker, setShowLobbyDatePicker] = useState(false);
   const [lobbyDate, setLobbyDate] = useState<Date | null>(null);
@@ -223,12 +224,13 @@ export default function DetailScreen() {
     // Three conditions, all of which have to hold: enough check-ins to call it
     // a habit, no widget already drawing, and never dismissed. Anything less
     // and this is an advert rather than a tip.
-    if (myCheckins < HINT_AFTER_CHECKINS || hasWidgetInstalled()) {
-      setWidgetHintReady(false);
-      return;
-    }
+    //
+    // The ineligible case used to setState synchronously and return; both
+    // answers go through the same await now, so nothing is written during the
+    // effect itself.
     let alive = true;
-    isWidgetHintDismissed().then((done) => {
+    const eligible = myCheckins >= HINT_AFTER_CHECKINS && !hasWidgetInstalled();
+    (eligible ? isWidgetHintDismissed() : Promise.resolve(true)).then((done) => {
       if (alive) setWidgetHintReady(!done);
     });
     return () => {
@@ -355,6 +357,7 @@ export default function DetailScreen() {
     // Deliberately only watches isLastDayFullyDone — actions is stable enough
     // here and re-running this on every challenge poll tick would just
     // re-fire the (idempotent) endEarly call.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLastDayFullyDone]);
 
   // Leave Detail for the celebration screen the moment the challenge is
@@ -382,6 +385,9 @@ export default function DetailScreen() {
       return;
     }
     if (sawUnfinished.current) router.replace(`/challenge/${challenge.id}/complete`);
+    // Status and id only: `challenge` is a fresh object on every poll and
+    // `router` is stable, so listing either would re-run this constantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challenge?.status, challenge?.id]);
 
   if (!challenge) {
@@ -1316,9 +1322,8 @@ export default function DetailScreen() {
       ) : null}
 
       {/* Faz 3C madde 3 — owner-only settings */}
-      {showOwnerSettings ? (
+      {showOwnerSettings && challenge.isOwner ? (
         <OwnerSettingsSheet
-          visible={showOwnerSettings}
           challenge={challenge}
           onClose={() => setShowOwnerSettings(false)}
           onSave={actions.updateDetails}

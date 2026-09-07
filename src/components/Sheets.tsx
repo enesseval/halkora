@@ -234,12 +234,10 @@ export function MissedDaySheet({
 
 /* ------------------------------------------------------------------ */
 export function NameSheet({
-  visible,
   current,
   onClose,
   onSave,
 }: {
-  visible: boolean;
   current: string;
   onClose: () => void;
   onSave: (name: string) => Promise<void>;
@@ -250,14 +248,10 @@ export function NameSheet({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
 
-  useEffect(() => {
-    if (visible) {
-      setValue(current);
-      setError(null);
-    }
-  }, [visible, current]);
-
-  if (!visible) return null;
+  // No reset effect: the caller mounts this only while it is open, so every
+  // opening is a fresh mount and useState's initialiser IS the reset. The
+  // effect that used to do it was a synchronous setState inside an effect —
+  // the shape react-hooks/set-state-in-effect exists to catch.
 
   const canSave = value.trim().length > 0 && value.trim() !== current && !saving;
 
@@ -332,12 +326,10 @@ export function NameSheet({
 /* Ayarlar — @kullanıcıadı düzenleme (Faz 3C, docs "Ek O")             */
 /* ------------------------------------------------------------------ */
 export function UsernameSheet({
-  visible,
   current,
   onClose,
   onSave,
 }: {
-  visible: boolean;
   current: string | null;
   onClose: () => void;
   onSave: (username: string) => Promise<void>;
@@ -349,14 +341,10 @@ export function UsernameSheet({
 
   const inputRef = useRef<TextInput>(null);
 
-  useEffect(() => {
-    if (visible) {
-      setValue(current ?? '');
-      setError(null);
-    }
-  }, [visible, current]);
-
-  if (!visible) return null;
+  // No reset effect: the caller mounts this only while it is open, so every
+  // opening is a fresh mount and useState's initialiser IS the reset. The
+  // effect that used to do it was a synchronous setState inside an effect —
+  // the shape react-hooks/set-state-in-effect exists to catch.
 
   /**
    * Nothing typed here is rewritten.
@@ -493,6 +481,8 @@ function EditField({
   placeholder?: string;
   maxLength?: number;
 }) {
+  // Focused only — see the create screen's Field for why.
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ marginTop: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
@@ -501,7 +491,7 @@ function EditField({
         </AppText>
         {/* Same counter the create screen grew — the owner edits the same
             strings under the same caps. */}
-        {maxLength && value.length > 0 ? (
+        {maxLength && focused && value.length > 0 ? (
           <AppText
             variant="meta"
             tabular
@@ -516,6 +506,8 @@ function EditField({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textTertiary}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         maxLength={maxLength}
         style={{
           height: 50,
@@ -534,13 +526,11 @@ function EditField({
 }
 
 export function OwnerSettingsSheet({
-  visible,
   challenge,
   onClose,
   onSave,
   onDelete,
 }: {
-  visible: boolean;
   challenge: Challenge;
   onClose: () => void;
   onSave: (title: string, dailyAction: string, stakeText: string) => Promise<void>;
@@ -554,19 +544,10 @@ export function OwnerSettingsSheet({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (visible) {
-      setTitle(challenge.title);
-      setDailyAction(challenge.dailyActionRaw ?? '');
-      setStakeText(challenge.stake?.text ?? '');
-      setError(null);
-    }
-    // Deliberately excludes `challenge` from deps — only reset when the
-    // sheet transitions to visible, not on every poll-driven refresh while
-    // it's open (that would wipe whatever the owner is mid-typing).
-  }, [visible]);
-
-  if (!visible) return null;
+  // No reset effect: the caller mounts this only while it is open, so every
+  // opening is a fresh mount and useState's initialiser IS the reset. The
+  // effect that used to do it was a synchronous setState inside an effect —
+  // the shape react-hooks/set-state-in-effect exists to catch.
 
   const canSave = title.trim().length > 0 && dailyAction.trim().length > 0 && !saving;
 

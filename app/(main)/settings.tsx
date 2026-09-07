@@ -21,12 +21,13 @@ import { useT, type Locale } from '@/i18n';
 /** null while the initial permission check is in flight. Push is native-only —
  * expo-notifications' web shim doesn't fully implement this, so skip there. */
 function useNotificationStatus(): boolean | null {
-  const [granted, setGranted] = useState<boolean | null>(null);
+  // Web is decided at the initialiser, not by a synchronous setState inside
+  // the effect — there is nothing to wait for there.
+  const [granted, setGranted] = useState<boolean | null>(() =>
+    Platform.OS === 'web' ? false : null,
+  );
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      setGranted(false);
-      return;
-    }
+    if (Platform.OS === 'web') return;
     Notifications.getPermissionsAsync()
       .then((p) => setGranted(p.status === 'granted'))
       .catch(() => setGranted(false));
@@ -494,23 +495,23 @@ export default function SettingsScreen() {
         </AppText>
       </ScrollView>
 
-      <UsernameSheet
-        visible={editingUsername}
-        current={username}
-        onClose={() => setEditingUsername(false)}
-        onSave={saveUsername}
-      />
+      {/* Mounted only while open, so opening it is a fresh mount and the
+          fields reset themselves — no effect needed. */}
+      {editingUsername ? (
+        <UsernameSheet
+          current={username}
+          onClose={() => setEditingUsername(false)}
+          onSave={saveUsername}
+        />
+      ) : null}
 
       {showWidgetHint ? <WidgetHintSheet onClose={() => setShowWidgetHint(false)} /> : null}
 
       {showBlocked ? <BlockedSheet onClose={() => setShowBlocked(false)} /> : null}
 
-      <NameSheet
-        visible={editingName}
-        current={displayName}
-        onClose={() => setEditingName(false)}
-        onSave={saveName}
-      />
+      {editingName ? (
+        <NameSheet current={displayName} onClose={() => setEditingName(false)} onSave={saveName} />
+      ) : null}
     </Screen>
   );
 }
