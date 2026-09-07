@@ -1,11 +1,12 @@
 
-import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { useRef, type ReactNode } from 'react';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { colors, hairline, radius, type } from '@/theme/tokens';
 import { Message } from '@/data/types';
 import { REACTION_EMOJIS } from '@/hooks';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { AppText } from './ui';
 
@@ -13,42 +14,66 @@ import { AppText } from './ui';
 export const TIME_REVEAL_W = 58;
 
 /**
- * One row of the conversation, with its time parked just off the right edge.
+ * One row of the conversation, with its time parked off the right edge.
  *
- * The clock used to appear nowhere at all, and putting it under every bubble
- * would double the height of a thread of one-word replies. So it lives where
- * WhatsApp puts it: outside the screen until you drag the thread left, shared
- * by every row at once (`revealX` is one value for the whole list, which is
- * what makes them move together rather than one at a time).
+ * Two rules, both learned the hard way:
+ *
+ *  - The time is INVISIBLE until you drag. It used to sit in a column that
+ *    overlapped the screen's own padding, so its left edge peeked out at
+ *    rest (saha testi bulgusu — "sağdaki saat her zaman gözüküyor ucundan").
+ *    It fades in with the drag now, from nothing.
+ *  - Only YOUR OWN messages move. Day dividers, system lines and everyone
+ *    else's bubbles are left of the time column already — sliding the whole
+ *    thread just shoved the entire conversation sideways for no reason
+ *    ("içeriği komple kaydırıyor ama buna gerek yok"). A right-aligned
+ *    bubble is the only thing the time column can collide with, so it is the
+ *    only thing that gets out of the way.
  */
 export function ChatRow({
   revealX,
   time,
+  shift,
   children,
 }: {
   revealX: SharedValue<number>;
   /** Absent for a day divider — a whole day has no single time. */
   time?: string;
+  /** Move this row's content out of the time column's way. Own messages only. */
+  shift?: boolean;
   children: ReactNode;
 }) {
-  const slide = useAnimatedStyle(() => ({ transform: [{ translateX: revealX.value }] }));
+  const slide = useAnimatedStyle(() => ({
+    transform: [{ translateX: shift ? revealX.value : 0 }],
+  }));
+  const clock = useAnimatedStyle(() => ({
+    transform: [{ translateX: revealX.value }],
+    opacity: Math.min(-revealX.value / (TIME_REVEAL_W * 0.6), 1),
+  }));
   return (
-    <Animated.View
-      style={[{ flexDirection: 'row', alignItems: 'center', width: '100%' }, slide]}
-    >
-      {/* Full width, and not allowed to shrink: the time column is meant to
-          overflow past the right edge, not to squeeze the message. */}
-      <View style={{ width: '100%', flexShrink: 0 }}>{children}</View>
-      <View
-        style={{ width: TIME_REVEAL_W, flexShrink: 0, alignItems: 'center', justifyContent: 'center' }}
-      >
-        {time ? (
+    <View style={{ width: '100%' }}>
+      <Animated.View style={slide}>{children}</Animated.View>
+      {time ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: 'absolute',
+              right: -TIME_REVEAL_W,
+              top: 0,
+              bottom: 0,
+              width: TIME_REVEAL_W,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            clock,
+          ]}
+        >
           <AppText variant="meta" tabular color={colors.textTertiary}>
             {time}
           </AppText>
-        ) : null}
-      </View>
-    </Animated.View>
+        </Animated.View>
+      ) : null}
+    </View>
   );
 }
 
@@ -84,43 +109,30 @@ export function SystemEvent({ text }: { text: string }) {
   );
 }
 
-interface BubbleProps {
+/** Where a bubble sits on screen, so its menu can be drawn over everything. */
+export interface MenuAnchor {
   message: Message;
-  onReact: (emoji: string) => void;
-  /** Guideline 1.2 — every piece of someone else's content needs a way to be
-   * reported and its author blocked. Absent on my own messages: there is
-   * nothing to report about myself. */
-  onReport?: () => void;
-  onBlock?: () => void;
-  /** Only on my own messages. */
-  onDelete?: () => void;
-  /** Which bubble currently has its menu open, and how to change that. Held
-   * by the list rather than each bubble: with a boolean per bubble, opening
-   * a second menu left the first one open behind it (saha testi bulgusu —
-   * "başka bir mesaja uzun bastığımda yine açılıyor ama önceki açık kalmaya
-   * devam ediyor"). One value can only name one bubble. */
-  openId: string | null;
-  setOpenId: (id: string | null) => void;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  mine: boolean;
 }
 
-export function MessageBubble({
-  message,
-  onReact,
-  onReport,
-  onBlock,
-  onDelete,
-  openId,
-  setOpenId,
-}: BubbleProps) {
-  const { t } = useT();
-  const showPicker = openId === message.id;
-  const setShowPicker = (next: boolean | ((v: boolean) => boolean)) => {
-    const value = typeof next === 'function' ? next(showPicker) : next;
-    setOpenId(value ? message.id : null);
-  };
+interface BubbleProps {
+  message: Message;
+  /** Long-press hands up the bubble's position in WINDOW coordinates; the
+   * screen draws the menu itself. See ChatMenu for why it cannot live here. */
+  onOpenMenu: (anchor: MenuAnchor) => void;
+  /** True while THIS bubble's menu is the open one — used only to let a plain
+   * tap put it away again. */
+  menuOpen: boolean;
+  onCloseMenu: () => void;
+}
+
+export function MessageBubble({ message, onOpenMenu, menuOpen, onCloseMenu }: BubbleProps) {
   const mine = message.mine;
-  const canModerate = !mine && (onReport || onBlock);
-  const canDelete = !!mine && !!onDelete;
+  const boxRef = useRef<View>(null);
 
   return (
     <View style={{ alignItems: mine ? 'flex-end' : 'flex-start', marginVertical: 5 }}>
@@ -130,32 +142,43 @@ export function MessageBubble({
         </AppText>
       ) : null}
 
-      <Pressable
-        // A plain tap on the bubble dismisses its own menu — the smallest
-        // "somewhere else" there is, and it costs nothing when no menu is up.
-        onPress={() => {
-          if (showPicker) setShowPicker(false);
-        }}
-        onLongPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-          setShowPicker((v) => !v);
-        }}
-        style={{
-          maxWidth: '82%',
-          backgroundColor: mine ? colors.emberSoft : colors.bgElevated,
-          borderWidth: hairline,
-          borderColor: mine ? 'transparent' : colors.strokeSubtle,
-          borderRadius: radius.card,
-          borderBottomRightRadius: mine ? 6 : radius.card,
-          borderBottomLeftRadius: mine ? radius.card : 6,
-          paddingVertical: 10,
-          paddingHorizontal: 14,
-        }}
-      >
-        <AppText variant="body" style={{ fontSize: 16 }}>
-          {message.text}
-        </AppText>
-      </Pressable>
+      <View ref={boxRef} collapsable={false}>
+        <Pressable
+          // A plain tap on the bubble dismisses its own menu — the smallest
+          // "somewhere else" there is, and it costs nothing when no menu is up.
+          onPress={() => {
+            if (menuOpen) onCloseMenu();
+          }}
+          onLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            if (menuOpen) {
+              onCloseMenu();
+              return;
+            }
+            // measureInWindow, not onLayout: the menu is drawn OUTSIDE the
+            // list, so it needs where this bubble is on the screen right now,
+            // not where it sits inside its row.
+            boxRef.current?.measureInWindow((x, y, width, height) => {
+              onOpenMenu({ message, x, y, width, height, mine: !!mine });
+            });
+          }}
+          style={{
+            maxWidth: '82%',
+            backgroundColor: mine ? colors.emberSoft : colors.bgElevated,
+            borderWidth: hairline,
+            borderColor: mine ? 'transparent' : colors.strokeSubtle,
+            borderRadius: radius.card,
+            borderBottomRightRadius: mine ? 6 : radius.card,
+            borderBottomLeftRadius: mine ? radius.card : 6,
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+          }}
+        >
+          <AppText variant="body" style={{ fontSize: 16 }}>
+            {message.text}
+          </AppText>
+        </Pressable>
+      </View>
 
       {message.reactions.length > 0 ? (
         <View style={{ flexDirection: 'row', gap: 6, marginTop: 5 }}>
@@ -182,119 +205,162 @@ export function MessageBubble({
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
 
-      {showPicker ? (
-        <Animated.View
-          entering={FadeIn.duration(150)}
-          style={{
-            // Floats over the conversation instead of sitting in it. Laid out
-            // inline, opening the menu pushed every message below it down and
-            // shoved the thread around under your finger.
-            //
-            // BELOW the bubble, not over it: anchored to the bubble's own
-            // bottom edge it covered the message you had just long-pressed,
-            // which is the one thing that has to stay readable (saha testi
-            // bulgusu — "tam mesajın üzerinde açılıyor, mesaj gözükmüyor").
-            // It still overlays whatever is under it rather than pushing.
-            position: 'absolute',
-            top: '100%',
-            marginTop: 4,
-            [mine ? 'right' : 'left']: 0,
-            zIndex: 10,
-            flexDirection: 'row',
-            gap: 4,
-            backgroundColor: colors.bgElevated,
-            borderWidth: hairline,
-            borderColor: colors.strokeSubtle,
-            borderRadius: radius.pill,
-            paddingHorizontal: 8,
-            paddingVertical: 6,
-          }}
-        >
-          {REACTION_EMOJIS.map((e) => (
-            <Pressable
-              key={e}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                onReact(e);
-                setShowPicker(false);
+/** Roughly how tall the menu is. Only used to decide above-or-below. */
+const MENU_H = 46;
+/** Breathing room from the bubble, and from the screen/keyboard edges. */
+const MENU_GAP = 6;
+const SCREEN_PAD = 12;
+
+/**
+ * The long-press menu, drawn over the whole screen rather than inside the
+ * bubble.
+ *
+ * It used to be an absolutely-positioned child of the bubble. Inside a
+ * FlashList that cannot work: every row is its own view, and a later row is
+ * drawn ON TOP of an earlier one no matter what zIndex the menu carries —
+ * so the menu came up underneath the messages below it and nothing in it
+ * could be tapped. That is why reactions, delete, report and block all
+ * looked broken at once (saha testi bulgusu — "menü diğer içeriklerin
+ * altında kalıyor", "tepkiler çalışmıyor", "açılan menüdeki hiçbir özellik
+ * çalışmıyor"). One overlay, above the list, fixes all of them together.
+ *
+ * It also decides above-or-below from the bubble's real position, so the
+ * bottom-most message's menu no longer opens under the keyboard.
+ */
+export function ChatMenu({
+  anchor,
+  onClose,
+  onReact,
+  onReport,
+  onBlock,
+  onDelete,
+}: {
+  anchor: MenuAnchor;
+  onClose: () => void;
+  onReact: (emoji: string) => void;
+  /** Guideline 1.2 — every piece of someone else's content needs a way to be
+   * reported and its author blocked. Absent on my own messages. */
+  onReport?: () => void;
+  onBlock?: () => void;
+  /** Only on my own messages. */
+  onDelete?: () => void;
+}) {
+  const { t } = useT();
+  const { height: screenH, width: screenW } = useWindowDimensions();
+  const keyboardHeight = useKeyboardHeight();
+
+  const canModerate = !anchor.mine && (onReport || onBlock);
+  const canDelete = !!anchor.mine && !!onDelete;
+
+  // Below the bubble when there is room, above it when there isn't. The
+  // keyboard counts as the bottom of the screen — it is what was swallowing
+  // the last message's menu.
+  const floor = screenH - keyboardHeight - SCREEN_PAD;
+  const below = anchor.y + anchor.height + MENU_GAP;
+  const opensBelow = below + MENU_H <= floor;
+  const top = opensBelow ? below : Math.max(SCREEN_PAD, anchor.y - MENU_H - MENU_GAP);
+
+  // Anchored to the bubble's own side so it reads as belonging to it.
+  const side = anchor.mine
+    ? { right: Math.max(SCREEN_PAD, screenW - (anchor.x + anchor.width)) }
+    : { left: Math.max(SCREEN_PAD, anchor.x) };
+
+  const pick = (fn?: () => void) => () => {
+    onClose();
+    fn?.();
+  };
+
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+      {/* Anywhere else puts it away. Covers the whole screen, so it catches
+          the tap before the list underneath ever sees it. */}
+      <Pressable style={{ flex: 1 }} onPress={onClose} />
+      <Animated.View
+        entering={FadeIn.duration(150)}
+        style={{
+          position: 'absolute',
+          top,
+          ...side,
+          maxWidth: screenW - SCREEN_PAD * 2,
+          flexDirection: 'row',
+          gap: 4,
+          backgroundColor: colors.bgElevated,
+          borderWidth: hairline,
+          borderColor: colors.strokeSubtle,
+          borderRadius: radius.pill,
+          paddingHorizontal: 8,
+          paddingVertical: 6,
+        }}
+      >
+        {REACTION_EMOJIS.map((e) => (
+          <Pressable
+            key={e}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              onClose();
+              onReact(e);
+            }}
+            style={({ pressed }) => ({
+              paddingHorizontal: 5,
+              transform: [{ scale: pressed ? 1.25 : 1 }],
+            })}
+          >
+            <AppText style={{ fontSize: 20 }}>{e}</AppText>
+          </Pressable>
+        ))}
+
+        {/* Same long-press that reacts also reports — one gesture, so
+            reporting is never harder to find than a thumbs-up. Divider and
+            muted colour keep it from competing with the reactions. */}
+        {canDelete ? (
+          <>
+            <View
+              style={{
+                width: hairline,
+                alignSelf: 'stretch',
+                backgroundColor: colors.strokeSubtle,
+                marginHorizontal: 4,
               }}
-              style={({ pressed }) => ({
-                paddingHorizontal: 5,
-                transform: [{ scale: pressed ? 1.25 : 1 }],
-              })}
-            >
-              <AppText style={{ fontSize: 20 }}>{e}</AppText>
+            />
+            <Pressable onPress={pick(onDelete)} style={{ paddingHorizontal: 6, justifyContent: 'center' }}>
+              <AppText variant="meta" color={colors.joker}>
+                {t.chat.deleteMessage}
+              </AppText>
             </Pressable>
-          ))}
+          </>
+        ) : null}
 
-          {/* Same long-press that reacts also reports — one gesture, so
-              reporting is never harder to find than a thumbs-up. Divider and
-              muted colour keep it from competing with the reactions. */}
-          {canDelete ? (
-            <>
-              <View
-                style={{
-                  width: hairline,
-                  alignSelf: 'stretch',
-                  backgroundColor: colors.strokeSubtle,
-                  marginHorizontal: 4,
-                }}
-              />
-              <Pressable
-                onPress={() => {
-                  setShowPicker(false);
-                  onDelete?.();
-                }}
-                style={{ paddingHorizontal: 6, justifyContent: 'center' }}
-              >
-                <AppText variant="meta" color={colors.joker}>
-                  {t.chat.deleteMessage}
+        {canModerate ? (
+          <>
+            <View
+              style={{
+                width: hairline,
+                alignSelf: 'stretch',
+                backgroundColor: colors.strokeSubtle,
+                marginHorizontal: 4,
+              }}
+            />
+            {onReport ? (
+              <Pressable onPress={pick(onReport)} style={{ paddingHorizontal: 6, justifyContent: 'center' }}>
+                <AppText variant="meta" color={colors.textSecondary}>
+                  {t.moderation.report}
                 </AppText>
               </Pressable>
-            </>
-          ) : null}
-
-          {canModerate ? (
-            <>
-              <View
-                style={{
-                  width: hairline,
-                  alignSelf: 'stretch',
-                  backgroundColor: colors.strokeSubtle,
-                  marginHorizontal: 4,
-                }}
-              />
-              {onReport ? (
-                <Pressable
-                  onPress={() => {
-                    setShowPicker(false);
-                    onReport();
-                  }}
-                  style={{ paddingHorizontal: 6, justifyContent: 'center' }}
-                >
-                  <AppText variant="meta" color={colors.textSecondary}>
-                    {t.moderation.report}
-                  </AppText>
-                </Pressable>
-              ) : null}
-              {onBlock ? (
-                <Pressable
-                  onPress={() => {
-                    setShowPicker(false);
-                    onBlock();
-                  }}
-                  style={{ paddingHorizontal: 6, justifyContent: 'center' }}
-                >
-                  <AppText variant="meta" color={colors.joker}>
-                    {t.moderation.block}
-                  </AppText>
-                </Pressable>
-              ) : null}
-            </>
-          ) : null}
-        </Animated.View>
-      ) : null}
+            ) : null}
+            {onBlock ? (
+              <Pressable onPress={pick(onBlock)} style={{ paddingHorizontal: 6, justifyContent: 'center' }}>
+                <AppText variant="meta" color={colors.joker}>
+                  {t.moderation.block}
+                </AppText>
+              </Pressable>
+            ) : null}
+          </>
+        ) : null}
+      </Animated.View>
     </View>
   );
 }
