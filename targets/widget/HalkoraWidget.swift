@@ -598,8 +598,9 @@ struct CheckInIntent: AppIntent {
 struct CycleIntent: AppIntent {
   static var title: LocalizedStringResource = "Sonraki"
 
-  /// Which cursor to move — `cursorHalka` (per-halka widgets share one, so
-  /// they all show the same ring) or `cursorToday` (the Bugün page).
+  /// Which cursor to move. Only `cursorToday` (the Bugün page) is left —
+  /// the per-ring widgets used to share one cursor, which is exactly why
+  /// stepping one of them stepped all of them.
   @Parameter(title: "Kapsam")
   var scope: String
 
@@ -619,7 +620,6 @@ struct CycleIntent: AppIntent {
   }
 }
 
-let cursorHalka = "halka"
 let cursorToday = "today"
 
 /// Cursors live in the App Group next to the snapshot. They're stored raw and
