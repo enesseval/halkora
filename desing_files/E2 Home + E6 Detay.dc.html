@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="design_doc_mode" content="canvas">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#08090B; -webkit-font-smoothing:antialiased; }
+    a { color:#FF6B47; text-decoration:none; }
+    a:hover { color:#FF8A6B; }
+    @keyframes ringPulse { 0%,100% { opacity:0.9; } 50% { opacity:0.25; } }
+  </style>
+</helmet>
+
+<section style="font-family:'Satoshi',sans-serif; color:#F4F5F7; padding:64px; display:flex; gap:80px; align-items:flex-start; flex-wrap:wrap;">
+
+  <!-- ================= E2 HOME ================= -->
+  <div id="1a" data-screen-label="E2 Home" style="display:flex; flex-direction:column; gap:20px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1a</span>
+      <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">E2 · Home — Decision Engine</span>
+    </div>
+
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+      <div style="height:100%; overflow-y:auto; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+        <div style="position:absolute; inset:0; pointer-events:none; z-index:5; opacity:0.03; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+        <div style="padding:72px 20px 48px;">
+
+          <!-- Header -->
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:28px;">
+            <div>
+              <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em; line-height:1.1;">Bugün</div>
+              <div style="font-size:13px; color:#5D6370; margin-top:4px;">7 Temmuz Salı</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button style="width:40px; height:40px; border-radius:50%; background:#15171C; border:1px solid #262A33; color:#F4F5F7; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 3.5v11M3.5 9h11" stroke="#F4F5F7" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </button>
+              <button style="width:40px; height:40px; border-radius:50%; background:#15171C; border:1px solid #262A33; color:#F4F5F7; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.6" stroke="#9AA0AC" stroke-width="1.5"/><path d="M9 1.8v2M9 14.2v2M16.2 9h-2M3.8 9h-2M14.1 3.9l-1.4 1.4M5.3 12.7l-1.4 1.4M14.1 14.1l-1.4-1.4M5.3 5.3L3.9 3.9" stroke="#9AA0AC" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Hero card: pending check-in -->
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px;">
+              <div style="min-width:0;">
+                <div style="font-size:13px; color:#9AA0AC; margin-bottom:6px;">30 Gün Kitap Okuma</div>
+                <div style="font-size:20px; font-weight:500; line-height:1.25;">Bugün: 20 sayfa oku</div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+                  <div style="display:flex;">
+                    <div style="width:22px; height:22px; border-radius:50%; background:#1D2027; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:9px; font-weight:600; color:#9AA0AC;">ZD</div>
+                    <div style="width:22px; height:22px; border-radius:50%; background:#262A33; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:9px; font-weight:600; color:#9AA0AC; margin-left:-6px;">EK</div>
+                    <div style="width:22px; height:22px; border-radius:50%; background:#1D2027; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:9px; font-weight:600; color:#9AA0AC; margin-left:-6px;">AY</div>
+                  </div>
+                  <span style="font-size:15px; color:#9AA0AC;">5/8 tamamladı</span>
+                </div>
+              </div>
+              <div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+                <svg width="72" height="72" viewBox="0 0 72 72">
+                  <sc-for list="{{ ringHomeM }}" as="s" hint-placeholder-count="14">
+                    <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                  </sc-for>
+                </svg>
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums;">7/14</div>
+              </div>
+            </div>
+            <button style="width:100%; height:56px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Check-in</button>
+          </div>
+
+          <!-- Second pending card -->
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; margin-bottom:32px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px;">
+              <div style="min-width:0;">
+                <div style="font-size:13px; color:#9AA0AC; margin-bottom:6px;">Şekersiz 14 Gün</div>
+                <div style="font-size:20px; font-weight:500; line-height:1.25;">Bugün: Şeker yok</div>
+                <div style="font-size:15px; color:#9AA0AC; margin-top:12px;">2/5 tamamladı</div>
+              </div>
+              <div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+                <svg width="72" height="72" viewBox="0 0 72 72">
+                  <sc-for list="{{ ringHomeM2 }}" as="s" hint-placeholder-count="14">
+                    <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                  </sc-for>
+                </svg>
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums;">3/14</div>
+              </div>
+            </div>
+            <button style="width:100%; height:56px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Check-in</button>
+          </div>
+
+          <!-- Tamamlandı -->
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.12em; color:#5D6370; text-transform:uppercase; margin-bottom:12px;">Tamamlandı</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:16px 20px; display:flex; align-items:center; gap:16px; opacity:0.8; margin-bottom:32px;">
+            <svg width="44" height="44" viewBox="0 0 44 44" style="flex-shrink:0; opacity:0.75;">
+              <sc-for list="{{ ringDone }}" as="s" hint-placeholder-count="21">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+              </sc-for>
+            </svg>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:15px; font-weight:500;">Sabah 06:30 Kulübü</div>
+              <div style="font-size:13px; color:#9AA0AC; margin-top:2px;"><span style="color:#FF6B47;">✓</span> Tamamlandı · Gün 12/21</div>
+            </div>
+            <span style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370; font-variant-numeric:tabular-nums;">07:12</span>
+          </div>
+
+          <!-- Yarın -->
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.12em; color:#5D6370; text-transform:uppercase; margin-bottom:12px;">Yarın başlıyor</div>
+          <div style="display:flex; align-items:center; gap:12px; padding:4px 20px 0; opacity:0.55;">
+            <div style="width:8px; height:8px; border-radius:50%; background:#3A3F4A; flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <span style="font-size:15px; color:#9AA0AC;">10.000 Adım × 7 Gün</span>
+              <span style="font-size:13px; color:#5D6370;"> · 6 kişi hazır</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <!-- ================= E6 DETAY ================= -->
+  <div id="1b" data-screen-label="E6 Challenge Detay" style="display:flex; flex-direction:column; gap:20px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1b</span>
+      <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">E6 · Challenge Detay</span>
+    </div>
+
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+      <div style="height:100%; overflow-y:auto; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+        <div style="position:absolute; inset:0; pointer-events:none; z-index:5; opacity:0.03; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+        <div style="padding:64px 20px 48px;">
+
+          <!-- Nav -->
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+            <button style="width:40px; height:40px; border-radius:50%; background:#15171C; border:1px solid #262A33; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="#F4F5F7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div style="font-size:15px; font-weight:500; color:#9AA0AC;">30 Gün Kitap Okuma</div>
+            <div style="width:40px;"></div>
+          </div>
+
+          <!-- Today action + L ring w/ embedded check-in -->
+          <div style="text-align:center; margin-bottom:8px;">
+            <div style="font-size:20px; font-weight:500;">Bugün: 20 sayfa oku</div>
+            <div style="font-size:13px; color:#5D6370; margin-top:4px; font-variant-numeric:tabular-nums;">Gün 7/14</div>
+          </div>
+
+          <div style="display:flex; justify-content:center; margin:20px 0 24px;">
+            <div style="position:relative; width:220px; height:220px;">
+              <svg width="220" height="220" viewBox="0 0 220 220">
+                <sc-for list="{{ ringL }}" as="s" hint-placeholder-count="14">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                </sc-for>
+              </svg>
+              <button style="position:absolute; inset:32px; border-radius:50%; background:#FF6B47; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; box-shadow:0 0 48px rgba(255,107,71,0.25);">
+                <span style="font-family:'Satoshi',sans-serif; font-size:20px; font-weight:700; color:#0D0E11;">Check-in</span>
+                <span style="font-size:13px; font-weight:500; color:rgba(13,14,17,0.65);">Gün 7</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Stake -->
+          <div style="display:flex; justify-content:center; margin-bottom:28px;">
+            <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,107,71,0.12); border-radius:12px; padding:10px 14px;">
+              <span style="font-size:15px;">🎯</span>
+              <span style="font-size:15px;">Bahis: Tamamlayamayan kahve ısmarlar</span>
+            </div>
+          </div>
+
+          <!-- Today 5/8 + avatars -->
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:17px; font-variant-numeric:tabular-nums;">Bugün 5/8</div>
+            <div style="display:flex;">
+              <div style="width:28px; height:28px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC;">EK</div>
+              <div style="width:28px; height:28px; border-radius:50%; background:#262A33; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC; margin-left:-8px;">ZD</div>
+              <div style="width:28px; height:28px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC; margin-left:-8px;">BA</div>
+              <div style="width:28px; height:28px; border-radius:50%; background:#262A33; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC; margin-left:-8px;">SN</div>
+              <div style="width:28px; height:28px; border-radius:50%; background:rgba(255,107,71,0.12); border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#FF6B47; margin-left:-8px;">+1</div>
+            </div>
+          </div>
+
+          <!-- Participants -->
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:4px 20px; margin-bottom:32px;">
+            <sc-for list="{{ participants }}" as="p" hint-placeholder-count="8">
+              <div style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:{{ p.border }};">
+                <div style="width:36px; height:36px; border-radius:50%; background:{{ p.avatarBg }}; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; color:#9AA0AC; flex-shrink:0;">{{ p.initials }}</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:15px; font-weight:500;">{{ p.name }}</div>
+                  <div style="font-size:13px; color:{{ p.statusColor }};">{{ p.status }}</div>
+                </div>
+                <sc-if value="{{ p.wave }}" hint-placeholder-val="{{ false }}">
+                  <button style="border:1px solid #262A33; background:#1D2027; color:#F4F5F7; border-radius:28px; padding:8px 14px; font-family:'Satoshi',sans-serif; font-size:13px; font-weight:500; cursor:pointer; flex-shrink:0;">El salla 👋</button>
+                </sc-if>
+                <svg width="28" height="28" viewBox="0 0 28 28" style="flex-shrink:0;">
+                  <sc-for list="{{ p.ring }}" as="s" hint-placeholder-count="14">
+                    <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+                  </sc-for>
+                </svg>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- Chat -->
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="flex:1; height:1px; background:#262A33;"></div>
+            <span style="font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; color:#5D6370;">Gün 7</span>
+            <div style="flex:1; height:1px; background:#262A33;"></div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:20px;">
+            <div style="max-width:85%;">
+              <div style="font-size:13px; color:#5D6370; margin:0 0 4px 4px;">Zeynep</div>
+              <div style="background:#1D2027; border-radius:18px; border-bottom-left-radius:6px; padding:10px 14px; font-size:15px; line-height:1.4;">Bugün 30 sayfa gitti, kitap açıldı resmen 📖</div>
+              <div style="display:inline-flex; align-items:center; gap:4px; background:#15171C; border:1px solid #262A33; border-radius:12px; padding:3px 8px; font-size:12px; margin:-6px 0 0 12px; position:relative;">🔥 <span style="color:#9AA0AC; font-family:'General Sans',sans-serif;">2</span></div>
+            </div>
+            <div style="text-align:center; font-size:13px; color:#5D6370;">Enes tamamladı <span style="color:#FF6B47;">✓</span></div>
+            <div style="max-width:85%; align-self:flex-end;">
+              <div style="background:#1D2027; border-radius:18px; border-bottom-right-radius:6px; padding:10px 14px; font-size:15px; line-height:1.4;">Ben akşama bırakıyorum, uyumadan hallederim 💪</div>
+            </div>
+          </div>
+
+          <!-- Composer -->
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="flex:1; background:#1D2027; border:1px solid #262A33; border-radius:28px; padding:13px 18px; font-size:15px; color:#5D6370;">Mesaj yaz…</div>
+            <button style="width:44px; height:44px; border-radius:50%; background:#15171C; border:1px solid #262A33; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; flex-shrink:0;">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 8h11M9 3.5L13.5 8 9 12.5" stroke="#9AA0AC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;: 1200, &quot;height&quot;: 1000},
+  &quot;pulse&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Halka&quot;}
+}">
+class Component extends DCLogic {
+  pt(c, r, deg) {
+    const a = (deg * Math.PI) / 180;
+    return (c + r * Math.cos(a)).toFixed(2) + ' ' + (c + r * Math.sin(a)).toFixed(2);
+  }
+
+  ringSegs(n, size, stroke, gapDeg, states, pulse) {
+    const colors = { filled: '#FF6B47', joker: '#E0B34C', waiting: '#3A3F4A', today: '#3A3F4A' };
+    const c = size / 2;
+    const r = (size - stroke) / 2;
+    const span = 360 / n;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a0 = -90 + i * span + gapDeg / 2;
+      const a1 = -90 + (i + 1) * span - gapDeg / 2;
+      const large = a1 - a0 > 180 ? 1 : 0;
+      const d = 'M ' + this.pt(c, r, a0) + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + this.pt(c, r, a1);
+      out.push({ d, stroke: colors[states[i]], w: stroke });
+      if (states[i] === 'today') {
+        out.push({
+          d, stroke: '#FF6B47', w: Math.max(1.5, stroke * 0.3),
+          style: pulse ? { animation: 'ringPulse 2s ease-in-out infinite' } : undefined,
+        });
+      }
+    }
+    return out;
+  }
+
+  mkStates(n, filledTo, jokerIdx, todayIdx) {
+    const a = [];
+    for (let i = 0; i < n; i++) {
+      let s = i < filledTo ? 'filled' : 'waiting';
+      if (i === jokerIdx) s = 'joker';
+      if (i === todayIdx) s = 'today';
+      a.push(s);
+    }
+    return a;
+  }
+
+  sRing(filledTo, todayIdx) {
+    return this.ringSegs(14, 28, 3, 8, this.mkStates(14, filledTo, -1, todayIdx), false);
+  }
+
+  renderVals() {
+    const pulse = this.props.pulse ?? true;
+    const b = '1px solid #262A33';
+    const mkP = (initials, name, status, done, filledTo, wave) => ({
+      initials, name, status, wave: !!wave,
+      statusColor: done ? '#9AA0AC' : '#5D6370',
+      avatarBg: done ? '#1D2027' : '#262A33',
+      ring: this.sRing(filledTo, done ? -1 : 6),
+      border: b,
+    });
+    const participants = [
+      mkP('SN', 'Sen', '✓ Bugün · 09:41', true, 7),
+      mkP('EK', 'Enes Kaya', '✓ Bugün', true, 7),
+      mkP('ZD', 'Zeynep Demir', '✓ Bugün', true, 7),
+      mkP('BA', 'Burak Aslan', '✓ Bugün', true, 6),
+      mkP('DK', 'Deniz Koç', '✓ Bugün', true, 7),
+      mkP('AY', 'Ayşe Yılmaz', 'Bekliyor', false, 6),
+      mkP('CT', 'Can Tekin', 'Bekliyor', false, 5),
+      mkP('MC', 'Mert Can', '2 gündür sessiz', false, 4, true),
+    ];
+    participants[7].border = 'none';
+    return {
+      participants,
+      ringL: this.ringSegs(14, 220, 12, 3, this.mkStates(14, 6, 3, 6), pulse),
+      ringHomeM: this.ringSegs(14, 72, 6, 4.5, this.mkStates(14, 6, 3, 6), pulse),
+      ringHomeM2: this.ringSegs(14, 72, 6, 4.5, this.mkStates(14, 2, -1, 2), pulse),
+      ringDone: this.ringSegs(21, 44, 3.5, 6, this.mkStates(21, 12, -1, -1), false),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="design_doc_mode" content="canvas">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#08090B; -webkit-font-smoothing:antialiased; }
+    a { color:#FF6B47; text-decoration:none; }
+    a:hover { color:#FF8A6B; }
+    @keyframes ringPulse { 0%,100% { opacity:0.9; } 50% { opacity:0.25; } }
+  </style>
+</helmet>
+
+<section style="font-family:'Satoshi',sans-serif; color:#F4F5F7; padding:64px; display:flex; flex-direction:column; gap:72px;">
+
+  <!-- ================= E7 STORYBOARD ================= -->
+  <div id="1a" style="display:flex; flex-direction:column; gap:20px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1a</span>
+      <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">E7 · Check-in Anı — mikro-etkileşim storyboard'u</span>
+    </div>
+
+    <div style="display:flex; gap:48px; align-items:flex-start; flex-wrap:wrap;">
+      <sc-for list="{{ frames }}" as="f" hint-placeholder-count="3">
+        <div data-screen-label="{{ f.screenLabel }}" style="display:flex; flex-direction:column; gap:16px;">
+          <div>
+            <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px;">{{ f.label }}</div>
+            <div style="font-size:13px; color:#5D6370; margin-top:2px; max-width:340px;">{{ f.caption }}</div>
+          </div>
+          <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+            <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+              <div style="position:absolute; inset:0; pointer-events:none; z-index:5; opacity:0.03; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+              <div style="padding:64px 20px 48px;">
+
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+                  <button style="width:40px; height:40px; border-radius:50%; background:#15171C; border:1px solid #262A33; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="#F4F5F7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                  <div style="font-size:15px; font-weight:500; color:#9AA0AC;">30 Gün Kitap Okuma</div>
+                  <div style="width:40px;"></div>
+                </div>
+
+                <div style="text-align:center; margin-bottom:8px;">
+                  <div style="font-size:20px; font-weight:500;">Bugün: 20 sayfa oku</div>
+                  <div style="font-size:13px; color:#5D6370; margin-top:4px; font-variant-numeric:tabular-nums;">Gün 7/14</div>
+                </div>
+
+                <div style="display:flex; justify-content:center; margin:20px 0 24px;">
+                  <div style="position:relative; width:220px; height:220px;">
+                    <svg width="220" height="220" viewBox="0 0 220 220">
+                      <sc-for list="{{ f.ring }}" as="s" hint-placeholder-count="14">
+                        <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                      </sc-for>
+                    </svg>
+                    <sc-if value="{{ f.done }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute; inset:32px; border-radius:50%; background:#15171C; border:1px solid #262A33; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;">
+                        <span style="font-size:26px; color:#FF6B47;">✓</span>
+                        <span style="font-size:17px; font-weight:500;">Tamamlandı</span>
+                        <span style="font-size:13px; color:#5D6370; font-variant-numeric:tabular-nums;">Gün 7 · 21:04</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ f.notDone }}" hint-placeholder-val="{{ true }}">
+                      <button style="{{ f.btnStyle }}">
+                        <span style="font-family:'Satoshi',sans-serif; font-size:20px; font-weight:700; color:#0D0E11;">Check-in</span>
+                        <span style="font-size:13px; font-weight:500; color:rgba(13,14,17,0.65);">Gün 7</span>
+                      </button>
+                    </sc-if>
+                  </div>
+                </div>
+
+                <sc-if value="{{ f.done }}" hint-placeholder-val="{{ false }}">
+                  <div style="text-align:center; margin-bottom:24px;">
+                    <div style="font-size:17px; color:#F4F5F7;">Sen 5. tamamlayansın</div>
+                    <div style="font-size:13px; color:#5D6370; margin-top:4px;">Ayşe, Can ve Mert'i bekliyoruz</div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:10px; margin-bottom:28px;">
+                    <div style="flex:1; background:#1D2027; border:1px solid #262A33; border-radius:28px; padding:13px 18px; font-size:15px; color:#5D6370;">Bir not bırak…</div>
+                    <button style="width:44px; height:44px; border-radius:50%; background:#15171C; border:1px solid #262A33; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; flex-shrink:0;">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 8h11M9 3.5L13.5 8 9 12.5" stroke="#9AA0AC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ f.notDone }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex; justify-content:center; margin-bottom:28px;">
+                    <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,107,71,0.12); border-radius:12px; padding:10px 14px;">
+                      <span style="font-size:15px;">🎯</span>
+                      <span style="font-size:15px;">Bahis: Tamamlayamayan kahve ısmarlar</span>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                  <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:17px; font-variant-numeric:tabular-nums;">{{ f.count }}</div>
+                  <div style="display:flex;">
+                    <div style="width:28px; height:28px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC;">EK</div>
+                    <div style="width:28px; height:28px; border-radius:50%; background:#262A33; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC; margin-left:-8px;">ZD</div>
+                    <div style="width:28px; height:28px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC; margin-left:-8px;">BA</div>
+                    <div style="width:28px; height:28px; border-radius:50%; background:#262A33; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#9AA0AC; margin-left:-8px;">DK</div>
+                    <sc-if value="{{ f.done }}" hint-placeholder-val="{{ false }}">
+                      <div style="width:28px; height:28px; border-radius:50%; background:rgba(255,107,71,0.12); border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:10px; font-weight:600; color:#FF6B47; margin-left:-8px;">SN</div>
+                    </sc-if>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </x-import>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ================= E5 DAVET KARŞILAMA ================= -->
+  <div id="1b" data-screen-label="E5 Davet Karşılama" style="display:flex; flex-direction:column; gap:20px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1b</span>
+      <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">E5 · Davet Karşılama — dönüşümün kalbi</span>
+    </div>
+
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+      <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+        <div style="position:absolute; inset:0; pointer-events:none; z-index:5; opacity:0.03; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+        <div style="padding:88px 20px 48px; height:100%; display:flex; flex-direction:column; box-sizing:border-box;">
+
+          <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:15px; color:#9AA0AC;">Bir davete katılıyorsun</div>
+          </div>
+
+          <!-- Challenge preview card -->
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px 20px; text-align:center; margin-bottom:24px;">
+            <div style="display:flex; justify-content:center; margin-bottom:20px;">
+              <div style="position:relative; width:96px; height:96px;">
+                <svg width="96" height="96" viewBox="0 0 96 96">
+                  <sc-for list="{{ ringInvite }}" as="s" hint-placeholder-count="14">
+                    <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+                  </sc-for>
+                </svg>
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:600; font-size:20px; font-variant-numeric:tabular-nums;">14</div>
+              </div>
+            </div>
+            <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em; line-height:1.15; margin-bottom:8px;">30 Gün Kitap Okuma</div>
+            <div style="font-size:17px; color:#9AA0AC; margin-bottom:4px;">Her gün 20 sayfa · 14 gün</div>
+            <div style="font-size:13px; color:#5D6370; margin-bottom:20px;">Yarın başlıyor</div>
+            <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,107,71,0.12); border-radius:12px; padding:10px 14px;">
+              <span style="font-size:15px;">🎯</span>
+              <span style="font-size:15px;">Bahis: Tamamlayamayan kahve ısmarlar</span>
+            </div>
+          </div>
+
+          <!-- Social hook -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:auto;">
+            <div style="display:flex;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#9AA0AC;">AV</div>
+              <div style="width:36px; height:36px; border-radius:50%; background:#262A33; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#9AA0AC; margin-left:-10px;">AY</div>
+              <div style="width:36px; height:36px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#9AA0AC; margin-left:-10px;">EK</div>
+              <div style="width:36px; height:36px; border-radius:50%; background:rgba(255,107,71,0.12); border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#FF6B47; margin-left:-10px;">+3</div>
+            </div>
+            <div style="font-size:17px; color:#F4F5F7;">Ali, Ayşe ve 4 kişi katıldı</div>
+          </div>
+
+          <!-- Name + CTA -->
+          <div style="display:flex; flex-direction:column; gap:12px; padding-bottom:16px;">
+            <input placeholder="Adın" style="width:100%; box-sizing:border-box; background:#1D2027; border:1px solid #262A33; border-radius:28px; padding:16px 20px; font-family:'Satoshi',sans-serif; font-size:17px; color:#F4F5F7; outline:none; text-align:center;">
+            <button style="width:100%; height:60px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:20px; font-weight:700; cursor:pointer;">Katıl</button>
+          </div>
+
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;: 1600, &quot;height&quot;: 2000},
+  &quot;pulse&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Halka&quot;},
+  &quot;fillPct&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 55, &quot;min&quot;: 10, &quot;max&quot;: 95, &quot;step&quot;: 5, &quot;unit&quot;: &quot;%&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Storyboard&quot;}
+}">
+class Component extends DCLogic {
+  pt(c, r, deg) {
+    const a = (deg * Math.PI) / 180;
+    return (c + r * Math.cos(a)).toFixed(2) + ' ' + (c + r * Math.sin(a)).toFixed(2);
+  }
+
+  ringSegs(n, size, stroke, gapDeg, states, pulse) {
+    const colors = { filled: '#FF6B47', joker: '#E0B34C', waiting: '#3A3F4A', today: '#3A3F4A', filling: '#FF6B47' };
+    const c = size / 2;
+    const r = (size - stroke) / 2;
+    const span = 360 / n;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a0 = -90 + i * span + gapDeg / 2;
+      const a1 = -90 + (i + 1) * span - gapDeg / 2;
+      const large = a1 - a0 > 180 ? 1 : 0;
+      const arc = (frac) => 'M ' + this.pt(c, r, a0) + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + this.pt(c, r, a0 + (a1 - a0) * frac);
+      const d = arc(1);
+      if (states[i] === 'filling') {
+        out.push({ d, stroke: colors.waiting, w: stroke });
+        out.push({ d: arc(this.fillFrac || 0.55), stroke: '#FF6B47', w: stroke, style: { filter: 'drop-shadow(0 0 6px rgba(255,107,71,0.8))' } });
+        continue;
+      }
+      out.push({ d, stroke: colors[states[i]], w: stroke });
+      if (states[i] === 'today') {
+        out.push({
+          d, stroke: '#FF6B47', w: Math.max(1.5, stroke * 0.3),
+          style: pulse ? { animation: 'ringPulse 2s ease-in-out infinite' } : undefined,
+        });
+      }
+    }
+    return out;
+  }
+
+  mkStates(n, filledTo, jokerIdx, todayState) {
+    const a = [];
+    for (let i = 0; i < n; i++) {
+      let s = i < filledTo ? 'filled' : 'waiting';
+      if (i === jokerIdx) s = 'joker';
+      a.push(s);
+    }
+    if (todayState) a[6] = todayState;
+    return a;
+  }
+
+  renderVals() {
+    const pulse = this.props.pulse ?? true;
+    const fillPct = (this.props.fillPct ?? 55) / 100;
+    const btnBase = 'position:absolute; inset:32px; border-radius:50%; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;';
+    const mkRing = (todayState) => this.ringSegs(14, 220, 12, 3, this.mkStates(14, 6, 3, todayState), pulse);
+
+    this.fillFrac = fillPct;
+
+    const frames = [
+      {
+        screenLabel: 'E7-1 Dokunuş öncesi', label: '1 · Dokunuş öncesi',
+        caption: "Bugünün segmenti ince Ember konturla nefes alıyor. Buton davet ediyor.",
+        ring: mkRing('today'), notDone: true, done: false, count: 'Bugün 4/8',
+        btnStyle: btnBase + ' background:#FF6B47; box-shadow:0 0 48px rgba(255,107,71,0.25);',
+      },
+      {
+        screenLabel: 'E7-2 Segment dolarken', label: '2 · Segment dolarken (400ms)',
+        caption: 'Buton hafif çöker; günün segmenti Ember\'la akarak dolar, kısa parlaklık nabzı.',
+        ring: mkRing('filling'), notDone: true, done: false, count: 'Bugün 4/8',
+        btnStyle: btnBase + ' background:#E05537; transform:scale(0.94); box-shadow:0 0 24px rgba(255,107,71,0.35);',
+      },
+      {
+        screenLabel: 'E7-3 Sonrası', label: '3 · Sonrası',
+        caption: '"Sen 5. tamamlayansın" yumuşak fade ile belirir; sayaç +1 tıklar. Konfeti yok.',
+        ring: mkRing('filled'), notDone: false, done: true, count: 'Bugün 5/8',
+        btnStyle: '',
+      },
+    ];
+
+    return {
+      frames,
+      ringInvite: this.ringSegs(14, 96, 7, 4, this.mkStates(14, 0, -1, null), false),
+    };
+  }
+}
+</script>
+</body>
+</html>

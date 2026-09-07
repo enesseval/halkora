@@ -14,6 +14,7 @@ module.exports = [
       '.expo/**',
       'dist/**',
       'supabase/functions/**', // Deno, not this project's TS config
+      'landing/**', // standalone Next.js site with its own toolchain
     ],
   },
   {

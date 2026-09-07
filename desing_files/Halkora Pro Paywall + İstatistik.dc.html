@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="design_doc_mode" content="canvas">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#08090B; -webkit-font-smoothing:antialiased; }
+    a { color:#FF6B47; text-decoration:none; }
+    a:hover { color:#FF8A6B; }
+    @keyframes ringPulse { 0%,100% { opacity:0.9; } 50% { opacity:0.25; } }
+  </style>
+</helmet>
+
+<section style="font-family:'Satoshi',sans-serif; color:#F4F5F7; padding:64px; display:flex; flex-direction:column; gap:40px;">
+
+  <div style="max-width:760px;">
+    <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:13px; letter-spacing:0.18em; color:#FF6B47; text-transform:uppercase; margin-bottom:12px;">Halkora Pro</div>
+    <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:32px; letter-spacing:-0.02em; margin-bottom:10px;">Paywall (3 bağlam) + Gelişmiş istatistik (2 durum)</div>
+    <p style="font-size:15px; color:#9AA0AC; line-height:1.6; margin:0;">Paywall bir davet: hero halka motifi %270 dolu — "halkanı büyüt" hissi. Yıllık plan varsayılan seçili, "2 ay bedava" rozet joker altınıyla. Kırmızı yok, baskı yok; kapat her zaman görünür.</p>
+  </div>
+
+  <div style="display:flex; gap:56px; align-items:flex-start; flex-wrap:wrap;">
+
+    <!-- ============ 1a PAYWALL — challengeLimit ============ -->
+    <div id="1a" data-screen-label="Paywall challengeLimit" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1a</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">Paywall · challengeLimit — 3. halka denemesi</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; position:relative; overflow:hidden;">
+        <dc-import name="PaywallSheet" style="position:absolute; inset:0;" headline="Daha fazla halka mı?" sub="Ücretsiz planda aynı anda 2 halka kurabilirsin. Pro ile sınır yok." hint-size="100%,100%"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1b PAYWALL — advancedStats ============ -->
+    <div id="1b" data-screen-label="Paywall advancedStats" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1b</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">Paywall · advancedStats — kilitli istatistikten</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; position:relative; overflow:hidden;">
+        <dc-import name="PaywallSheet" style="position:absolute; inset:0;" headline="Halkanı daha yakından tanı" sub="Kişi kişi seriler, kusursuz günler ve dahası Pro ile açılır." hint-size="100%,100%"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1c PAYWALL — generic ============ -->
+    <div id="1c" data-screen-label="Paywall generic" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1c</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">Paywall · generic — Ayarlar'dan</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; position:relative; overflow:hidden;">
+        <dc-import name="PaywallSheet" style="position:absolute; inset:0;" headline="Halkora Pro" sub="Halkora'nın tamamını aç." hint-size="100%,100%"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1d İSTATİSTİK — PRO AÇIK ============ -->
+    <div id="1d" data-screen-label="İstatistik Pro açık" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1d</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">İstatistik · Pro — bitiş ekranı içinde açık</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7;">
+          <div style="padding:64px 20px 48px;">
+
+            <!-- finish screen context (condensed) -->
+            <div style="text-align:center; margin-bottom:32px;">
+              <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em;">14 gün. Birlikte.</div>
+              <div style="font-size:15px; color:#9AA0AC; margin-top:6px;">30 Gün Kitap Okuma tamamlandı</div>
+            </div>
+
+            <div style="font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.12em; color:#5D6370; text-transform:uppercase; margin-bottom:12px;">Halkanın hikâyesi</div>
+
+            <!-- perfect days highlight -->
+            <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; margin-bottom:12px; display:flex; align-items:center; gap:20px;">
+              <div style="flex:1;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; color:#FF6B47;">9</div>
+                <div style="font-size:15px; font-weight:500; margin-top:2px;">kusursuz gün</div>
+                <div style="font-size:13px; color:#5D6370; margin-top:2px;">Herkesin check-in yaptığı günler</div>
+              </div>
+              <svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0;">
+                <sc-for list="{{ ringPerfect }}" as="s" hint-placeholder-count="14">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+                </sc-for>
+              </svg>
+            </div>
+
+            <!-- per-person list -->
+            <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:4px 20px;">
+              <sc-for list="{{ statRows }}" as="p" hint-placeholder-count="5">
+                <div style="display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:{{ p.border }};">
+                  <div style="width:36px; height:36px; border-radius:50%; background:#1D2027; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; color:#9AA0AC; flex-shrink:0;">{{ p.initials }}</div>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:15px; font-weight:500;">{{ p.name }}</div>
+                    <div style="font-size:13px; color:#9AA0AC; font-variant-numeric:tabular-nums;">{{ p.detail }}</div>
+                  </div>
+                  <div style="font-size:13px; color:#5D6370; font-variant-numeric:tabular-nums; flex-shrink:0;">🔥 {{ p.streak }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1e İSTATİSTİK — KİLİTLİ TEASER ============ -->
+    <div id="1e" data-screen-label="İstatistik kilitli teaser" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1e</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">İstatistik · Ücretsiz — kilitli teaser</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7;">
+          <div style="padding:64px 20px 48px;">
+
+            <div style="text-align:center; margin-bottom:32px;">
+              <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em;">14 gün. Birlikte.</div>
+              <div style="font-size:15px; color:#9AA0AC; margin-top:6px;">30 Gün Kitap Okuma tamamlandı</div>
+            </div>
+
+            <!-- summary numbers stay free -->
+            <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; margin-bottom:12px; display:flex; text-align:center;">
+              <div style="flex:1;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:28px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">8</div>
+                <div style="font-size:13px; color:#5D6370;">kişi</div>
+              </div>
+              <div style="width:1px; background:#262A33;"></div>
+              <div style="flex:1;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:28px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">96</div>
+                <div style="font-size:13px; color:#5D6370;">check-in</div>
+              </div>
+              <div style="width:1px; background:#262A33;"></div>
+              <div style="flex:1;">
+                <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:28px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; color:#FF6B47;">%86</div>
+                <div style="font-size:13px; color:#5D6370;">tamamlama</div>
+              </div>
+            </div>
+
+            <!-- locked teaser -->
+            <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:18px 20px; display:flex; align-items:center; gap:14px;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#1D2027; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="6.5" rx="2" stroke="#9AA0AC" stroke-width="1.4"/><path d="M5.5 7V5.5a2.5 2.5 0 0 1 5 0V7" stroke="#9AA0AC" stroke-width="1.4"/></svg>
+              </div>
+              <div style="flex:1; font-size:14px; color:#9AA0AC; line-height:1.4;">Kişi kişi seriler, kusursuz günler ve dahası Pro ile açılır.</div>
+              <button style="border:none; background:rgba(255,107,71,0.12); color:#FF6B47; border-radius:28px; padding:10px 16px; font-family:'Satoshi',sans-serif; font-size:14px; font-weight:700; cursor:pointer; flex-shrink:0;">Pro ile aç</button>
+            </div>
+
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <div style="max-width:760px; background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; font-size:14px; color:#9AA0AC; line-height:1.7;">
+    <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.12em; color:#5D6370; text-transform:uppercase; margin-bottom:10px;">Tasarım notları</div>
+    Üç varyant (<a href="#1a">1a</a>–<a href="#1c">1c</a>) tek iskelet: yalnız başlık + alt metin değişir, kas hafızası korunur. Fiyat bloğu iki kart: yıllık varsayılan seçili (ember kontur), "2 ay bedava" rozeti joker altını — ikinci canlı renk değil, mevcut token. Aylık eşdeğeri (₺33/ay) yıllık kartın içinde, karşılaştırma zahmetsiz. Kilitli teaser (<a href="#1e">1e</a>) tek satır kalır; ücretsiz özet rakamları hep açık — değer önce gösterilir, sonra davet edilir. RN uyumu: yalnız flexbox, hairline stroke, radius; gölge/filtre yok.
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;: 2100, &quot;height&quot;: 2100}
+}">
+class Component extends DCLogic {
+  pt(c, r, deg) {
+    const a = (deg * Math.PI) / 180;
+    return (c + r * Math.cos(a)).toFixed(2) + ' ' + (c + r * Math.sin(a)).toFixed(2);
+  }
+  ringSegs(n, size, stroke, gapDeg, states) {
+    const colors = { filled: '#FF6B47', joker: '#E0B34C', waiting: '#3A3F4A' };
+    const c = size / 2, r = (size - stroke) / 2, span = 360 / n;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a0 = -90 + i * span + gapDeg / 2;
+      const a1 = -90 + (i + 1) * span - gapDeg / 2;
+      const d = 'M ' + this.pt(c, r, a0) + ' A ' + r + ' ' + r + ' 0 0 1 ' + this.pt(c, r, a1);
+      out.push({ d, stroke: colors[states[i]], w: stroke });
+    }
+    return out;
+  }
+  mk(n, filledTo) {
+    const a = [];
+    for (let i = 0; i < n; i++) a.push(i < filledTo ? 'filled' : 'waiting');
+    return a;
+  }
+  renderVals() {
+    const b = '1px solid #262A33';
+    return {
+      ringPerfect: this.ringSegs(14, 64, 5.5, 5, this.mk(14, 9)),
+      statRows: [
+        { initials: 'SN', name: 'Selin Nur', detail: '14/14 gün · %100', streak: '14', border: b },
+        { initials: 'EK', name: 'Enes Kaya', detail: '13/14 gün · %93', streak: '11', border: b },
+        { initials: 'AY', name: 'Ayşe Yılmaz', detail: '12/14 gün · %86', streak: '8', border: b },
+        { initials: 'ZD', name: 'Zeynep Demir', detail: '12/14 gün · %86', streak: '7', border: b },
+        { initials: 'MC', name: 'Mert Can', detail: '9/14 gün · %64', streak: '5', border: 'none' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
