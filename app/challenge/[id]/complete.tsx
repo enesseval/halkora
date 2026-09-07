@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { useChallenge, useChallengeActions, useChallengesQuery, useCreateGate } from '@/hooks';
+import { useChallenge, useChallengeActions, useChallengesQuery } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { AppText, Avatar, Button, Card, IconButton, Screen, SectionLabel } from '@/components/ui';
@@ -44,7 +44,6 @@ export default function CompleteScreen() {
   const challenge = useChallenge(id);
   const { isPro } = useAuth();
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
-  const canCreate = useCreateGate();
   const actions = useChallengeActions(id ?? '');
   const [settling, setSettling] = useState(false);
 
@@ -348,21 +347,13 @@ export default function CompleteScreen() {
           </View>
         ) : null}
 
-        {/* CTAs */}
+        {/* CTAs. "Rövanş" — a new ring pre-filled from this one, auto-inviting
+            the old group — used to lead here. Removed on request: it was
+            never asked for, and a finished ring's screen is for looking back,
+            not for being sold the next one. Starting again is what the "+" on
+            Home is. */}
         <View style={{ gap: 12, marginTop: spacing.section }}>
-          <Button
-            label={t.complete.rematch}
-            onPress={() => {
-              if (canCreate()) router.replace(`/create?rematchOf=${challenge.id}`);
-            }}
-          />
-          <Button label={t.complete.shareResult} variant="secondary" onPress={share} />
-          {/* Rematch now opens as a lobby rather than starting on a date, so
-              say so up front — otherwise "neden hemen başlamadı" is the
-              first question (docs/BAHIS-V2-VE-ROVANS.md §7). */}
-          <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
-            {t.complete.rematchLobbyHint}
-          </AppText>
+          <Button label={t.complete.shareResult} onPress={share} />
         </View>
       </ScrollView>
     </Screen>

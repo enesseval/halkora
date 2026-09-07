@@ -425,8 +425,6 @@ export const en: Dictionary = {
     settleCta: 'Mark as paid',
     settledLabel: '✓ Stake settled',
     settleFailed: "Couldn't mark it",
-    rematchLobbyHint: 'A rematch opens as a lobby — your old ring gets invited, and you start with whoever shows up.',
-    rematch: 'Start a new ring',
     openRing: 'Open the ring',
     shareResult: 'Share result',
     shareMessage: (title: string, totalDays: number) =>

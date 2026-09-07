@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -14,12 +14,9 @@ import DateTimePicker, {
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import {
   useCreateChallenge,
-  useChallenge,
   TEMPLATES,
   STAKE_PRESETS,
 } from '@/hooks';
-import { sendInvite, isDuplicateInviteError } from '@/data/invites';
-import { isSupabaseConfigured } from '@/lib/supabase';
 import { addDays, formatLongDate, formatShortDate, isSameDay } from '@/lib/day';
 import type { StakeKind } from '@/data/types';
 import { AppText, Button, Chip, IconButton, Screen } from '@/components/ui';
@@ -425,17 +422,15 @@ export default function CreateScreen() {
   // links here with the just-completed challenge's id; its own data (still
   // in the local cache) prefills the form and, once created, every past
   // participant gets auto-invited (below).
-  const { rematchOf } = useLocalSearchParams<{ rematchOf?: string }>();
-  const rematchSource = useChallenge(rematchOf);
 
   const [step, setStep] = useState(0);
-  const [title, setTitle] = useState(() => rematchSource?.title ?? '');
-  const [action, setAction] = useState(() => rematchSource?.dailyActionRaw ?? '');
-  const [totalDays, setTotalDays] = useState(() => rematchSource?.totalDays ?? 14);
+  const [title, setTitle] = useState(() => '');
+  const [action, setAction] = useState(() => '');
+  const [totalDays, setTotalDays] = useState(() => 14);
   // False while a 7/30 preset chip is active; true once the wheel picker has
   // been used to pick a custom count (starts already "custom" — 14 isn't a preset).
   const [customDays, setCustomDays] = useState(
-    () => !DAY_OPTIONS.includes(rematchSource?.totalDays ?? 14),
+    () => !DAY_OPTIONS.includes(14),
   );
   const [showDayPicker, setShowDayPicker] = useState(false);
   const pickPresetDays = (d: number) => {
@@ -463,7 +458,7 @@ export default function CreateScreen() {
   // A rematch defaults to a lobby: the old group has to opt in again, and
   // starting on a date would kick off with whoever happened to be around
   // (docs/BAHIS-V2-VE-ROVANS.md §7). Still switchable.
-  const [lobby, setLobby] = useState(!!rematchOf);
+  const [lobby, setLobby] = useState(false);
 
   // The footer lifts by the measured keyboard height (see the footer's own
   // note); the inset comes off it because Screen already applies one.
@@ -475,12 +470,12 @@ export default function CreateScreen() {
   const isCustom = !isToday && !isTomorrow;
   // Read-only: nothing in the UI switches this today, so it is a value, not
   // state with an unused setter.
-  const stakeMode: 'direct' | 'vote' = rematchSource?.stake?.mode ?? 'direct';
-  const [stakeText, setStakeText] = useState(() => rematchSource?.stake?.text ?? '');
+  const stakeMode: 'direct' | 'vote' = 'direct';
+  const [stakeText, setStakeText] = useState(() => '');
   // Bahis v2 (docs/db-stake-v2.sql): individual = whoever misses more than
   // the threshold pays; collective = the group hits a shared target or
   // nobody does.
-  const [stakeKind, setStakeKind] = useState<StakeKind>(rematchSource?.stake?.kind ?? 'individual');
+  const [stakeKind, setStakeKind] = useState<StakeKind>('individual');
   /**
    * Whether this ring has a stake at all.
    *
@@ -491,10 +486,10 @@ export default function CreateScreen() {
    * one of the three answers now, and it starts as the selected one: nothing
    * is quietly switched on for you.
    */
-  const [stakeOn, setStakeOn] = useState(!!rematchSource?.stake?.text);
+  const [stakeOn, setStakeOn] = useState(false);
   const [showCollectiveHelp, setShowCollectiveHelp] = useState(false);
   const [collectivePct, setCollectivePct] = useState(
-    () => rematchSource?.stake?.collectiveTargetPct ?? 80,
+    () => 80,
   );
   // Suggested from the length (a 14-day ring tolerates ~3), but the moment
   // the user picks one themselves we stop moving it under them.
@@ -503,7 +498,7 @@ export default function CreateScreen() {
   // an extra render for a number that is simply a function of two things we
   // already have. `null` means "still following the suggestion".
   const [thresholdChoice, setThresholdChoice] = useState<number | null>(
-    () => rematchSource?.stake?.thresholdMissed ?? null,
+    () => null,
   );
   const thresholdMissed = thresholdChoice ?? suggestedThreshold(totalDays);
   // The suggestion has to be reachable: a fixed 0/1/2/3 row can't offer the
@@ -512,7 +507,7 @@ export default function CreateScreen() {
     new Set([0, 1, 2, 3, suggestedThreshold(totalDays)]),
   ).sort((a, b) => a - b);
   const [creating, setCreating] = useState(false);
-  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(() => rematchSource?.firstDayJoinOnly ?? false);
+  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(() => false);
 
   const titles = t.create.titles;
 
@@ -555,20 +550,6 @@ export default function CreateScreen() {
     if (!id) {
       setCreating(false);
       return;
-    }
-    // Rematch: auto-invite everyone who was in the old ring (except me, the
-    // new owner — I'm already a participant via `create` above). Best-effort
-    // — a failed/duplicate invite here shouldn't block landing on the new
-    // ring's invite screen, which still shows the code as a manual fallback.
-    if (rematchSource && isSupabaseConfigured) {
-      const others = rematchSource.participants.filter((p) => !p.isMe);
-      await Promise.all(
-        others.map((p) =>
-          sendInvite(id, p.id, 'rematch').catch((e) => {
-            if (!isDuplicateInviteError(e)) console.error('rematch auto-invite failed', e);
-          }),
-        ),
-      );
     }
     router.replace(`/challenge/${id}/invite`);
   };
