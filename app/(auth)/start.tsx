@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

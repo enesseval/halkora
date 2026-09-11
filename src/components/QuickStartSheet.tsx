@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AppState, Pressable, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -70,10 +70,8 @@ function Row({
 
 /** Home "+" → half-screen sheet: start a challenge, or join one by code. */
 export function QuickStartSheet({
-  visible,
   onClose,
 }: {
-  visible: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -99,15 +97,8 @@ export function QuickStartSheet({
     setPasted(true);
   });
 
-  useEffect(() => {
-    if (!visible) {
-      setMode('choose');
-      setInput('');
-      setPasted(false);
-    }
-  }, [visible]);
-
-  if (!visible) return null;
+  // No reset effect: the caller mounts this only while it is open, so closing
+  // it unmounts it and every opening starts from useState's initialisers.
 
   const code = extractCode(input);
   const fromClipboard = pasted;

@@ -8,13 +8,14 @@ import {
   RefreshControl,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
-import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -46,7 +47,7 @@ import { StakeBadge } from '@/components/StakeBadge';
 import { InviteShare } from '@/components/InviteShare';
 import { ShareRingSheet } from '@/components/ShareRingSheet';
 import { ParticipantRow } from '@/components/ParticipantRow';
-import { ChatRow, DayDivider, MessageBubble, SystemEvent, TIME_REVEAL_W } from '@/components/Chat';
+import { ChatMenu, ChatRow, DayDivider, MessageBubble, SystemEvent, TIME_REVEAL_W, type MenuAnchor } from '@/components/Chat';
 import {
   JokerDaySheet,
   MissedDaySheet,
@@ -158,10 +159,17 @@ export default function DetailScreen() {
   const { firstLoadError: chatError, error: chatErrorDetail, retry: retryChat } = useChallengeMessages(id);
   useRealtimeChallenge(id);
   const [draft, setDraft] = useState('');
-  const [showOwnerSettings, setShowOwnerSettings] = useState(false);
+  // Home's swipe-to-edit action (saha testi bulgusu) lands here with ?edit=1
+  // to jump straight to the owner settings sheet instead of making the owner
+  // tap the gear icon a second time. Read at the initialiser rather than
+  // pushed in by an effect — the param is there on the very first render, and
+  // ownership is checked where the sheet is rendered.
+  const [showOwnerSettings, setShowOwnerSettings] = useState(edit === '1');
   // Which chat bubble has its long-press menu open. One value for the whole
   // list, so opening a second menu closes the first.
-  const [openBubbleId, setOpenBubbleId] = useState<string | null>(null);
+  // The whole anchor, not just an id: the menu is drawn over the list now
+  // (see ChatMenu) and needs to know where on screen the bubble actually is.
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
   /**
    * How far the conversation is currently dragged left, revealing each row's
    * time. One value for the whole list, so the rows move as one thread.
@@ -189,12 +197,7 @@ export default function DetailScreen() {
   const [leaving, setLeaving] = useState(false);
   const [nudgeTarget, setNudgeTarget] = useState<Participant | null>(null);
 
-  // Home's swipe-to-edit action (saha testi bulgusu) lands here with
-  // ?edit=1 to jump straight to the owner settings sheet instead of making
-  // the owner tap the gear icon a second time.
-  useEffect(() => {
-    if (edit === '1' && challenge?.isOwner) setShowOwnerSettings(true);
-  }, [edit, challenge?.isOwner]);
+
   const [starting, setStarting] = useState(false);
   const [showLobbyDatePicker, setShowLobbyDatePicker] = useState(false);
   const [lobbyDate, setLobbyDate] = useState<Date | null>(null);
@@ -221,12 +224,13 @@ export default function DetailScreen() {
     // Three conditions, all of which have to hold: enough check-ins to call it
     // a habit, no widget already drawing, and never dismissed. Anything less
     // and this is an advert rather than a tip.
-    if (myCheckins < HINT_AFTER_CHECKINS || hasWidgetInstalled()) {
-      setWidgetHintReady(false);
-      return;
-    }
+    //
+    // The ineligible case used to setState synchronously and return; both
+    // answers go through the same await now, so nothing is written during the
+    // effect itself.
     let alive = true;
-    isWidgetHintDismissed().then((done) => {
+    const eligible = myCheckins >= HINT_AFTER_CHECKINS && !hasWidgetInstalled();
+    (eligible ? isWidgetHintDismissed() : Promise.resolve(true)).then((done) => {
       if (alive) setWidgetHintReady(!done);
     });
     return () => {
@@ -353,6 +357,7 @@ export default function DetailScreen() {
     // Deliberately only watches isLastDayFullyDone — actions is stable enough
     // here and re-running this on every challenge poll tick would just
     // re-fire the (idempotent) endEarly call.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLastDayFullyDone]);
 
   // Leave Detail for the celebration screen the moment the challenge is
@@ -363,11 +368,27 @@ export default function DetailScreen() {
   // mount, so a Detail screen left open past the challenge's actual end kept
   // showing a stale "waiting for tomorrow" view until backing out and back in
   // (saha testi bulgusu).
+  //
+  // ONLY on the transition. Firing on any completed ring meant a finished
+  // ring's detail could never be opened at all — tapping it from Geçmiş
+  // bounced straight past the screen and its chat, so the stake's own
+  // "Bahis kapandı" line was unreachable and the ring looked like it had
+  // been replaced by a summary (saha testi bulgusu — "halka bittiğinde
+  // detaya giremiyosun, direk sonuç ekranı geliyor, burda mesajlaşma kısmı
+  // yok"). The celebration is for the moment it ends, not for every visit
+  // afterwards; the finish screen carries its own way back in.
+  const sawUnfinished = useRef(false);
   useEffect(() => {
-    if (challenge?.status === 'completed') {
-      router.replace(`/challenge/${challenge.id}/complete`);
+    if (!challenge) return;
+    if (challenge.status !== 'completed') {
+      sawUnfinished.current = true;
+      return;
     }
-  }, [challenge?.status]);
+    if (sawUnfinished.current) router.replace(`/challenge/${challenge.id}/complete`);
+    // Status and id only: `challenge` is a fresh object on every poll and
+    // `router` is stable, so listing either would re-run this constantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challenge?.status, challenge?.id]);
 
   if (!challenge) {
     // Not in the store yet — tell "still loading" and "genuinely failed" apart
@@ -600,15 +621,27 @@ export default function DetailScreen() {
     if (others) {
       buttons.push({
         text: t.detail.ownerLeave,
-        onPress: async () => {
-          try {
-            // Two lines, because two things happened: someone left, and the
-            // ring changed hands. The group needs both.
-            await actions.leaveChallenge(t.detail.systemLeft(myName));
-            goHomeAfterExit();
-          } catch (e) {
-            alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
-          }
+        // Confirmed like the other two. Leaving is not reversible either —
+        // your own check-in history goes with you — and it was the one option
+        // here that acted on a single tap.
+        onPress: () => {
+          Alert.alert(t.detail.leaveChallengeConfirmTitle, t.detail.leaveChallengeConfirmBody, [
+            { text: t.common.cancel, style: 'cancel' },
+            {
+              text: t.detail.leaveChallenge,
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  // Two lines, because two things happened: someone left, and
+                  // the ring changed hands. The group needs both.
+                  await actions.leaveChallenge(t.detail.systemLeft(myName));
+                  goHomeAfterExit();
+                } catch (e) {
+                  alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
+                }
+              },
+            },
+          ]);
         },
       });
     }
@@ -1079,15 +1112,12 @@ export default function DetailScreen() {
         );
       case 'message':
         return (
-          <ChatRow revealX={revealX} time={clockOf(item.m.createdAt)}>
+          <ChatRow revealX={revealX} time={clockOf(item.m.createdAt)} shift={item.m.mine}>
             <MessageBubble
               message={item.m}
-              onReact={(emoji) => actions.react(item.m.id, emoji)}
-              onReport={item.m.authorId ? () => setReportTarget(item.m) : undefined}
-              onBlock={item.m.authorId ? () => confirmBlock(item.m) : undefined}
-              onDelete={item.m.mine ? () => confirmDeleteMessage(item.m.id) : undefined}
-              openId={openBubbleId}
-              setOpenId={setOpenBubbleId}
+              onOpenMenu={setMenuAnchor}
+              menuOpen={menuAnchor?.message.id === item.m.id}
+              onCloseMenu={() => setMenuAnchor(null)}
             />
           </ChatRow>
         );
@@ -1130,11 +1160,7 @@ export default function DetailScreen() {
               path of every other gesture, which is how the swipe on Home came to
               open the ring instead of revealing its actions. */}
           <GestureDetector gesture={timeReveal}>
-          <View
-            style={{ flex: 1 }}
-            onStartShouldSetResponder={() => openBubbleId !== null}
-            onResponderRelease={() => setOpenBubbleId(null)}
-          >
+          <View style={{ flex: 1 }}>
             <FlashList
               ref={listRef}
               data={rows}
@@ -1152,7 +1178,7 @@ export default function DetailScreen() {
               // Scrolling the thread puts an open bubble menu away — it floats
               // over the conversation now, so leaving it up while the messages
               // move under it would be worse than the old inline version.
-              onScrollBeginDrag={() => setOpenBubbleId(null)}
+              onScrollBeginDrag={() => setMenuAnchor(null)}
               onScroll={handleListScroll}
               scrollEventThrottle={100}
               refreshControl={
@@ -1296,13 +1322,27 @@ export default function DetailScreen() {
       ) : null}
 
       {/* Faz 3C madde 3 — owner-only settings */}
-      {showOwnerSettings ? (
+      {showOwnerSettings && challenge.isOwner ? (
         <OwnerSettingsSheet
-          visible={showOwnerSettings}
           challenge={challenge}
           onClose={() => setShowOwnerSettings(false)}
           onSave={actions.updateDetails}
           onDelete={doDeleteChallenge}
+        />
+      ) : null}
+
+      {/* The long-press menu. Deliberately here — a sibling of the whole
+          screen, not a child of a list row. Inside the FlashList it was drawn
+          underneath the rows below it, which is why every button in it was
+          untappable (tepki, sil, şikâyet, engelle). */}
+      {menuAnchor ? (
+        <ChatMenu
+          anchor={menuAnchor}
+          onClose={() => setMenuAnchor(null)}
+          onReact={(emoji) => actions.react(menuAnchor.message.id, emoji)}
+          onReport={menuAnchor.message.authorId && !menuAnchor.mine ? () => setReportTarget(menuAnchor.message) : undefined}
+          onBlock={menuAnchor.message.authorId && !menuAnchor.mine ? () => confirmBlock(menuAnchor.message) : undefined}
+          onDelete={menuAnchor.mine ? () => confirmDeleteMessage(menuAnchor.message.id) : undefined}
         />
       ) : null}
 

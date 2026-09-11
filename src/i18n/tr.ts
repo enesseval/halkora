@@ -439,11 +439,7 @@ export const tr = {
     settleCta: 'Ödendi olarak işaretle',
     settledLabel: '✓ Bahis kapandı',
     settleFailed: 'İşaretlenemedi',
-    rematchLobbyHint: 'Rövanş lobide açılır — eski halkana davet gider, kim gelirse onunla başlarsın.',
-    // Aynı grupla tekrar: create formu bu challenge'ın verileriyle önceden
-    // dolu açılır, oluşunca eski katılımcılara otomatik davet gider
-    // (app/(main)/create.tsx `rematchOf` parametresi).
-    rematch: 'Yeni bir halka kur',
+    openRing: 'Halkaya git',
     shareResult: 'Sonucu paylaş',
     shareMessage: (title: string, totalDays: number) => `"${title}" tamamlandı — ${totalDays} gün, birlikte. 🔥`,
     // Paylaşım kartı (9:16 PNG — Instagram vb. için)

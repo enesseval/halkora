@@ -1,3 +1,11 @@
+/* eslint-disable react-hooks/immutability --
+ * Every animation here is a Reanimated shared value, and writing `.value` is
+ * that library's entire API — from event handlers, from effects, from
+ * worklets. react-hooks/immutability sees only "a value this hook was given
+ * is being mutated" and has no way to tell the two apart, so it fires on each
+ * one in turn. Scoped to this rule and this file rather than silenced
+ * per-line, which just moved the error to the next assignment.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -147,13 +155,20 @@ export function CheckInButton({
   // "animasyon tamamlanıyor, buton değişiyor daha sonra hata verip geri
   // değişiyor").
   useEffect(() => {
-    if (confirm !== 'done' || done) return;
-    // Only the animation is stopped here; the timer that was already running
-    // clears the state on its own a moment later. Setting state from inside
-    // an effect would be the wrong tool for something the timeline can say
-    // by itself.
+    // Both directions. This used to test the check-in case only, so a failed
+    // UNDO played its animation all the way through, the button settled into
+    // "not checked in", and only then did the alert arrive and the tick come
+    // back (saha testi bulgusu — "geri alıyor sonra alert çıkıyor, buton
+    // değişmiyor da"). The rule is the same either way: the confirmation is
+    // wrong the moment it disagrees with what the app now knows.
+    const contradicted = (confirm === 'done' && !done) || (confirm === 'undone' && done);
+    if (!contradicted) return;
     cancelAnimation(confirmT);
     confirmT.value = withTiming(0, { duration: 140 });
+    // And hand the button back sooner than the ~1.3s the successful timeline
+    // would have taken — there is nothing left to celebrate.
+    if (clearTimer.current) clearTimeout(clearTimer.current);
+    clearTimer.current = setTimeout(() => setConfirm(null), 200);
   }, [done, confirm, confirmT]);
 
   const press = () => {

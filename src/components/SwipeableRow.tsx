@@ -3,7 +3,7 @@ import { Animated as RNAnimated, Pressable, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, radius } from '@/theme/tokens';
+import { colors } from '@/theme/tokens';
 
 export interface SwipeAction {
   label: string;

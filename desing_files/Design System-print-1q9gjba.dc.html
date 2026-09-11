@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-print-defaults>
+@media print {
+  @page { margin: 0.5in; }
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+  figure, table, pre, blockquote, img, svg, tr, [class~="card" i] { break-inside: avoid; }
+  img, svg { max-width: 100%; }
+  p { orphans: 3; widows: 3; }
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#0D0E11; -webkit-font-smoothing:antialiased; }
+    a { color:#FF6B47; text-decoration:none; }
+    a:hover { color:#FF8A6B; }
+    @keyframes ringPulse { 0%,100% { opacity:0.9; } 50% { opacity:0.25; } }
+  </style>
+</helmet>
+
+<div style="font-family:'Satoshi',sans-serif; color:#F4F5F7; background:#0D0E11; min-height:100vh; position:relative;">
+
+  <sc-if value="{{ grainOn }}" hint-placeholder-val="{{ true }}">
+    <div style="position:fixed; inset:0; pointer-events:none; z-index:40; opacity:0.035; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+  </sc-if>
+
+  <div style="max-width:920px; margin:0 auto; padding:72px 28px 120px;">
+
+    <!-- ============ HEADER ============ -->
+    <header style="margin-bottom:72px;">
+      <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:13px; letter-spacing:0.18em; color:#FF6B47; text-transform:uppercase; margin-bottom:16px;">The Challenge</div>
+      <h1 style="font-family:'General Sans',sans-serif; font-weight:600; font-size:44px; letter-spacing:-0.02em; margin:0 0 12px; line-height:1.05;">Design System</h1>
+      <p style="font-size:17px; color:#9AA0AC; margin:0; max-width:520px; line-height:1.5;">Dark-first. Tek vurgu rengi. UI kaybolur, taahhüt kalır. Renkler, tipografi, imza halka ve çekirdek bileşenler.</p>
+    </header>
+
+    <!-- ============ 01 RENK ============ -->
+    <section style="margin-bottom:80px;">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:28px;">
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.16em; color:#5D6370; text-transform:uppercase;">01 · Renk Tokenları</span>
+        <div style="flex:1; height:1px; background:#262A33;"></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px;">
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#0D0E11; border:1px solid #262A33; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">bg/base</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#0D0E11 · ekran zemini</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#15171C; border:1px solid #262A33; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">bg/surface</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#15171C · kartlar</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#1D2027; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">bg/elevated</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#1D2027 · sheet, input</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#262A33; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">stroke/subtle</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#262A33 · 1px kontur</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#F4F5F7; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">text/primary</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#F4F5F7 · başlıklar</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#9AA0AC; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">text/secondary</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#9AA0AC · destek metni</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#5D6370; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">text/tertiary</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#5D6370 · meta, zaman</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #FF6B47; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#FF6B47; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">accent/ember</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#FF6B47 · TEK vurgu</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:rgba(255,107,71,0.12); margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">accent/ember-soft</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">ember @ %12 · rozet zemini</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#E0B34C; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">state/joker</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#E0B34C · yalnız joker günü</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:16px;">
+          <div style="height:56px; border-radius:10px; background:#3A3F4A; margin-bottom:12px;"></div>
+          <div style="font-size:14px; font-weight:500;">state/waiting</div>
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370;">#3A3F4A · boş / bekliyor</div>
+        </div>
+      </div>
+      <p style="font-size:14px; color:#5D6370; margin:20px 0 0; line-height:1.6;">Kural: Ember dışında ikinci canlı renk yok. Yeşil "tamamlandı" yok — tamamlanma Ember'ın dolup dinginleşmesidir. Kırmızı hiçbir durumda kullanılmaz.</p>
+    </section>
+
+    <!-- ============ 02 TİPOGRAFİ ============ -->
+    <section style="margin-bottom:80px;">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:28px;">
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.16em; color:#5D6370; text-transform:uppercase;">02 · Tipografi</span>
+        <div style="flex:1; height:1px; background:#262A33;"></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px;">
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:24px;">
+          <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; margin-bottom:8px;">Gün 7 · 18/24</div>
+          <div style="font-size:14px; color:#9AA0AC;">General Sans — display &amp; rakamlar</div>
+          <div style="font-size:13px; color:#5D6370;">Semibold–Bold · tracking −2% · her zaman tabular</div>
+        </div>
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:24px;">
+          <div style="font-size:20px; font-weight:500; margin-bottom:8px;">Grubun bugün seni bekliyor.</div>
+          <div style="font-size:14px; color:#9AA0AC;">Satoshi — gövde &amp; UI</div>
+          <div style="font-size:13px; color:#5D6370;">Regular–Medium · kısa, yargısız, ileriye bakan</div>
+        </div>
+      </div>
+
+      <div style="background:#15171C; border:1px solid #262A33; border-radius:16px; padding:8px 24px; display:flex; flex-direction:column;">
+        <div style="display:flex; align-items:baseline; gap:24px; padding:14px 0; border-bottom:1px solid #262A33;">
+          <span style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370; width:120px;">34 · hero rakam</span>
+          <span style="font-family:'General Sans',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">%86</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:24px; padding:14px 0; border-bottom:1px solid #262A33;">
+          <span style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370; width:120px;">28 · ekran başlığı</span>
+          <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em;">Dün olmadı. Bugün buradasın.</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:24px; padding:14px 0; border-bottom:1px solid #262A33;">
+          <span style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370; width:120px;">20 · kart aksiyonu</span>
+          <span style="font-size:20px; font-weight:500;">Bugün: 20 sayfa oku</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:24px; padding:14px 0; border-bottom:1px solid #262A33;">
+          <span style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370; width:120px;">17 · gövde</span>
+          <span style="font-size:17px;">Challenge sonunda bahis sonuçlanır.</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:24px; padding:14px 0; border-bottom:1px solid #262A33;">
+          <span style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370; width:120px;">15 · ikincil</span>
+          <span style="font-size:15px; color:#9AA0AC;">5/8 kişi tamamladı</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:24px; padding:14px 0;">
+          <span style="font-family:'General Sans',sans-serif; font-size:13px; color:#5D6370; width:120px;">13 · meta</span>
+          <span style="font-size:13px; color:#5D6370;">Bugün 09:41</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 03 İMZA HALKA ============ -->
+    <section style="margin-bottom:80px;">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:28px;">
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.16em; color:#5D6370; text-transform:uppercase;">03 · Segmentli İlerleme Halkası</span>
+        <div style="flex:1; height:1px; background:#262A33;"></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:32px; display:flex; flex-direction:column; align-items:center; gap:24px;">
+          <div style="position:relative; width:180px; height:180px;">
+            <svg width="180" height="180" viewBox="0 0 180 180">
+              <sc-for list="{{ segsL }}" as="s" hint-placeholder-count="14">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+              </sc-for>
+            </svg>
+            <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+              <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">7/14</div>
+              <div style="font-size:13px; color:#5D6370;">Gün</div>
+            </div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:15px; font-weight:500;">L · ~180pt</div>
+            <div style="font-size:13px; color:#5D6370;">Challenge detay — merkez check-in alanına dönüşür</div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; display:flex; align-items:center; gap:24px; flex:1;">
+            <div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+              <svg width="72" height="72" viewBox="0 0 72 72">
+                <sc-for list="{{ segsM }}" as="s" hint-placeholder-count="14">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                </sc-for>
+              </svg>
+              <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums;">7/14</div>
+            </div>
+            <div>
+              <div style="font-size:15px; font-weight:500;">M · ~72pt</div>
+              <div style="font-size:13px; color:#5D6370;">Home kartı — merkezde gün sayısı</div>
+            </div>
+          </div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; display:flex; align-items:center; gap:24px; flex:1;">
+            <div style="width:72px; display:flex; justify-content:center; flex-shrink:0;">
+              <svg width="28" height="28" viewBox="0 0 28 28">
+                <sc-for list="{{ segsS1 }}" as="s" hint-placeholder-count="14">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                </sc-for>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:15px; font-weight:500;">S · ~28pt</div>
+              <div style="font-size:13px; color:#5D6370;">Katılımcı satırı — yalnız durum</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; margin-top:12px; display:flex; flex-wrap:wrap; gap:28px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;"><span style="width:14px; height:14px; border-radius:4px; background:#FF6B47; display:inline-block;"></span><span style="font-size:14px; color:#9AA0AC;">Dolu gün — Ember</span></div>
+        <div style="display:flex; align-items:center; gap:10px;"><span style="width:14px; height:14px; border-radius:4px; background:#E0B34C; display:inline-block;"></span><span style="font-size:14px; color:#9AA0AC;">Joker günü — amber</span></div>
+        <div style="display:flex; align-items:center; gap:10px;"><span style="width:14px; height:14px; border-radius:4px; background:#3A3F4A; display:inline-block;"></span><span style="font-size:14px; color:#9AA0AC;">Boş / kaçırılmış — nötr, asla kırmızı</span></div>
+        <div style="display:flex; align-items:center; gap:10px;"><span style="width:14px; height:14px; border-radius:4px; background:#3A3F4A; border:1.5px solid #FF6B47; display:inline-block;"></span><span style="font-size:14px; color:#9AA0AC;">Bugün — ince Ember kontur, 2sn nefes</span></div>
+        <div style="font-size:14px; color:#5D6370; font-style:italic; margin-left:auto;">"Bu kadar geldim. Şimdi bırakmam."</div>
+      </div>
+    </section>
+
+    <!-- ============ 04 BİLEŞENLER ============ -->
+    <section>
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:28px;">
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.16em; color:#5D6370; text-transform:uppercase;">04 · Bileşenler</span>
+        <div style="flex:1; height:1px; background:#262A33;"></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(400px,1fr)); gap:24px;">
+
+        <!-- ChallengeCard -->
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase;">ChallengeCard — aktif</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; max-width:350px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px;">
+              <div style="min-width:0;">
+                <div style="font-size:13px; color:#9AA0AC; margin-bottom:6px;">30 Gün Kitap Okuma</div>
+                <div style="font-size:20px; font-weight:500; line-height:1.25;">Bugün: 20 sayfa oku</div>
+                <div style="font-size:15px; color:#9AA0AC; margin-top:10px;">5/8 kişi tamamladı</div>
+              </div>
+              <div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+                <svg width="72" height="72" viewBox="0 0 72 72">
+                  <sc-for list="{{ segsM }}" as="s" hint-placeholder-count="14">
+                    <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                  </sc-for>
+                </svg>
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums;">7/14</div>
+              </div>
+            </div>
+            <button style="width:100%; height:52px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Check-in</button>
+          </div>
+
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase; margin-top:8px;">ChallengeCard — tamamlanmış (dinginleşmiş)</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:16px 20px; max-width:350px; display:flex; align-items:center; gap:16px; opacity:0.85;">
+            <svg width="44" height="44" viewBox="0 0 44 44" style="flex-shrink:0; opacity:0.75;">
+              <sc-for list="{{ segsDone }}" as="s" hint-placeholder-count="21">
+                <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+              </sc-for>
+            </svg>
+            <div>
+              <div style="font-size:15px; font-weight:500;">Sabah 06:30 Kulübü</div>
+              <div style="font-size:13px; color:#9AA0AC; margin-top:2px;"><span style="color:#FF6B47;">✓</span> Tamamlandı · Gün 12/21</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CheckInButton -->
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase;">CheckInButton — durumlar</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; max-width:350px; display:flex; flex-direction:column; gap:12px;">
+            <button style="width:100%; height:52px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Check-in</button>
+            <button style="width:100%; height:52px; border-radius:28px; background:#E05537; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; transform:scale(0.97); cursor:pointer;">Check-in</button>
+            <button style="width:100%; height:52px; border-radius:28px; background:transparent; color:#9AA0AC; border:1px solid #262A33; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:500; cursor:default;"><span style="color:#FF6B47;">✓</span> Tamamlandı</button>
+            <div style="display:flex; justify-content:space-between; font-size:13px; color:#5D6370; padding:0 8px;"><span>varsayılan</span><span>basılı</span><span>tamamlanmış</span></div>
+          </div>
+
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase; margin-top:8px;">StakeBadge</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; max-width:350px;">
+            <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,107,71,0.12); border-radius:12px; padding:10px 14px;">
+              <span style="font-size:15px;">🎯</span>
+              <span style="font-size:15px; color:#F4F5F7;">Bahis: Tamamlayamayan kahve ısmarlar</span>
+            </div>
+          </div>
+
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase; margin-top:8px;">AvatarStack</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; max-width:350px; display:flex; align-items:center; gap:12px;">
+            <div style="display:flex;">
+              <div style="width:32px; height:32px; border-radius:50%; background:#1D2027; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#9AA0AC;">EK</div>
+              <div style="width:32px; height:32px; border-radius:50%; background:#262A33; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#9AA0AC; margin-left:-8px;">AY</div>
+              <div style="width:32px; height:32px; border-radius:50%; background:#1D2027; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#9AA0AC; margin-left:-8px;">MC</div>
+              <div style="width:32px; height:32px; border-radius:50%; background:#262A33; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#9AA0AC; margin-left:-8px;">ZD</div>
+              <div style="width:32px; height:32px; border-radius:50%; background:rgba(255,107,71,0.12); border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:12px; font-weight:600; color:#FF6B47; margin-left:-8px;">+3</div>
+            </div>
+            <span style="font-size:15px; color:#9AA0AC;">Bugün tamamlayanlar</span>
+          </div>
+        </div>
+
+        <!-- ParticipantRow -->
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase;">ParticipantRow — 3 durum</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:8px 20px; max-width:350px;">
+            <div style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #262A33;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#1D2027; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; color:#9AA0AC; flex-shrink:0;">EK</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:15px; font-weight:500;">Enes Kaya</div>
+                <div style="font-size:13px; color:#9AA0AC;"><span style="color:#FF6B47;">✓</span> Bugün</div>
+              </div>
+              <svg width="28" height="28" viewBox="0 0 28 28" style="flex-shrink:0;">
+                <sc-for list="{{ segsS1 }}" as="s" hint-placeholder-count="14">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                </sc-for>
+              </svg>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #262A33;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#262A33; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; color:#9AA0AC; flex-shrink:0;">AY</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:15px; font-weight:500;">Ayşe Yılmaz</div>
+                <div style="font-size:13px; color:#5D6370;">Bekliyor</div>
+              </div>
+              <svg width="28" height="28" viewBox="0 0 28 28" style="flex-shrink:0;">
+                <sc-for list="{{ segsS2 }}" as="s" hint-placeholder-count="14">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                </sc-for>
+              </svg>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px 0;">
+              <div style="width:36px; height:36px; border-radius:50%; background:#1D2027; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; color:#9AA0AC; flex-shrink:0;">MC</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:15px; font-weight:500;">Mert Can</div>
+                <div style="font-size:13px; color:#5D6370;">2 gündür sessiz</div>
+              </div>
+              <button style="border:1px solid #262A33; background:#1D2027; color:#F4F5F7; border-radius:28px; padding:8px 14px; font-family:'Satoshi',sans-serif; font-size:13px; font-weight:500; cursor:pointer; flex-shrink:0;">El salla 👋</button>
+              <svg width="28" height="28" viewBox="0 0 28 28" style="flex-shrink:0;">
+                <sc-for list="{{ segsS3 }}" as="s" hint-placeholder-count="14">
+                  <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                </sc-for>
+              </svg>
+            </div>
+          </div>
+
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase; margin-top:8px;">VoteOption</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; max-width:350px; display:flex; flex-direction:column; gap:10px;">
+            <div style="position:relative; border:1px solid #FF6B47; border-radius:16px; padding:14px 16px; overflow:hidden;">
+              <div style="position:absolute; inset:0; width:62%; background:rgba(255,107,71,0.12);"></div>
+              <div style="position:relative; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:15px; font-weight:500;">Kahve ısmarlar</span>
+                <span style="font-family:'General Sans',sans-serif; font-size:15px; font-weight:600; color:#FF6B47; font-variant-numeric:tabular-nums;">%62 ✓</span>
+              </div>
+            </div>
+            <div style="position:relative; border:1px solid #262A33; border-radius:16px; padding:14px 16px; overflow:hidden;">
+              <div style="position:absolute; inset:0; width:38%; background:rgba(255,107,71,0.06);"></div>
+              <div style="position:relative; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:15px; color:#9AA0AC;">Grubun seçtiği filmi izler</span>
+                <span style="font-family:'General Sans',sans-serif; font-size:15px; font-weight:600; color:#5D6370; font-variant-numeric:tabular-nums;">%38</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat -->
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase;">DayDivider + MessageBubble</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; max-width:350px; display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="flex:1; height:1px; background:#262A33;"></div>
+              <span style="font-family:'General Sans',sans-serif; font-size:13px; font-weight:600; color:#5D6370;">Gün 7</span>
+              <div style="flex:1; height:1px; background:#262A33;"></div>
+            </div>
+            <div style="max-width:85%;">
+              <div style="font-size:13px; color:#5D6370; margin:0 0 4px 4px;">Zeynep</div>
+              <div style="background:#1D2027; border-radius:18px; border-bottom-left-radius:6px; padding:10px 14px; font-size:15px; line-height:1.4;">Bugün 30 sayfa gitti, kitap açıldı resmen 📖</div>
+              <div style="display:inline-flex; align-items:center; gap:4px; background:#15171C; border:1px solid #262A33; border-radius:12px; padding:3px 8px; font-size:12px; margin:-6px 0 0 12px; position:relative;">🔥 <span style="color:#9AA0AC; font-family:'General Sans',sans-serif;">2</span></div>
+            </div>
+            <div style="text-align:center; font-size:13px; color:#5D6370;">Enes tamamladı <span style="color:#FF6B47;">✓</span></div>
+            <div style="max-width:85%; align-self:flex-end;">
+              <div style="background:#1D2027; border-radius:18px; border-bottom-right-radius:6px; padding:10px 14px; font-size:15px; line-height:1.4;">Ben akşama bırakıyorum, uyumadan hallederim 💪</div>
+            </div>
+          </div>
+
+          <div style="font-family:'General Sans',sans-serif; font-size:13px; letter-spacing:0.1em; color:#5D6370; text-transform:uppercase; margin-top:8px;">Motion notu</div>
+          <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px; max-width:350px; font-size:14px; color:#9AA0AC; line-height:1.6;">
+            Check-in: dokunuş → buton hafif çöker → segment 400ms'de Ember'la dolar → kısa parlaklık nabzı → sayaç +1. Konfeti yok; tatmin dokunsal ve tipografiktir. Geçişler 250ms ease-out.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;grain&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Doku&quot;},
+  &quot;pulse&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Halka&quot;},
+  &quot;ringGap&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 3, &quot;min&quot;: 1, &quot;max&quot;: 8, &quot;step&quot;: 0.5, &quot;unit&quot;: &quot;°&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Halka&quot;}
+}">
+class Component extends DCLogic {
+  pt(c, r, deg) {
+    const a = (deg * Math.PI) / 180;
+    return (c + r * Math.cos(a)).toFixed(2) + ' ' + (c + r * Math.sin(a)).toFixed(2);
+  }
+
+  ringSegs(n, size, stroke, gapDeg, states, pulse) {
+    const colors = { filled: '#FF6B47', joker: '#E0B34C', waiting: '#3A3F4A', today: '#3A3F4A' };
+    const c = size / 2;
+    const r = (size - stroke) / 2;
+    const span = 360 / n;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a0 = -90 + i * span + gapDeg / 2;
+      const a1 = -90 + (i + 1) * span - gapDeg / 2;
+      const large = a1 - a0 > 180 ? 1 : 0;
+      const d = 'M ' + this.pt(c, r, a0) + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + this.pt(c, r, a1);
+      out.push({ d, stroke: colors[states[i]], w: stroke });
+      if (states[i] === 'today') {
+        out.push({
+          d,
+          stroke: '#FF6B47',
+          w: Math.max(1.5, stroke * 0.3),
+          style: pulse ? { animation: 'ringPulse 2s ease-in-out infinite' } : undefined,
+        });
+      }
+    }
+    return out;
+  }
+
+  mkStates(n, filledTo, jokerIdx, todayIdx, missed) {
+    const a = [];
+    for (let i = 0; i < n; i++) {
+      let s = i < filledTo ? 'filled' : 'waiting';
+      if (missed && missed.indexOf(i) !== -1) s = 'waiting';
+      if (i === jokerIdx) s = 'joker';
+      if (i === todayIdx) s = 'today';
+      a.push(s);
+    }
+    return a;
+  }
+
+  renderVals() {
+    const gap = this.props.ringGap ?? 3;
+    const pulse = this.props.pulse ?? true;
+    const mk = (n, size, stroke, g, states) => this.ringSegs(n, size, stroke, g, states, pulse);
+    return {
+      grainOn: this.props.grain ?? true,
+      segsL: mk(14, 180, 10, gap, this.mkStates(14, 6, 3, 6)),
+      segsM: mk(14, 72, 6, gap + 1.5, this.mkStates(14, 6, 3, 6)),
+      segsDone: mk(21, 44, 3.5, gap + 3, this.mkStates(21, 12, -1, -1)),
+      segsS1: mk(14, 28, 3, gap + 5, this.mkStates(14, 7, -1, -1)),
+      segsS2: mk(14, 28, 3, gap + 5, this.mkStates(14, 6, -1, 6)),
+      segsS3: mk(14, 28, 3, gap + 5, this.mkStates(14, 4, -1, 6, [4, 5])),
+    };
+  }
+}
+</script>
+<script>
+(async () => {
+  if (!document.title || !document.title.trim()) document.title = "Design System";
+  // Prepend so page-supplied @page / break rules (deck-stage's margin:0,
+  // author CSS) keep source-order precedence over the baseline.
+  const baseCss = document.createElement('style');
+  baseCss.textContent = "@media print {\n  figure, table { break-inside: avoid; }\n  *, *::before, *::after {\n    print-color-adjust: exact; -webkit-print-color-adjust: exact;\n    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;\n    animation-delay: -99s !important; animation-duration: .001s !important;\n    animation-iteration-count: 1 !important; animation-fill-mode: both !important;\n    animation-play-state: running !important; transition-duration: 0s !important;\n  }\n}";
+  document.head.prepend(baseCss);
+  if (document.readyState === 'loading') {
+    await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
+  }
+  let ds = document.querySelector('deck-stage');
+  // whenDefined never resolves when nothing registers the element, so only
+  // await it when a <deck-stage> tag exists (and race a timeout regardless).
+  if (ds && !customElements.get('deck-stage')) {
+    try {
+      await Promise.race([
+        customElements.whenDefined('deck-stage'),
+        new Promise((r) => setTimeout(r, 3000)),
+      ]);
+    } catch (e) {}
+    ds = document.querySelector('deck-stage');
+  }
+  // dc-runtime assigns window.DCLogic at init and mounts into #dc-root on
+  // DOMContentLoaded; settle on that subtree so React has rendered before
+  // print(). Non-DC pages fall through to weighing body.
+  const isDc = !ds && 'DCLogic' in window;
+  const settleRoot = ds || (isDc ? document.getElementById('dc-root') : null) || document.body;
+  if (settleRoot) {
+    // Weigh only content children — skip script/style/template so inline
+    // Babel/CSS doesn't register as stable "content" before the framework
+    // has mounted anything.
+    const MEDIA = 'img,svg,canvas,video,picture,iframe,embed,object';
+    const weigh = () => {
+      let text = 0, media = 0;
+      for (const c of settleRoot.children) {
+        const t = c.tagName;
+        if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+        text += (c.textContent || '').trim().length;
+        media += c.querySelectorAll(MEDIA).length + (c.matches(MEDIA) ? 1 : 0);
+      }
+      return text + media * 100;
+    };
+    // "Non-zero and stable" alone is not sufficient to mean rendered: generic
+    // body can carry a static shell while async main content is pending, and
+    // #dc-root can carry the root DC's static text while child refs are still
+    // .sc-placeholder boxes. Gate generic on readyState 'complete', and never
+    // accept stability while a dc-runtime placeholder is present.
+    const isGeneric = settleRoot === document.body;
+    const deadline = Date.now() + 15000;
+    let last = -1, stable = 0;
+    while (Date.now() < deadline) {
+      const n = weigh();
+      const ready =
+        (!isGeneric || document.readyState === 'complete') &&
+        !settleRoot.querySelector('.sc-placeholder');
+      if (n > 0 && n === last && ready) { if (++stable >= 2) break; } else { stable = 0; }
+      last = n;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  // Project support.js may predate runtime default-seeding; push via bridge.
+  if (isDc && window.__dcSetProps && window.__dcRootName) {
+    try {
+      const dpEl = document.querySelector('script[data-dc-script]');
+      const meta = JSON.parse((dpEl && dpEl.getAttribute('data-props')) || '{}');
+      const bag = {};
+      for (const k in meta)
+        if (k[0] !== '$' && meta[k] && meta[k].default !== undefined)
+          bag[k] = meta[k].default;
+      if (Object.keys(bag).length) {
+        window.__dcSetProps(window.__dcRootName(), bag);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    } catch (e) {}
+  }
+  // Reveal content gated on scroll or visibility before printing. Lazy <img>,
+  // IntersectionObserver fade-ins, and collapsed <details> don't render while
+  // off-screen, so a long page would print with them blank or closed. Open
+  // every <details>, force native-lazy images eager, and scroll the document
+  // through its full height to trip lazy-load + IO; then wait (bounded) for the
+  // newly-triggered images. Inert for deck-stage (slides aren't scroll-gated).
+  try {
+    for (const d of document.querySelectorAll('details')) d.open = true;
+    for (const img of document.querySelectorAll('img[loading="lazy"]'))
+      img.loading = 'eager';
+    const scroller = document.scrollingElement || document.documentElement;
+    const full = Math.max(scroller.scrollHeight, document.body.scrollHeight);
+    const step = window.innerHeight || 800;
+    for (let y = 0; y <= full; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    window.scrollTo(0, 0);
+    await Promise.race([
+      Promise.all(
+        [...document.images].map((img) =>
+          img.complete
+            ? null
+            : new Promise((res) => {
+                img.addEventListener('load', res, { once: true });
+                img.addEventListener('error', res, { once: true });
+              })
+        )
+      ),
+      new Promise((r) => setTimeout(r, 4000)),
+    ]);
+  } catch (e) {}
+  try { await document.fonts.ready; } catch (e) {}
+  // Jump every animation to its end state so print() never captures a slide
+  // mid-entrance. Ordering matters: the 0s-transition style must be live
+  // BEFORE data-deck-active is set so attribute-keyed transitions don't
+  // start a (now-0s) run from the pre-active base.
+  const st = document.createElement('style');
+  st.textContent = '*,*::before,*::after{animation-delay:-99s !important;animation-duration:.001s !important;animation-iteration-count:1 !important;animation-fill-mode:both !important;animation-play-state:running !important;transition-duration:0s !important}';
+  document.head.appendChild(st);
+  for (const d of document.querySelectorAll('deck-stage')) {
+    for (const c of d.children) {
+      const t = c.tagName;
+      if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+      c.setAttribute('data-deck-active', '');
+    }
+  }
+  // Re-append deck-stage's @page last so no author @page can add a margin and
+  // spill each full-bleed slide onto two sheets. Backstop for old copies.
+  if (ds) {
+    let pg = document.getElementById('deck-stage-print-page');
+    if (!pg) {
+      pg = document.createElement('style');
+      pg.textContent = '@page{size:' + (+ds.getAttribute('width') || 1920) +
+        'px ' + (+ds.getAttribute('height') || 1080) + 'px;margin:0}';
+    }
+    document.body.appendChild(pg);
+  }
+  try {
+    const sweep = () => {
+      for (const a of document.getAnimations()) {
+        try { a.finish(); } catch (e) {
+          try { a.currentTime = (a.effect && a.effect.getComputedTiming().duration) || 0; a.pause(); } catch (e2) {}
+        }
+      }
+    };
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+  } catch (e) {}
+  // Size the PDF page to the rendered design unless the file opted into
+  // standard paper via @page{size:letter|A4|…}. Decks own their own @page.
+  // Wrappers (body, …) lose padding+margin so the frame sits at (0,0); the
+  // frame itself loses only margin — its padding is INSIDE the measured
+  // rect and must stay, or content shifts and leaves a gap at bottom/right.
+  var __m = null;
+  try { __m = (() => {
+  var STAMP = true;
+  var docEl = document.documentElement;
+  var doc = { width: docEl.scrollWidth, height: docEl.scrollHeight };
+
+  var ds = document.querySelector('deck-stage');
+  if (ds) {
+    var dw = Number(ds.getAttribute('width')) || 1920;
+    var dh = Number(ds.getAttribute('height')) || 1080;
+    var n = typeof ds.length === 'number' ? ds.length : ds.children.length;
+    var idx = typeof ds.index === 'number' ? ds.index : 0;
+    var frames = [];
+    for (var i = 0; i < n; i++) frames.push({ left: 0, top: 0, width: dw, height: dh });
+    return { kind: 'deck', source: 'declared', doc: doc, frames: frames,
+      authored: frames.map(function(){return{width:true,height:true}}),
+      deck: { width: dw, height: dh, slideCount: n, index: idx },
+      signals: { paperPage: false, pxPage: false } };
+  }
+
+  // Declared kind: a doc-page tag names the kind outright, so no signal
+  // heuristics run (like the deck branch above, signals report false —
+  // they describe inferred classifications only). The tag alone is not
+  // trusted: the element must have upgraded (shadowRoot present), so a
+  // leftover tag whose script was deleted falls through to the heuristics
+  // that handle plain markup.
+  var stageSx = window.scrollX || 0, stageSy = window.scrollY || 0;
+  var dp = document.querySelector('doc-page');
+  if (dp && dp.shadowRoot) {
+    // Crop to the sheet, not the host — the desk around it is screen-only
+    // chrome that must not land in PNG exports.
+    var sheet = dp.shadowRoot.querySelector('.sheet');
+    var sr = (sheet || dp).getBoundingClientRect();
+    return { kind: 'paper-doc', source: 'declared', doc: doc,
+      frames: [{ left: sr.left + stageSx, top: sr.top + stageSy,
+        width: sr.width, height: sr.height }],
+      authored: [{ width: false, height: false }],
+      signals: { paperPage: false, pxPage: false } };
+  }
+  var paperPage = false, pxPage = false;
+  var eachRule = function (fn) {
+    for (var s = 0; s < document.styleSheets.length; s++) {
+      var rs; try { rs = document.styleSheets[s].cssRules; } catch (e) { continue; }
+      for (var r = 0; r < rs.length; r++) {
+        fn(rs[r]);
+        if (rs[r].cssRules) for (var n = 0; n < rs[r].cssRules.length; n++) fn(rs[r].cssRules[n]);
+      }
+    }
+  };
+  eachRule(function (r) {
+    if (r.type !== 6) return;
+    var m = /\bsize\s*:\s*([^;}]+)/i.exec(r.cssText || '');
+    if (!m) return;
+    if (/\b(letter|a[3-5]|legal|ledger)\b/i.test(m[1])) paperPage = true;
+    if (/\d+(?:\.\d+)?px\b/i.test(m[1])) pxPage = true;
+  });
+  var signals = { paperPage: paperPage, pxPage: pxPage };
+
+  var pxVal = function (v) {
+    var m = /^(\d+(?:\.\d+)?)px$/.exec(v || ''); return m ? +m[1] : 0;
+  };
+  var authoredPx = function (el, prop) {
+    if (pxVal(el.style[prop])) return true;
+    var attr = el.getAttribute(prop);
+    if (attr && /^\d+$/.test(attr)) return true;
+    var hit = false;
+    eachRule(function (r) {
+      if (hit || r.type !== 1 || !r.style) return;
+      try { if (el.matches(r.selectorText) && pxVal(r.style[prop])) hit = true; } catch (e) {}
+    });
+    return hit;
+  };
+
+  var el = document.body, rootPxW = false;
+  for (;;) {
+    var kids = [];
+    for (var c = 0; c < el.children.length; c++) {
+      var t = el.children[c].tagName;
+      if (t !== 'SCRIPT' && t !== 'STYLE' && t !== 'TEMPLATE') kids.push(el.children[c]);
+    }
+    if (kids.length !== 1 || !(kids[0] instanceof HTMLElement)) break;
+    if (STAMP) el.setAttribute('data-om-frame-wrap', '');
+    el = kids[0];
+    rootPxW = authoredPx(el, 'width');
+    if (rootPxW) break;
+  }
+  if (!rootPxW) rootPxW = authoredPx(el, 'width');
+
+  // @page{size:letter} alone is a flowing doc; with a px-width root it's a
+  // fixed sheet pretending to be paper — fall through and size to render.
+  if (paperPage && !rootPxW) {
+    return { kind: 'paper-doc', source: 'inferred', doc: doc, signals: signals,
+      frames: [{ left: 0, top: 0, width: doc.width, height: doc.height }],
+      authored: [{ width: false, height: false }] };
+  }
+
+  var sx = window.scrollX || 0, sy = window.scrollY || 0;
+  var rectOf = function (e) {
+    var r = e.getBoundingClientRect();
+    var oy; try { oy = getComputedStyle(e).overflowY; } catch (err) {}
+    var h = oy === 'visible' ? Math.max(r.height, e.scrollHeight || 0) : r.height;
+    return { left: r.left + sx, top: r.top + sy, width: r.width, height: h };
+  };
+
+  // Multi-frame: off unless the page opts in via data-om-multi-frame on the
+  // stop element — the explicit opt-in is what guards against card grids
+  // and pricing tables that match the geometry but aren't separate
+  // canvases. Two ways to name the frames, explicit first:
+  // 1. Descendants marked data-om-frame-export (the social-frames starter
+  //    marks each asset frame; shells/panels around them are presentation,
+  //    so nesting is expected). Document order.
+  // 2. Fallback, no marked descendants: direct children with an authored px
+  //    width AND height (the original geometry heuristic).
+  // Frames may be different sizes (a gallery mixes 1080×1920 stories with
+  // 728×90 banners); data-om-frame-label rides along for export filenames.
+  if (el.hasAttribute('data-om-multi-frame')) {
+    var visOk = function (e) {
+      var cs; try { cs = getComputedStyle(e); } catch (err) { return false; }
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && cs.position !== 'fixed';
+    };
+    // A frame's crop is its VISUAL box — never the scrollHeight-inflated
+    // rect that rectOf computes for page roots. Shadow-DOM hover controls
+    // (image-slot's Replace bar parks 29px below its host) and similar
+    // escaping UI contribute scrollable overflow to the frame, and the
+    // inflated height both squashes the nominal-size resize and drags
+    // content below the frame into the crop. Zoom-independent; bit every
+    // slot-bearing frame.
+    var frameRectOf = function (e) {
+      var r = e.getBoundingClientRect();
+      return { left: r.left + sx, top: r.top + sy, width: r.width, height: r.height };
+    };
+    var pushCand = function (list, e) {
+      if (!visOk(e)) return;
+      var rc = frameRectOf(e);
+      if (rc.width < 2 || rc.height < 2) return;
+      var lbl = e.getAttribute('data-om-frame-label');
+      if (lbl) rc.label = lbl;
+      list.push(rc);
+    };
+    var cands = [];
+    var marked = el.querySelectorAll('[data-om-frame-export]');
+    if (marked.length) {
+      for (var mk = 0; mk < marked.length; mk++) pushCand(cands, marked[mk]);
+    } else {
+      for (var k = 0; k < el.children.length; k++) {
+        var ch = el.children[k];
+        if (!authoredPx(ch, 'width') || !authoredPx(ch, 'height')) continue;
+        pushCand(cands, ch);
+      }
+    }
+    if (cands.length >= 2) {
+      return { kind: 'multi-frame', source: 'inferred', doc: doc, signals: signals,
+        frames: cands, authored: cands.map(function(){return{width:true,height:true}}) };
+    }
+  }
+
+  if (STAMP) el.setAttribute('data-om-frame', '');
+  return { kind: 'single-canvas', source: 'inferred', doc: doc, signals: signals,
+    frames: [rectOf(el)],
+    authored: [{ width: rootPxW, height: authoredPx(el, 'height') }] };
+})(); } catch (e) {}
+  var frame = null;
+  if (__m && __m.kind === 'single-canvas') {
+    var f = __m.frames && __m.frames[0];
+    if (f && f.width >= 200 && f.height >= 200) {
+      frame = f;
+      var fst = document.createElement('style');
+      fst.textContent = '@media print{@page{size:' + Math.ceil(f.width) + 'px ' +
+        Math.ceil(f.height) + 'px;margin:0}' +
+        'html,body,[data-om-frame-wrap]{padding:0!important;margin:0!important;background:none!important}' +
+        '[data-om-frame]{margin:0!important}}';
+      document.body.appendChild(fst);
+    }
+  }
+  // Relax break-inside on oversized elements. An element taller than a
+  // printable page can't honor break-inside: avoid — browsers either overflow
+  // it or push it whole to the next page, leaving a blank gap, then break it
+  // anyway at an arbitrary point. After the final layout (content revealed,
+  // animations jumped), find elements taller than a page that still compute
+  // break-inside: avoid and reset them to auto, so the browser breaks them at
+  // their children's boundaries instead (children keep their own avoid). PAGE_PX
+  // is a conservative portrait estimate at 96 CSS px/in — Letter/A4 usable
+  // height minus our 0.5in margins — so only clearly-oversized elements are
+  // touched and under-page elements still stay whole. Skipped for decks (slides
+  // are sized to the page) and for fixed-size canvases (frame set, or an author
+  // px-based @page) — runs as before for flowing docs on letter/A4.
+  try {
+    if (!ds && !frame && !(__m && __m.signals && __m.signals.pxPage)) {
+      const PAGE_PX = 1024;
+      // Our print defaults add a real @page margin only when the source has
+      // no @page of its own; computed style can't tell us (it reports screen
+      // media), so read the injected rule directly.
+      const defaults = document.querySelector('style[data-omelette-print-defaults]');
+      const pageInset = /@page\s*\{[^}]*margin/.test(defaults ? defaults.textContent || '' : '');
+      const SEL = 'section,article,figure,table,pre,blockquote,[class~="card" i],[class~="page" i],[class~="sheet" i]';
+      for (const el of document.body.querySelectorAll(SEL)) {
+        if (el instanceof HTMLElement && el.offsetHeight > PAGE_PX) {
+          el.setAttribute('data-om-oversized', '');
+          // Fake-paged docs simulate sheets with over-tall break-after:page
+          // boxes; honoring the break spills half-blank pages and ends a
+          // colored box mid-sheet. Flow them, and (only when we own the page
+          // inset) drop the redundant padding/background via the rule below.
+          const cs = getComputedStyle(el);
+          if (cs.breakAfter === 'page' || cs.pageBreakAfter === 'always') {
+            el.setAttribute('data-om-fakepage', '');
+          }
+        }
+      }
+      const ost = document.createElement('style');
+      ost.textContent = '@media print{' +
+        '[data-om-oversized]{break-inside:auto !important;page-break-inside:auto !important}' +
+        '[data-om-fakepage]{break-after:auto !important;page-break-after:auto !important}' +
+        (pageInset ? '[data-om-fakepage]{padding:0 !important;background:none !important}' : '') +
+        '}';
+      document.head.appendChild(ost);
+    }
+  } catch (e) {}
+  // macOS Preview renders Skia-PDF Luminosity soft-masks as opaque grey boxes;
+  // swap the CSS that triggers them for Preview-safe forms.
+  try {
+    for (const el of document.body.querySelectorAll('*')) {
+      const cs = getComputedStyle(el);
+
+      if (cs.boxShadow !== 'none' && cs.filter === 'none') {
+        const outs = [], kept = [];
+        for (const s of cs.boxShadow.split(/,(?![^(]*[)])/)) {
+          const t = s.trim();
+          const m = t.match(/^(rgba?[(][^)]+[)]) (-?[0-9.]+px) (-?[0-9.]+px) ([0-9.]+px) -?[0-9.]+px$/);
+          if (m && parseFloat(m[4]) > 0) outs.push('drop-shadow(' + m[2] + ' ' + m[3] + ' ' + m[4] + ' ' + m[1] + ')');
+          else kept.push(t);
+        }
+        if (outs.length) {
+          el.style.setProperty('filter', outs.join(' '), 'important');
+          el.style.setProperty('box-shadow', kept.join(', ') || 'none', 'important');
+        }
+      }
+
+      const mask = cs.maskImage && cs.maskImage !== 'none' ? cs.maskImage : cs.webkitMaskImage;
+      if (mask && mask !== 'none' && cs.filter === 'none') el.style.setProperty('filter', 'opacity(1)', 'important');
+    }
+  } catch (e) {}
+  setTimeout(() => { try { window.print(); } catch (e) {} }, 200);
+})();
+</script>
+</body>
+</html>

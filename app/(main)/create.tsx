@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -14,12 +14,9 @@ import DateTimePicker, {
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import {
   useCreateChallenge,
-  useChallenge,
   TEMPLATES,
   STAKE_PRESETS,
 } from '@/hooks';
-import { sendInvite, isDuplicateInviteError } from '@/data/invites';
-import { isSupabaseConfigured } from '@/lib/supabase';
 import { addDays, formatLongDate, formatShortDate, isSameDay } from '@/lib/day';
 import type { StakeKind } from '@/data/types';
 import { AppText, Button, Chip, IconButton, Screen } from '@/components/ui';
@@ -358,6 +355,11 @@ function Field({
   /** Hard cap, enforced by the native input. */
   maxLength?: number;
 }) {
+  // Only the field you are actually typing in counts. Left on, every filled
+  // field kept its counter and the screen filled up with numbers about text
+  // nobody was editing (saha testi bulgusu — "başlıktan açıklamaya
+  // geçtiğimde başlıkta hala 10/40 gözükmeye devam ediyor").
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ marginTop: 20 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
@@ -368,7 +370,7 @@ function Field({
             screen said why (saha testi bulgusu). It appears with the first
             character and goes ember at the limit, so the wall is announced
             before you hit it. */}
-        {maxLength && value.length > 0 ? (
+        {maxLength && focused && value.length > 0 ? (
           <AppText
             variant="meta"
             tabular
@@ -384,6 +386,8 @@ function Field({
         placeholder={placeholder}
         placeholderTextColor={colors.textTertiary}
         autoFocus={autoFocus}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         // These strings are drawn into fixed places — a home card, the ring's
         // centre, a 360pt share image — where the only thing an unbounded
         // title can do is get truncated with an ellipsis. Better to stop the
@@ -418,17 +422,15 @@ export default function CreateScreen() {
   // links here with the just-completed challenge's id; its own data (still
   // in the local cache) prefills the form and, once created, every past
   // participant gets auto-invited (below).
-  const { rematchOf } = useLocalSearchParams<{ rematchOf?: string }>();
-  const rematchSource = useChallenge(rematchOf);
 
   const [step, setStep] = useState(0);
-  const [title, setTitle] = useState(() => rematchSource?.title ?? '');
-  const [action, setAction] = useState(() => rematchSource?.dailyActionRaw ?? '');
-  const [totalDays, setTotalDays] = useState(() => rematchSource?.totalDays ?? 14);
+  const [title, setTitle] = useState(() => '');
+  const [action, setAction] = useState(() => '');
+  const [totalDays, setTotalDays] = useState(() => 14);
   // False while a 7/30 preset chip is active; true once the wheel picker has
   // been used to pick a custom count (starts already "custom" — 14 isn't a preset).
   const [customDays, setCustomDays] = useState(
-    () => !DAY_OPTIONS.includes(rematchSource?.totalDays ?? 14),
+    () => !DAY_OPTIONS.includes(14),
   );
   const [showDayPicker, setShowDayPicker] = useState(false);
   const pickPresetDays = (d: number) => {
@@ -456,7 +458,7 @@ export default function CreateScreen() {
   // A rematch defaults to a lobby: the old group has to opt in again, and
   // starting on a date would kick off with whoever happened to be around
   // (docs/BAHIS-V2-VE-ROVANS.md §7). Still switchable.
-  const [lobby, setLobby] = useState(!!rematchOf);
+  const [lobby, setLobby] = useState(false);
 
   // The footer lifts by the measured keyboard height (see the footer's own
   // note); the inset comes off it because Screen already applies one.
@@ -466,12 +468,14 @@ export default function CreateScreen() {
   const isToday = isSameDay(startDate, today);
   const isTomorrow = isSameDay(startDate, tomorrow);
   const isCustom = !isToday && !isTomorrow;
-  const [stakeMode, setStakeMode] = useState<'direct' | 'vote'>(rematchSource?.stake?.mode ?? 'direct');
-  const [stakeText, setStakeText] = useState(() => rematchSource?.stake?.text ?? '');
+  // Read-only: nothing in the UI switches this today, so it is a value, not
+  // state with an unused setter.
+  const stakeMode: 'direct' | 'vote' = 'direct';
+  const [stakeText, setStakeText] = useState(() => '');
   // Bahis v2 (docs/db-stake-v2.sql): individual = whoever misses more than
   // the threshold pays; collective = the group hits a shared target or
   // nobody does.
-  const [stakeKind, setStakeKind] = useState<StakeKind>(rematchSource?.stake?.kind ?? 'individual');
+  const [stakeKind, setStakeKind] = useState<StakeKind>('individual');
   /**
    * Whether this ring has a stake at all.
    *
@@ -482,27 +486,28 @@ export default function CreateScreen() {
    * one of the three answers now, and it starts as the selected one: nothing
    * is quietly switched on for you.
    */
-  const [stakeOn, setStakeOn] = useState(!!rematchSource?.stake?.text);
+  const [stakeOn, setStakeOn] = useState(false);
   const [showCollectiveHelp, setShowCollectiveHelp] = useState(false);
   const [collectivePct, setCollectivePct] = useState(
-    () => rematchSource?.stake?.collectiveTargetPct ?? 80,
+    () => 80,
   );
   // Suggested from the length (a 14-day ring tolerates ~3), but the moment
   // the user picks one themselves we stop moving it under them.
-  const [thresholdTouched, setThresholdTouched] = useState(false);
-  const [thresholdMissed, setThresholdMissed] = useState(
-    () => rematchSource?.stake?.thresholdMissed ?? suggestedThreshold(rematchSource?.totalDays ?? 14),
+  // Derived, not mirrored. This used to be state kept in step with
+  // `totalDays` by an effect — a synchronous setState inside an effect, and
+  // an extra render for a number that is simply a function of two things we
+  // already have. `null` means "still following the suggestion".
+  const [thresholdChoice, setThresholdChoice] = useState<number | null>(
+    () => null,
   );
-  useEffect(() => {
-    if (!thresholdTouched) setThresholdMissed(suggestedThreshold(totalDays));
-  }, [totalDays, thresholdTouched]);
+  const thresholdMissed = thresholdChoice ?? suggestedThreshold(totalDays);
   // The suggestion has to be reachable: a fixed 0/1/2/3 row can't offer the
   // 6 a 30-day ring suggests.
   const thresholdOptions = Array.from(
     new Set([0, 1, 2, 3, suggestedThreshold(totalDays)]),
   ).sort((a, b) => a - b);
   const [creating, setCreating] = useState(false);
-  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(() => rematchSource?.firstDayJoinOnly ?? false);
+  const [firstDayJoinOnly, setFirstDayJoinOnly] = useState(() => false);
 
   const titles = t.create.titles;
 
@@ -545,20 +550,6 @@ export default function CreateScreen() {
     if (!id) {
       setCreating(false);
       return;
-    }
-    // Rematch: auto-invite everyone who was in the old ring (except me, the
-    // new owner — I'm already a participant via `create` above). Best-effort
-    // — a failed/duplicate invite here shouldn't block landing on the new
-    // ring's invite screen, which still shows the code as a manual fallback.
-    if (rematchSource && isSupabaseConfigured) {
-      const others = rematchSource.participants.filter((p) => !p.isMe);
-      await Promise.all(
-        others.map((p) =>
-          sendInvite(id, p.id, 'rematch').catch((e) => {
-            if (!isDuplicateInviteError(e)) console.error('rematch auto-invite failed', e);
-          }),
-        ),
-      );
     }
     router.replace(`/challenge/${id}/invite`);
   };
@@ -873,8 +864,7 @@ export default function CreateScreen() {
                       label={t.create.stakeThresholdDay(n)}
                       selected={thresholdMissed === n}
                       onPress={() => {
-                        setThresholdTouched(true);
-                        setThresholdMissed(n);
+                        setThresholdChoice(n);
                       }}
                     />
                   ))}
@@ -995,8 +985,29 @@ export default function CreateScreen() {
           the bottom inset and left the button under the keyboard on the stake
           step — the one step with text fields near the bottom. The inset is
           subtracted because Screen already applies it and the keyboard height
-          is measured from the true screen edge. */}
-      <View style={{ paddingBottom: spacing.section + Math.max(keyboardHeight - insets.bottom, 0) }}>
+          is measured from the true screen edge.
+
+          Two corrections from the field:
+          · The 32pt resting gap was being added ON TOP of the keyboard lift,
+            so with the keyboard up the button floated well clear of it. That
+            32 is breathing room from the bottom of the SCREEN; against a
+            keyboard edge a tighter 12 is right.
+          · It carries the page's own background and a hairline now. Sitting
+            transparent over a scroll view, content ran underneath it and
+            showed through around the button ("buton arkasındaki alan
+            içeriklerin üstüne biniyor"). */}
+      <View
+        style={{
+          backgroundColor: colors.bgBase,
+          borderTopWidth: keyboardHeight > 0 ? hairline : 0,
+          borderTopColor: colors.strokeSubtle,
+          paddingTop: keyboardHeight > 0 ? 12 : 0,
+          paddingBottom:
+            keyboardHeight > 0
+              ? 12 + Math.max(keyboardHeight - insets.bottom, 0)
+              : spacing.section,
+        }}
+      >
         <Button
           label={
             step === 3

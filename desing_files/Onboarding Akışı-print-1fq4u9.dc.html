@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-print-defaults>
+@media print {
+  @page { margin: 0.5in; }
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+  figure, table, pre, blockquote, img, svg, tr, [class~="card" i] { break-inside: avoid; }
+  img, svg { max-width: 100%; }
+  p { orphans: 3; widows: 3; }
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="design_doc_mode" content="canvas">
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#08090B; -webkit-font-smoothing:antialiased; }
+    a { color:#FF6B47; text-decoration:none; }
+    a:hover { color:#FF8A6B; }
+    @keyframes ringPulse { 0%,100% { opacity:0.9; } 50% { opacity:0.25; } }
+    @keyframes segFill { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+  </style>
+</helmet>
+
+<section style="font-family:'Satoshi',sans-serif; color:#F4F5F7; padding:64px; display:flex; flex-direction:column; gap:40px;">
+
+  <div style="max-width:760px;">
+    <div style="font-family:'General Sans',sans-serif; font-weight:700; font-size:13px; letter-spacing:0.18em; color:#FF6B47; text-transform:uppercase; margin-bottom:12px;">Onboarding Akışı</div>
+    <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:32px; letter-spacing:-0.02em; margin-bottom:10px;">İndirmeden ilk check-in'e: 6 ekran</div>
+    <p style="font-size:15px; color:#9AA0AC; line-height:1.6; margin:0;">Giriş 3 ekran, kaydırmalı, her an atlanabilir. Ton övgü değil meydan okuma — uygulama kendini övmez, kullanıcıya söz verdirir. İsim tek alan, hesap yok. Yol ayrımında iki eşit kart; "Katıl" seçilince alan aynı ekranda açılır ve panodaki davet linki otomatik yakalanır — yapıştırma bile gerekmez.</p>
+  </div>
+
+  <div style="display:flex; gap:56px; align-items:flex-start; flex-wrap:wrap;">
+
+    <!-- ============ 1a O1 HOOK ============ -->
+    <div id="1a" data-screen-label="O1 Hook" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1a</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">O1 · Kanca — söz</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+          <div style="position:absolute; inset:0; pointer-events:none; opacity:0.03; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+          <div style="padding:64px 24px 48px; height:100%; display:flex; flex-direction:column; box-sizing:border-box;">
+            <div style="display:flex; justify-content:flex-end;">
+              <button style="border:none; background:transparent; color:#5D6370; font-family:'Satoshi',sans-serif; font-size:15px; cursor:pointer; padding:8px 0;">Atla</button>
+            </div>
+
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:40px;">
+              <div style="position:relative; width:160px; height:160px; align-self:center;">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                  <sc-for list="{{ ringHook }}" as="s" hint-placeholder-count="14">
+                    <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                  </sc-for>
+                </svg>
+                <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:700; font-size:28px; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">3/14</div>
+              </div>
+              <div>
+                <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:34px; letter-spacing:-0.02em; line-height:1.15;">Kendine verdiğin sözler<br>yalnızken kolay unutulur.</div>
+                <p style="font-size:17px; color:#9AA0AC; line-height:1.5; margin:16px 0 0;">Arkadaşların izlerken değil.</p>
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:24px;">
+              <div style="display:flex; gap:8px; justify-content:center;">
+                <span style="width:24px; height:6px; border-radius:3px; background:#FF6B47;"></span>
+                <span style="width:6px; height:6px; border-radius:3px; background:#3A3F4A;"></span>
+                <span style="width:6px; height:6px; border-radius:3px; background:#3A3F4A;"></span>
+              </div>
+              <button style="width:100%; height:56px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Devam</button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1b O2 MEKANİK ============ -->
+    <div id="1b" data-screen-label="O2 Mekanik" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1b</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">O2 · Mekanik — tek dokunuş</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+          <div style="padding:64px 24px 48px; height:100%; display:flex; flex-direction:column; box-sizing:border-box;">
+            <div style="display:flex; justify-content:flex-end;">
+              <button style="border:none; background:transparent; color:#5D6370; font-family:'Satoshi',sans-serif; font-size:15px; cursor:pointer; padding:8px 0;">Atla</button>
+            </div>
+
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:36px;">
+              <div>
+                <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:34px; letter-spacing:-0.02em; line-height:1.15;">Her gün<br>tek dokunuş.</div>
+                <p style="font-size:17px; color:#9AA0AC; line-height:1.5; margin:16px 0 0;">Check-in yaparsın, günün segmenti dolar. Grubun anında görür.</p>
+              </div>
+
+              <!-- demo card -->
+              <div style="background:#15171C; border:1px solid #262A33; border-radius:24px; padding:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px;">
+                  <div style="min-width:0;">
+                    <div style="font-size:13px; color:#9AA0AC; margin-bottom:6px;">30 Gün Kitap Okuma</div>
+                    <div style="font-size:20px; font-weight:500; line-height:1.25;">Bugün: 20 sayfa oku</div>
+                    <div style="font-size:15px; color:#9AA0AC; margin-top:10px;">5/8 kişi tamamladı</div>
+                  </div>
+                  <div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+                    <svg width="72" height="72" viewBox="0 0 72 72">
+                      <sc-for list="{{ ringDemo }}" as="s" hint-placeholder-count="14">
+                        <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none" style="{{ s.style }}"></path>
+                      </sc-for>
+                    </svg>
+                    <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums;">7/14</div>
+                  </div>
+                </div>
+                <button style="width:100%; height:52px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Check-in</button>
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:24px;">
+              <div style="display:flex; gap:8px; justify-content:center;">
+                <span style="width:6px; height:6px; border-radius:3px; background:#3A3F4A;"></span>
+                <span style="width:24px; height:6px; border-radius:3px; background:#FF6B47;"></span>
+                <span style="width:6px; height:6px; border-radius:3px; background:#3A3F4A;"></span>
+              </div>
+              <button style="width:100%; height:56px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Devam</button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1c O3 BAHİS ============ -->
+    <div id="1c" data-screen-label="O3 Bahis" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1c</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">O3 · Bahis — tatlı risk</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+          <div style="padding:64px 24px 48px; height:100%; display:flex; flex-direction:column; box-sizing:border-box;">
+            <div style="display:flex; justify-content:flex-end;">
+              <button style="border:none; background:transparent; color:#5D6370; font-family:'Satoshi',sans-serif; font-size:15px; cursor:pointer; padding:8px 0;">Atla</button>
+            </div>
+
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:36px;">
+              <div>
+                <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:34px; letter-spacing:-0.02em; line-height:1.15;">İşin ucunda<br>bir şey olsun.</div>
+                <p style="font-size:17px; color:#9AA0AC; line-height:1.5; margin:16px 0 0;">Grup bir bahis koyar. Tamamlayamayan öder — dostça, küçük, unutulmaz.</p>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,107,71,0.12); border-radius:12px; padding:12px 16px; align-self:flex-start;">
+                  <span style="font-size:15px;">☕</span>
+                  <span style="font-size:15px;">Tamamlayamayan kahve ısmarlar</span>
+                </div>
+                <div style="display:inline-flex; align-items:center; gap:8px; background:#15171C; border:1px solid #262A33; border-radius:12px; padding:12px 16px; align-self:flex-start; margin-left:28px;">
+                  <span style="font-size:15px;">🍽️</span>
+                  <span style="font-size:15px; color:#9AA0AC;">Yemek ısmarlar</span>
+                </div>
+                <div style="display:inline-flex; align-items:center; gap:8px; background:#15171C; border:1px solid #262A33; border-radius:12px; padding:12px 16px; align-self:flex-start; margin-left:12px;">
+                  <span style="font-size:15px;">🎬</span>
+                  <span style="font-size:15px; color:#9AA0AC;">Grubun seçtiği filmi izler</span>
+                </div>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="display:flex;">
+                  <div style="width:28px; height:28px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:11px; font-weight:600; color:#9AA0AC;">EK</div>
+                  <div style="width:28px; height:28px; border-radius:50%; background:#262A33; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:11px; font-weight:600; color:#9AA0AC; margin-left:-8px;">AY</div>
+                  <div style="width:28px; height:28px; border-radius:50%; background:#1D2027; border:2px solid #0D0E11; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:11px; font-weight:600; color:#9AA0AC; margin-left:-8px;">ZD</div>
+                </div>
+                <span style="font-size:14px; color:#5D6370;">Kaybeden belli olur, kimse utandırılmaz.</span>
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:24px;">
+              <div style="display:flex; gap:8px; justify-content:center;">
+                <span style="width:6px; height:6px; border-radius:3px; background:#3A3F4A;"></span>
+                <span style="width:6px; height:6px; border-radius:3px; background:#3A3F4A;"></span>
+                <span style="width:24px; height:6px; border-radius:3px; background:#FF6B47;"></span>
+              </div>
+              <button style="width:100%; height:56px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Başlayalım</button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1d İSİM ============ -->
+    <div id="1d" data-screen-label="O4 İsim" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1d</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">O4 · İsim — tek alan, hesap yok</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" keyboard="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+          <div style="padding:48px 24px 24px; height:100%; display:flex; flex-direction:column; box-sizing:border-box;">
+
+            <div style="margin-top:24px;">
+              <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em; line-height:1.2;">Grubun seni<br>nasıl tanısın?</div>
+              <p style="font-size:15px; color:#9AA0AC; margin:10px 0 0;">Sadece ismin yeter. Hesap, şifre, e-posta yok.</p>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:16px; margin-top:36px;">
+              <div style="width:56px; height:56px; border-radius:50%; background:rgba(255,107,71,0.12); display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:20px; font-weight:600; color:#FF6B47; flex-shrink:0;">SN</div>
+              <div style="flex:1; background:#1D2027; border:1px solid #FF6B47; border-radius:16px; padding:16px 18px; display:flex; align-items:center;">
+                <span style="font-size:20px; font-weight:500;">Selin N</span>
+                <span style="width:2px; height:24px; background:#FF6B47; margin-left:2px; animation:ringPulse 1.2s ease-in-out infinite;"></span>
+              </div>
+            </div>
+            <div style="font-size:13px; color:#5D6370; margin:12px 0 0 72px;">İstediğin zaman değiştirebilirsin.</div>
+
+            <div style="margin-top:auto; padding-bottom:12px;">
+              <button style="width:100%; height:56px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer;">Devam</button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1e YOL AYRIMI ============ -->
+    <div id="1e" data-screen-label="O5 Yol Ayrımı" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1e</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">O5 · Yol ayrımı — oluştur / katıl</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+          <div style="padding:64px 24px 48px; height:100%; display:flex; flex-direction:column; box-sizing:border-box;">
+
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:32px;">
+              <div>
+                <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:28px; letter-spacing:-0.02em; line-height:1.2;">Güzel, Selin.<br>Nasıl başlıyoruz?</div>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <!-- create card -->
+                <button style="text-align:left; background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; cursor:pointer; font-family:'Satoshi',sans-serif; color:#F4F5F7; display:flex; align-items:center; gap:18px;">
+                  <div style="width:52px; height:52px; border-radius:50%; background:rgba(255,107,71,0.12); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 4.5v13M4.5 11h13" stroke="#FF6B47" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  </div>
+                  <div style="flex:1;">
+                    <div style="font-size:20px; font-weight:700;">Challenge başlat</div>
+                    <div style="font-size:14px; color:#9AA0AC; margin-top:4px; line-height:1.4;">Hedefi sen koy, grubunu çağır. 2 dakika sürer.</div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="#5D6370" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+
+                <!-- join card -->
+                <button style="text-align:left; background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; cursor:pointer; font-family:'Satoshi',sans-serif; color:#F4F5F7; display:flex; align-items:center; gap:18px;">
+                  <div style="width:52px; height:52px; border-radius:50%; background:#1D2027; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M9 13a4.2 4.2 0 0 0 6 0l2.4-2.4a4.24 4.24 0 0 0-6-6L10.6 5.4M13 9a4.2 4.2 0 0 0-6 0l-2.4 2.4a4.24 4.24 0 0 0 6 6l.8-.8" stroke="#9AA0AC" stroke-width="1.6" stroke-linecap="round"/></svg>
+                  </div>
+                  <div style="flex:1;">
+                    <div style="font-size:20px; font-weight:700;">Davetle katıl</div>
+                    <div style="font-size:14px; color:#9AA0AC; margin-top:4px; line-height:1.4;">Arkadaşın link mi gönderdi? Buradan gir.</div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="#5D6370" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+
+              <div style="text-align:center; font-size:14px; color:#5D6370;">İkisini de sonra yapabilirsin — <span style="color:#9AA0AC;">şimdilik göz at</span></div>
+            </div>
+
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ============ 1f KATIL — OTO YAKALAMA ============ -->
+    <div id="1f" data-screen-label="O6 Davetle Katıl" style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="background:rgba(255,107,71,0.12); color:#FF6B47; font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; border-radius:12px; padding:4px 10px;">1f</span>
+        <span style="font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; color:#9AA0AC;">O6 · Katıl — pano otomatik yakalanır</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,884px">
+        <div style="height:100%; overflow:hidden; background:#0D0E11; font-family:'Satoshi',sans-serif; color:#F4F5F7; position:relative;">
+          <div style="padding:64px 24px 48px; height:100%; display:flex; flex-direction:column; box-sizing:border-box;">
+
+            <div style="display:flex; align-items:center; gap:12px;">
+              <button style="width:40px; height:40px; border-radius:50%; background:#15171C; border:1px solid #262A33; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="#F4F5F7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:20px; letter-spacing:-0.02em;">Davetle katıl</div>
+            </div>
+
+            <!-- expanded input (animates open from the card, 250ms ease-out) -->
+            <div style="margin-top:32px; display:flex; align-items:center; gap:10px; background:#1D2027; border:1px solid #262A33; border-radius:16px; padding:16px 18px;">
+              <svg width="18" height="18" viewBox="0 0 22 22" fill="none" style="flex-shrink:0;"><path d="M9 13a4.2 4.2 0 0 0 6 0l2.4-2.4a4.24 4.24 0 0 0-6-6L10.6 5.4M13 9a4.2 4.2 0 0 0-6 0l-2.4 2.4a4.24 4.24 0 0 0 6 6l.8-.8" stroke="#5D6370" stroke-width="1.6" stroke-linecap="round"/></svg>
+              <span style="font-size:15px; color:#5D6370;">Davet linki veya kod</span>
+            </div>
+
+            <!-- clipboard auto-catch -->
+            <div style="margin-top:16px; background:#15171C; border:1px solid #FF6B47; border-radius:24px; padding:20px; position:relative;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4.5" y="2.5" width="7" height="3" rx="1" stroke="#FF6B47" stroke-width="1.3"/><path d="M5 4H4a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 12 4h-1" stroke="#FF6B47" stroke-width="1.3" stroke-linecap="round"/></svg>
+                <span style="font-size:13px; font-weight:500; color:#FF6B47;">Panonda bir davet bulduk</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="position:relative; width:56px; height:56px; flex-shrink:0;">
+                  <svg width="56" height="56" viewBox="0 0 56 56">
+                    <sc-for list="{{ ringInvite }}" as="s" hint-placeholder-count="14">
+                      <path d="{{ s.d }}" stroke="{{ s.stroke }}" stroke-width="{{ s.w }}" fill="none"></path>
+                    </sc-for>
+                  </svg>
+                  <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums;">14</div>
+                </div>
+                <div style="min-width:0;">
+                  <div style="font-size:17px; font-weight:500;">30 Gün Kitap Okuma</div>
+                  <div style="font-size:13px; color:#9AA0AC; margin-top:2px;">Her gün 20 sayfa · yarın başlıyor</div>
+                  <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+                    <div style="display:flex;">
+                      <div style="width:22px; height:22px; border-radius:50%; background:#1D2027; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:9px; font-weight:600; color:#9AA0AC;">AV</div>
+                      <div style="width:22px; height:22px; border-radius:50%; background:#262A33; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:9px; font-weight:600; color:#9AA0AC; margin-left:-7px;">AY</div>
+                      <div style="width:22px; height:22px; border-radius:50%; background:#1D2027; border:2px solid #15171C; display:flex; align-items:center; justify-content:center; font-family:'General Sans',sans-serif; font-size:9px; font-weight:600; color:#9AA0AC; margin-left:-7px;">EK</div>
+                    </div>
+                    <span style="font-size:13px; color:#5D6370;">Ali ve 5 kişi içeride</span>
+                  </div>
+                </div>
+              </div>
+              <button style="width:100%; height:52px; border-radius:28px; background:#FF6B47; color:#0D0E11; border:none; font-family:'Satoshi',sans-serif; font-size:17px; font-weight:700; cursor:pointer; margin-top:20px;">Bu challenge'a katıl</button>
+            </div>
+
+            <div style="text-align:center; font-size:13px; color:#5D6370; margin-top:16px;">Yanlış davet mi? Linki yukarıya yapıştır.</div>
+
+            <div style="margin-top:auto; text-align:center; font-size:13px; color:#3A3F4A;">Katıldığında doğrudan challenge ekranına geçersin.</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <!-- flow note -->
+  <div style="max-width:760px; background:#15171C; border:1px solid #262A33; border-radius:24px; padding:24px; font-size:14px; color:#9AA0AC; line-height:1.7;">
+    <div style="font-family:'General Sans',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.12em; color:#5D6370; text-transform:uppercase; margin-bottom:10px;">Akış notları</div>
+    <a href="#1a">1a</a>→<a href="#1c">1c</a> kaydırmalıdır ve her ekrandan atlanabilir; halka <a href="#1a">1a</a>'da yavaşça dolarak (segment segment, 400ms) imzayı ilk saniyede öğretir. İsim (<a href="#1d">1d</a>) girişten sonra sorulur, önce değil — kullanıcı değeri görmeden hiçbir şey istemeyiz. <a href="#1e">1e</a>'de "Davetle katıl" seçilince kart 250ms'de yukarı genişleyip <a href="#1f">1f</a>'teki input'a dönüşür; ayrı ekran hissi yoktur. Pano izni iOS'ta dokunuşla verildiği için "Panonda bir davet bulduk" kartı input'a odaklanıldığı anda belirir — kullanıcı hiç yapıştırmadan tek dokunuşla katılır ve doğrudan challenge detayına (ilk check-in'e) iner. Davet linkiyle gelenler bu akışı hiç görmez; onlar E5'e düşer.
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: {&quot;width&quot;: 2100, &quot;height&quot;: 2150},
+  &quot;pulse&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Halka&quot;}
+}">
+class Component extends DCLogic {
+  pt(c, r, deg) {
+    const a = (deg * Math.PI) / 180;
+    return (c + r * Math.cos(a)).toFixed(2) + ' ' + (c + r * Math.sin(a)).toFixed(2);
+  }
+
+  ringSegs(n, size, stroke, gapDeg, states, pulse) {
+    const colors = { filled: '#FF6B47', joker: '#E0B34C', waiting: '#3A3F4A', today: '#3A3F4A' };
+    const c = size / 2;
+    const r = (size - stroke) / 2;
+    const span = 360 / n;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a0 = -90 + i * span + gapDeg / 2;
+      const a1 = -90 + (i + 1) * span - gapDeg / 2;
+      const large = a1 - a0 > 180 ? 1 : 0;
+      const d = 'M ' + this.pt(c, r, a0) + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + this.pt(c, r, a1);
+      out.push({ d, stroke: colors[states[i]], w: stroke });
+      if (states[i] === 'today') {
+        out.push({
+          d, stroke: '#FF6B47', w: Math.max(1.5, stroke * 0.3),
+          style: pulse ? { animation: 'ringPulse 2s ease-in-out infinite' } : undefined,
+        });
+      }
+    }
+    return out;
+  }
+
+  mk(n, filledTo, jokerIdx, todayIdx) {
+    const a = [];
+    for (let i = 0; i < n; i++) {
+      let s = i < filledTo ? 'filled' : 'waiting';
+      if (i === jokerIdx) s = 'joker';
+      if (i === todayIdx) s = 'today';
+      a.push(s);
+    }
+    return a;
+  }
+
+  renderVals() {
+    const pulse = this.props.pulse ?? true;
+    return {
+      ringHook: this.ringSegs(14, 160, 10, 3.5, this.mk(14, 3, -1, 3), pulse),
+      ringDemo: this.ringSegs(14, 72, 6, 4.5, this.mk(14, 6, 3, 6), pulse),
+      ringInvite: this.ringSegs(14, 56, 5, 6, this.mk(14, 0, -1, -1), false),
+    };
+  }
+}
+</script>
+<script>
+(async () => {
+  if (!document.title || !document.title.trim()) document.title = "Onboarding Akışı";
+  // Prepend so page-supplied @page / break rules (deck-stage's margin:0,
+  // author CSS) keep source-order precedence over the baseline.
+  const baseCss = document.createElement('style');
+  baseCss.textContent = "@media print {\n  figure, table { break-inside: avoid; }\n  *, *::before, *::after {\n    print-color-adjust: exact; -webkit-print-color-adjust: exact;\n    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;\n    animation-delay: -99s !important; animation-duration: .001s !important;\n    animation-iteration-count: 1 !important; animation-fill-mode: both !important;\n    animation-play-state: running !important; transition-duration: 0s !important;\n  }\n}";
+  document.head.prepend(baseCss);
+  if (document.readyState === 'loading') {
+    await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
+  }
+  let ds = document.querySelector('deck-stage');
+  // whenDefined never resolves when nothing registers the element, so only
+  // await it when a <deck-stage> tag exists (and race a timeout regardless).
+  if (ds && !customElements.get('deck-stage')) {
+    try {
+      await Promise.race([
+        customElements.whenDefined('deck-stage'),
+        new Promise((r) => setTimeout(r, 3000)),
+      ]);
+    } catch (e) {}
+    ds = document.querySelector('deck-stage');
+  }
+  // dc-runtime assigns window.DCLogic at init and mounts into #dc-root on
+  // DOMContentLoaded; settle on that subtree so React has rendered before
+  // print(). Non-DC pages fall through to weighing body.
+  const isDc = !ds && 'DCLogic' in window;
+  const settleRoot = ds || (isDc ? document.getElementById('dc-root') : null) || document.body;
+  if (settleRoot) {
+    // Weigh only content children — skip script/style/template so inline
+    // Babel/CSS doesn't register as stable "content" before the framework
+    // has mounted anything.
+    const MEDIA = 'img,svg,canvas,video,picture,iframe,embed,object';
+    const weigh = () => {
+      let text = 0, media = 0;
+      for (const c of settleRoot.children) {
+        const t = c.tagName;
+        if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+        text += (c.textContent || '').trim().length;
+        media += c.querySelectorAll(MEDIA).length + (c.matches(MEDIA) ? 1 : 0);
+      }
+      return text + media * 100;
+    };
+    // "Non-zero and stable" alone is not sufficient to mean rendered: generic
+    // body can carry a static shell while async main content is pending, and
+    // #dc-root can carry the root DC's static text while child refs are still
+    // .sc-placeholder boxes. Gate generic on readyState 'complete', and never
+    // accept stability while a dc-runtime placeholder is present.
+    const isGeneric = settleRoot === document.body;
+    const deadline = Date.now() + 15000;
+    let last = -1, stable = 0;
+    while (Date.now() < deadline) {
+      const n = weigh();
+      const ready =
+        (!isGeneric || document.readyState === 'complete') &&
+        !settleRoot.querySelector('.sc-placeholder');
+      if (n > 0 && n === last && ready) { if (++stable >= 2) break; } else { stable = 0; }
+      last = n;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  // Project support.js may predate runtime default-seeding; push via bridge.
+  if (isDc && window.__dcSetProps && window.__dcRootName) {
+    try {
+      const dpEl = document.querySelector('script[data-dc-script]');
+      const meta = JSON.parse((dpEl && dpEl.getAttribute('data-props')) || '{}');
+      const bag = {};
+      for (const k in meta)
+        if (k[0] !== '$' && meta[k] && meta[k].default !== undefined)
+          bag[k] = meta[k].default;
+      if (Object.keys(bag).length) {
+        window.__dcSetProps(window.__dcRootName(), bag);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    } catch (e) {}
+  }
+  // Reveal content gated on scroll or visibility before printing. Lazy <img>,
+  // IntersectionObserver fade-ins, and collapsed <details> don't render while
+  // off-screen, so a long page would print with them blank or closed. Open
+  // every <details>, force native-lazy images eager, and scroll the document
+  // through its full height to trip lazy-load + IO; then wait (bounded) for the
+  // newly-triggered images. Inert for deck-stage (slides aren't scroll-gated).
+  try {
+    for (const d of document.querySelectorAll('details')) d.open = true;
+    for (const img of document.querySelectorAll('img[loading="lazy"]'))
+      img.loading = 'eager';
+    const scroller = document.scrollingElement || document.documentElement;
+    const full = Math.max(scroller.scrollHeight, document.body.scrollHeight);
+    const step = window.innerHeight || 800;
+    for (let y = 0; y <= full; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    window.scrollTo(0, 0);
+    await Promise.race([
+      Promise.all(
+        [...document.images].map((img) =>
+          img.complete
+            ? null
+            : new Promise((res) => {
+                img.addEventListener('load', res, { once: true });
+                img.addEventListener('error', res, { once: true });
+              })
+        )
+      ),
+      new Promise((r) => setTimeout(r, 4000)),
+    ]);
+  } catch (e) {}
+  try { await document.fonts.ready; } catch (e) {}
+  // Jump every animation to its end state so print() never captures a slide
+  // mid-entrance. Ordering matters: the 0s-transition style must be live
+  // BEFORE data-deck-active is set so attribute-keyed transitions don't
+  // start a (now-0s) run from the pre-active base.
+  const st = document.createElement('style');
+  st.textContent = '*,*::before,*::after{animation-delay:-99s !important;animation-duration:.001s !important;animation-iteration-count:1 !important;animation-fill-mode:both !important;animation-play-state:running !important;transition-duration:0s !important}';
+  document.head.appendChild(st);
+  for (const d of document.querySelectorAll('deck-stage')) {
+    for (const c of d.children) {
+      const t = c.tagName;
+      if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+      c.setAttribute('data-deck-active', '');
+    }
+  }
+  // Re-append deck-stage's @page last so no author @page can add a margin and
+  // spill each full-bleed slide onto two sheets. Backstop for old copies.
+  if (ds) {
+    let pg = document.getElementById('deck-stage-print-page');
+    if (!pg) {
+      pg = document.createElement('style');
+      pg.textContent = '@page{size:' + (+ds.getAttribute('width') || 1920) +
+        'px ' + (+ds.getAttribute('height') || 1080) + 'px;margin:0}';
+    }
+    document.body.appendChild(pg);
+  }
+  try {
+    const sweep = () => {
+      for (const a of document.getAnimations()) {
+        try { a.finish(); } catch (e) {
+          try { a.currentTime = (a.effect && a.effect.getComputedTiming().duration) || 0; a.pause(); } catch (e2) {}
+        }
+      }
+    };
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+  } catch (e) {}
+  // Size the PDF page to the rendered design unless the file opted into
+  // standard paper via @page{size:letter|A4|…}. Decks own their own @page.
+  // Wrappers (body, …) lose padding+margin so the frame sits at (0,0); the
+  // frame itself loses only margin — its padding is INSIDE the measured
+  // rect and must stay, or content shifts and leaves a gap at bottom/right.
+  var __m = null;
+  try { __m = (() => {
+  var STAMP = true;
+  var docEl = document.documentElement;
+  var doc = { width: docEl.scrollWidth, height: docEl.scrollHeight };
+
+  var ds = document.querySelector('deck-stage');
+  if (ds) {
+    var dw = Number(ds.getAttribute('width')) || 1920;
+    var dh = Number(ds.getAttribute('height')) || 1080;
+    var n = typeof ds.length === 'number' ? ds.length : ds.children.length;
+    var idx = typeof ds.index === 'number' ? ds.index : 0;
+    var frames = [];
+    for (var i = 0; i < n; i++) frames.push({ left: 0, top: 0, width: dw, height: dh });
+    return { kind: 'deck', source: 'declared', doc: doc, frames: frames,
+      authored: frames.map(function(){return{width:true,height:true}}),
+      deck: { width: dw, height: dh, slideCount: n, index: idx },
+      signals: { paperPage: false, pxPage: false } };
+  }
+
+  // Declared kind: a doc-page tag names the kind outright, so no signal
+  // heuristics run (like the deck branch above, signals report false —
+  // they describe inferred classifications only). The tag alone is not
+  // trusted: the element must have upgraded (shadowRoot present), so a
+  // leftover tag whose script was deleted falls through to the heuristics
+  // that handle plain markup.
+  var stageSx = window.scrollX || 0, stageSy = window.scrollY || 0;
+  var dp = document.querySelector('doc-page');
+  if (dp && dp.shadowRoot) {
+    // Crop to the sheet, not the host — the desk around it is screen-only
+    // chrome that must not land in PNG exports.
+    var sheet = dp.shadowRoot.querySelector('.sheet');
+    var sr = (sheet || dp).getBoundingClientRect();
+    return { kind: 'paper-doc', source: 'declared', doc: doc,
+      frames: [{ left: sr.left + stageSx, top: sr.top + stageSy,
+        width: sr.width, height: sr.height }],
+      authored: [{ width: false, height: false }],
+      signals: { paperPage: false, pxPage: false } };
+  }
+  var paperPage = false, pxPage = false;
+  var eachRule = function (fn) {
+    for (var s = 0; s < document.styleSheets.length; s++) {
+      var rs; try { rs = document.styleSheets[s].cssRules; } catch (e) { continue; }
+      for (var r = 0; r < rs.length; r++) {
+        fn(rs[r]);
+        if (rs[r].cssRules) for (var n = 0; n < rs[r].cssRules.length; n++) fn(rs[r].cssRules[n]);
+      }
+    }
+  };
+  eachRule(function (r) {
+    if (r.type !== 6) return;
+    var m = /\bsize\s*:\s*([^;}]+)/i.exec(r.cssText || '');
+    if (!m) return;
+    if (/\b(letter|a[3-5]|legal|ledger)\b/i.test(m[1])) paperPage = true;
+    if (/\d+(?:\.\d+)?px\b/i.test(m[1])) pxPage = true;
+  });
+  var signals = { paperPage: paperPage, pxPage: pxPage };
+
+  var pxVal = function (v) {
+    var m = /^(\d+(?:\.\d+)?)px$/.exec(v || ''); return m ? +m[1] : 0;
+  };
+  var authoredPx = function (el, prop) {
+    if (pxVal(el.style[prop])) return true;
+    var attr = el.getAttribute(prop);
+    if (attr && /^\d+$/.test(attr)) return true;
+    var hit = false;
+    eachRule(function (r) {
+      if (hit || r.type !== 1 || !r.style) return;
+      try { if (el.matches(r.selectorText) && pxVal(r.style[prop])) hit = true; } catch (e) {}
+    });
+    return hit;
+  };
+
+  var el = document.body, rootPxW = false;
+  for (;;) {
+    var kids = [];
+    for (var c = 0; c < el.children.length; c++) {
+      var t = el.children[c].tagName;
+      if (t !== 'SCRIPT' && t !== 'STYLE' && t !== 'TEMPLATE') kids.push(el.children[c]);
+    }
+    if (kids.length !== 1 || !(kids[0] instanceof HTMLElement)) break;
+    if (STAMP) el.setAttribute('data-om-frame-wrap', '');
+    el = kids[0];
+    rootPxW = authoredPx(el, 'width');
+    if (rootPxW) break;
+  }
+  if (!rootPxW) rootPxW = authoredPx(el, 'width');
+
+  // @page{size:letter} alone is a flowing doc; with a px-width root it's a
+  // fixed sheet pretending to be paper — fall through and size to render.
+  if (paperPage && !rootPxW) {
+    return { kind: 'paper-doc', source: 'inferred', doc: doc, signals: signals,
+      frames: [{ left: 0, top: 0, width: doc.width, height: doc.height }],
+      authored: [{ width: false, height: false }] };
+  }
+
+  var sx = window.scrollX || 0, sy = window.scrollY || 0;
+  var rectOf = function (e) {
+    var r = e.getBoundingClientRect();
+    var oy; try { oy = getComputedStyle(e).overflowY; } catch (err) {}
+    var h = oy === 'visible' ? Math.max(r.height, e.scrollHeight || 0) : r.height;
+    return { left: r.left + sx, top: r.top + sy, width: r.width, height: h };
+  };
+
+  // Multi-frame: off unless the page opts in via data-om-multi-frame on the
+  // stop element — the explicit opt-in is what guards against card grids
+  // and pricing tables that match the geometry but aren't separate
+  // canvases. Two ways to name the frames, explicit first:
+  // 1. Descendants marked data-om-frame-export (the social-frames starter
+  //    marks each asset frame; shells/panels around them are presentation,
+  //    so nesting is expected). Document order.
+  // 2. Fallback, no marked descendants: direct children with an authored px
+  //    width AND height (the original geometry heuristic).
+  // Frames may be different sizes (a gallery mixes 1080×1920 stories with
+  // 728×90 banners); data-om-frame-label rides along for export filenames.
+  if (el.hasAttribute('data-om-multi-frame')) {
+    var visOk = function (e) {
+      var cs; try { cs = getComputedStyle(e); } catch (err) { return false; }
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && cs.position !== 'fixed';
+    };
+    // A frame's crop is its VISUAL box — never the scrollHeight-inflated
+    // rect that rectOf computes for page roots. Shadow-DOM hover controls
+    // (image-slot's Replace bar parks 29px below its host) and similar
+    // escaping UI contribute scrollable overflow to the frame, and the
+    // inflated height both squashes the nominal-size resize and drags
+    // content below the frame into the crop. Zoom-independent; bit every
+    // slot-bearing frame.
+    var frameRectOf = function (e) {
+      var r = e.getBoundingClientRect();
+      return { left: r.left + sx, top: r.top + sy, width: r.width, height: r.height };
+    };
+    var pushCand = function (list, e) {
+      if (!visOk(e)) return;
+      var rc = frameRectOf(e);
+      if (rc.width < 2 || rc.height < 2) return;
+      var lbl = e.getAttribute('data-om-frame-label');
+      if (lbl) rc.label = lbl;
+      list.push(rc);
+    };
+    var cands = [];
+    var marked = el.querySelectorAll('[data-om-frame-export]');
+    if (marked.length) {
+      for (var mk = 0; mk < marked.length; mk++) pushCand(cands, marked[mk]);
+    } else {
+      for (var k = 0; k < el.children.length; k++) {
+        var ch = el.children[k];
+        if (!authoredPx(ch, 'width') || !authoredPx(ch, 'height')) continue;
+        pushCand(cands, ch);
+      }
+    }
+    if (cands.length >= 2) {
+      return { kind: 'multi-frame', source: 'inferred', doc: doc, signals: signals,
+        frames: cands, authored: cands.map(function(){return{width:true,height:true}}) };
+    }
+  }
+
+  if (STAMP) el.setAttribute('data-om-frame', '');
+  return { kind: 'single-canvas', source: 'inferred', doc: doc, signals: signals,
+    frames: [rectOf(el)],
+    authored: [{ width: rootPxW, height: authoredPx(el, 'height') }] };
+})(); } catch (e) {}
+  var frame = null;
+  if (__m && __m.kind === 'single-canvas') {
+    var f = __m.frames && __m.frames[0];
+    if (f && f.width >= 200 && f.height >= 200) {
+      frame = f;
+      var fst = document.createElement('style');
+      fst.textContent = '@media print{@page{size:' + Math.ceil(f.width) + 'px ' +
+        Math.ceil(f.height) + 'px;margin:0}' +
+        'html,body,[data-om-frame-wrap]{padding:0!important;margin:0!important;background:none!important}' +
+        '[data-om-frame]{margin:0!important}}';
+      document.body.appendChild(fst);
+    }
+  }
+  // Relax break-inside on oversized elements. An element taller than a
+  // printable page can't honor break-inside: avoid — browsers either overflow
+  // it or push it whole to the next page, leaving a blank gap, then break it
+  // anyway at an arbitrary point. After the final layout (content revealed,
+  // animations jumped), find elements taller than a page that still compute
+  // break-inside: avoid and reset them to auto, so the browser breaks them at
+  // their children's boundaries instead (children keep their own avoid). PAGE_PX
+  // is a conservative portrait estimate at 96 CSS px/in — Letter/A4 usable
+  // height minus our 0.5in margins — so only clearly-oversized elements are
+  // touched and under-page elements still stay whole. Skipped for decks (slides
+  // are sized to the page) and for fixed-size canvases (frame set, or an author
+  // px-based @page) — runs as before for flowing docs on letter/A4.
+  try {
+    if (!ds && !frame && !(__m && __m.signals && __m.signals.pxPage)) {
+      const PAGE_PX = 1024;
+      // Our print defaults add a real @page margin only when the source has
+      // no @page of its own; computed style can't tell us (it reports screen
+      // media), so read the injected rule directly.
+      const defaults = document.querySelector('style[data-omelette-print-defaults]');
+      const pageInset = /@page\s*\{[^}]*margin/.test(defaults ? defaults.textContent || '' : '');
+      const SEL = 'section,article,figure,table,pre,blockquote,[class~="card" i],[class~="page" i],[class~="sheet" i]';
+      for (const el of document.body.querySelectorAll(SEL)) {
+        if (el instanceof HTMLElement && el.offsetHeight > PAGE_PX) {
+          el.setAttribute('data-om-oversized', '');
+          // Fake-paged docs simulate sheets with over-tall break-after:page
+          // boxes; honoring the break spills half-blank pages and ends a
+          // colored box mid-sheet. Flow them, and (only when we own the page
+          // inset) drop the redundant padding/background via the rule below.
+          const cs = getComputedStyle(el);
+          if (cs.breakAfter === 'page' || cs.pageBreakAfter === 'always') {
+            el.setAttribute('data-om-fakepage', '');
+          }
+        }
+      }
+      const ost = document.createElement('style');
+      ost.textContent = '@media print{' +
+        '[data-om-oversized]{break-inside:auto !important;page-break-inside:auto !important}' +
+        '[data-om-fakepage]{break-after:auto !important;page-break-after:auto !important}' +
+        (pageInset ? '[data-om-fakepage]{padding:0 !important;background:none !important}' : '') +
+        '}';
+      document.head.appendChild(ost);
+    }
+  } catch (e) {}
+  // macOS Preview renders Skia-PDF Luminosity soft-masks as opaque grey boxes;
+  // swap the CSS that triggers them for Preview-safe forms.
+  try {
+    for (const el of document.body.querySelectorAll('*')) {
+      const cs = getComputedStyle(el);
+
+      if (cs.boxShadow !== 'none' && cs.filter === 'none') {
+        const outs = [], kept = [];
+        for (const s of cs.boxShadow.split(/,(?![^(]*[)])/)) {
+          const t = s.trim();
+          const m = t.match(/^(rgba?[(][^)]+[)]) (-?[0-9.]+px) (-?[0-9.]+px) ([0-9.]+px) -?[0-9.]+px$/);
+          if (m && parseFloat(m[4]) > 0) outs.push('drop-shadow(' + m[2] + ' ' + m[3] + ' ' + m[4] + ' ' + m[1] + ')');
+          else kept.push(t);
+        }
+        if (outs.length) {
+          el.style.setProperty('filter', outs.join(' '), 'important');
+          el.style.setProperty('box-shadow', kept.join(', ') || 'none', 'important');
+        }
+      }
+
+      const mask = cs.maskImage && cs.maskImage !== 'none' ? cs.maskImage : cs.webkitMaskImage;
+      if (mask && mask !== 'none' && cs.filter === 'none') el.style.setProperty('filter', 'opacity(1)', 'important');
+    }
+  } catch (e) {}
+  setTimeout(() => { try { window.print(); } catch (e) {} }, 200);
+})();
+</script>
+</body>
+</html>

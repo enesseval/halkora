@@ -4,10 +4,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
-import { useChallenge, useChallengeActions, useChallengesQuery, useCreateGate } from '@/hooks';
+import { useChallenge, useChallengeActions, useChallengesQuery } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
-import { AppText, Avatar, Button, Card, Screen, SectionLabel } from '@/components/ui';
+import { AppText, Avatar, Button, Card, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
@@ -44,7 +44,6 @@ export default function CompleteScreen() {
   const challenge = useChallenge(id);
   const { isPro } = useAuth();
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
-  const canCreate = useCreateGate();
   const actions = useChallengeActions(id ?? '');
   const [settling, setSettling] = useState(false);
 
@@ -58,6 +57,13 @@ export default function CompleteScreen() {
   const someoneOwes =
     outcome?.kind === 'collective' ? outcome.collectiveHit === false : (outcome?.losers.length ?? 0) > 0;
   const canSettle = !!outcome && !settled && someoneOwes;
+
+  // Cold-started here (a push, or the ring vanishing under you) there may be
+  // nothing to go back TO, so Home is the floor.
+  const goHome = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
 
   const doSettle = async () => {
     if (settling) return;
@@ -112,8 +118,29 @@ export default function CompleteScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
+      {/* This screen had no way out at all. Reaching it because a ring you
+          were in was deleted or closed left you on a dead end — back-swipe
+          worked, but nothing on screen said so (saha testi bulgusu — "o
+          ekranda da çarpı vs. falan yok"). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 6 }}>
+        <IconButton size={38} onPress={goHome}>
+          <Feather name="x" size={18} color={colors.textPrimary} />
+        </IconButton>
+        <View style={{ flex: 1 }} />
+        {/* The ring itself is still there, chat and all — the finish screen is
+            a summary, not a replacement for it. */}
+        <Pressable
+          onPress={() => router.push(`/challenge/${challenge.id}?from=complete`)}
+          style={({ pressed }) => ({ paddingHorizontal: 10, paddingVertical: 8, opacity: pressed ? 0.6 : 1 })}
+        >
+          <AppText variant="secondary" color={colors.ember}>
+            {t.complete.openRing}
+          </AppText>
+        </Pressable>
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.section }}>
-        <View style={{ alignItems: 'center', marginTop: 24 }}>
+        <View style={{ alignItems: 'center', marginTop: 8 }}>
           <ProgressRing
             totalDays={challenge.totalDays}
             days={challenge.days}
@@ -320,21 +347,13 @@ export default function CompleteScreen() {
           </View>
         ) : null}
 
-        {/* CTAs */}
+        {/* CTAs. "Rövanş" — a new ring pre-filled from this one, auto-inviting
+            the old group — used to lead here. Removed on request: it was
+            never asked for, and a finished ring's screen is for looking back,
+            not for being sold the next one. Starting again is what the "+" on
+            Home is. */}
         <View style={{ gap: 12, marginTop: spacing.section }}>
-          <Button
-            label={t.complete.rematch}
-            onPress={() => {
-              if (canCreate()) router.replace(`/create?rematchOf=${challenge.id}`);
-            }}
-          />
-          <Button label={t.complete.shareResult} variant="secondary" onPress={share} />
-          {/* Rematch now opens as a lobby rather than starting on a date, so
-              say so up front — otherwise "neden hemen başlamadı" is the
-              first question (docs/BAHIS-V2-VE-ROVANS.md §7). */}
-          <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
-            {t.complete.rematchLobbyHint}
-          </AppText>
+          <Button label={t.complete.shareResult} onPress={share} />
         </View>
       </ScrollView>
     </Screen>
