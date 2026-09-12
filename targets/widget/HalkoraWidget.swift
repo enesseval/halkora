@@ -1755,6 +1755,12 @@ struct HalkoraListView: View {
   var entry: HalkoraListEntry
 
   private var rowLimit: Int { family == .systemLarge ? 6 : 3 }
+  /// The medium card carries three rows in a box the same height the small
+  /// one uses for a single ring, so an even 14 all round left the first and
+  /// last row sitting on the edge (saha testi bulgusu — "içerikler üstte ve
+  /// altta sınırla birleşik, hiç boşluk yok"). The large one really is full
+  /// at six rows and keeps the tighter figure.
+  private var vPad: CGFloat { family == .systemLarge ? 14 : 18 }
 
   var body: some View {
     let at = entry.date
@@ -1851,7 +1857,8 @@ struct HalkoraListView: View {
         Spacer(minLength: 0)
       }
     }
-    .padding(14)
+    .padding(.horizontal, 14)
+    .padding(.vertical, vPad)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .widgetURL(URL(string: "halkora://"))
     .containerBackground(halkoraBg, for: .widget)

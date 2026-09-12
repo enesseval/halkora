@@ -590,7 +590,19 @@ export default function DetailScreen() {
           onPress: async () => {
             setLeaving(true);
             try {
-              await actions.leaveChallenge(t.detail.systemLeft(myName));
+              // Alone in your own ring, "leave" means CLOSE — and it has to
+              // close it the way the copy promises, keeping you in it.
+              // leave_challenge also closes the ring, but it removes your
+              // participant row on the way out, so the ring stopped being
+              // yours to see: it vanished from Geçmiş and read as deleted
+              // (saha testi bulgusu — "tek kişiyken istatistikler geçmişte
+              // kalır diyor ama halkayı siliyor"). close_challenge leaves
+              // everyone where they are.
+              if (closes) {
+                await actions.closeChallenge(t.detail.systemClosed(myName));
+              } else {
+                await actions.leaveChallenge(t.detail.systemLeft(myName));
+              }
               goHomeAfterExit();
             } catch (e) {
               alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
@@ -1160,7 +1172,17 @@ export default function DetailScreen() {
               path of every other gesture, which is how the swipe on Home came to
               open the ring instead of revealing its actions. */}
           <GestureDetector gesture={timeReveal}>
-          <View style={{ flex: 1 }}>
+          {/* Claims the touch ONLY while a menu is open, and only when the
+              touch starts somewhere nothing else wants it: React Native asks
+              the deepest view first, so a bubble's own Pressable still gets
+              its taps and long-presses. That is what lets a long-press on
+              another message open ITS menu while this one is up, and a tap on
+              empty space still put the menu away. */}
+          <View
+            style={{ flex: 1 }}
+            onStartShouldSetResponder={() => menuAnchor !== null}
+            onResponderRelease={() => setMenuAnchor(null)}
+          >
             <FlashList
               ref={listRef}
               data={rows}
