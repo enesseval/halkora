@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
@@ -8,9 +8,6 @@ import * as Haptics from 'expo-haptics';
 import { colors, hairline, radius, spacing } from '@/theme/tokens';
 import { ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
-import { useMockStore } from '@/stores/mockStore';
-import { widgetDiagnostics, syncWidgetSnapshot } from '@/lib/widget';
-import { purchasesDiagnostics } from '@/lib/purchases';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '@/lib/legal';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
@@ -104,7 +101,6 @@ export default function SettingsScreen() {
   const { t, locale, setLocale } = useT();
   const {
     configured,
-    session,
     name,
     username,
     isAnonymous,
@@ -115,29 +111,14 @@ export default function SettingsScreen() {
     saveUsername,
     signOut,
     deleteAccount,
-    resetOnboarding,
-    setProDev,
     setMessagePreview,
   } = useAuth();
-  const debugUserId = session?.user.id.slice(0, 8);
-  const challenges = useMockStore((s) => s.challenges);
-  const [widgetDebug, setWidgetDebug] = useState<string | null>(null);
-  const [purchasesDebug, setPurchasesDebug] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [showWidgetHint, setShowWidgetHint] = useState(false);
   const [showBlocked, setShowBlocked] = useState(false);
-  // The DEV block below ships in the release build on purpose — that is the
-  // build almost all on-device testing happens in, and gating it behind
-  // __DEV__ hid it exactly where it was needed. It must not be *findable*
-  // though: a reviewer opening Settings has to see a finished app, and
-  // "Onboarding'i tekrar gör" next to a Pro toggle is not that. So it hides
-  // behind a gesture nobody reaches by accident.
-  const [devTaps, setDevTaps] = useState(0);
-  const [devUnlocked, setDevUnlocked] = useState(false);
-  const devTapReset = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -169,15 +150,6 @@ export default function SettingsScreen() {
       { text: t.settings.languageEnglish, onPress: () => changeLanguage('en') },
       { text: t.common.cancel, style: 'cancel' },
     ]);
-  };
-
-  const goOnboarding = async () => {
-    if (configured) {
-      // clears the profile name -> root guard sends us back to onboarding
-      await resetOnboarding();
-    } else {
-      router.replace('/onboarding');
-    }
   };
 
   const logout = async () => {
@@ -219,27 +191,6 @@ export default function SettingsScreen() {
     Linking.openURL(url).catch(() => Alert.alert(t.settings.legalOpenFailed));
   };
 
-  // Leaving a pending reset behind would fire setState on an unmounted
-  // screen; harmless today, but the cleanup costs three lines.
-  useEffect(() => () => {
-    if (devTapReset.current) clearTimeout(devTapReset.current);
-  }, []);
-
-  // Six deliberate taps on your own name, each within 1.5s of the last.
-  const tapName = () => {
-    if (devUnlocked) return;
-    if (devTapReset.current) clearTimeout(devTapReset.current);
-    const next = devTaps + 1;
-    if (next >= 6) {
-      setDevTaps(0);
-      setDevUnlocked(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      return;
-    }
-    setDevTaps(next);
-    devTapReset.current = setTimeout(() => setDevTaps(0), 1500);
-  };
-
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }}>
@@ -265,11 +216,11 @@ export default function SettingsScreen() {
           }}
         >
           <Avatar initials={displayInitials} size={48} tint />
-          <Pressable style={{ flex: 1 }} onPress={tapName}>
+          <View style={{ flex: 1 }}>
             <AppText variant="bodyMedium" style={{ fontSize: 18 }}>
               {displayName}
             </AppText>
-          </Pressable>
+          </View>
         </View>
 
         {/* Halkora Pro — always reachable (a door, not a nag). Free: ember-
@@ -419,75 +370,6 @@ export default function SettingsScreen() {
               {deleting ? t.settings.deleting : t.settings.deleteAccount}
             </AppText>
           </Pressable>
-        ) : null}
-
-        {/* TEMPORARY (remove before public release / once Faz B's is_pro
-            hardening — docs/db-pro.sql §3 — is applied): flip is_pro before
-            RevenueCat exists, and show the raw stored value + short user id
-            so "is_pro=true'ye çevirdim ama görünmüyor" is self-diagnosable
-            (compare against `select id, is_pro from profiles;`) instead of
-            guessing. Deliberately NOT gated behind __DEV__ — that hid this
-            entirely in a Release/TestFlight-style build, which is exactly
-            the build most on-device testing happens in right now. Reached by
-            tapping your own name six times (tapName above), so it is present
-            for testing without being part of the app anyone else sees. */}
-        {configured && devUnlocked ? (
-          <View style={{ marginBottom: 24 }}>
-            <SectionLabel>DEV</SectionLabel>
-            <View style={{ marginTop: 10 }}>
-              <Group>
-                <Row icon="rotate-ccw" label={t.settings.seeOnboardingAgain} onPress={goOnboarding} />
-                <Divider />
-                <Row
-                  icon="zap"
-                  label={t.pro.devToggle}
-                  value={isPro ? 'Pro' : 'Free'}
-                  tint={isPro ? colors.ember : undefined}
-                  onPress={() => {
-                    void setProDev(!isPro);
-                  }}
-                />
-                <Divider />
-                {/* Every failure mode in the widget's shared-storage chain is
-                    silent (see widgetDiagnostics) — this forces a write and
-                    reads it straight back so a blank widget is diagnosable
-                    on-device instead of guessed at. */}
-                {/* Same reasoning for the store chain: a dead paywall looks
-                    identical whether the key is missing, the native module
-                    isn't linked, the agreement isn't active, or the offering
-                    has no packages. This says which one it is. */}
-                <Row
-                  icon="credit-card"
-                  label={t.settings.purchasesDebug}
-                  onPress={() => {
-                    purchasesDiagnostics().then(setPurchasesDebug).catch(() => {});
-                  }}
-                />
-                <Divider />
-                <Row
-                  icon="grid"
-                  label={t.settings.widgetDebug}
-                  onPress={() => {
-                    syncWidgetSnapshot(challenges);
-                    setWidgetDebug(widgetDiagnostics(challenges));
-                  }}
-                />
-              </Group>
-            </View>
-            <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 8 }} tabular>
-              uid: {debugUserId ?? '—'} · is_pro: {String(isPro)}
-            </AppText>
-            {purchasesDebug ? (
-              <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
-                store: {purchasesDebug}
-              </AppText>
-            ) : null}
-            {widgetDebug ? (
-              <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 4 }}>
-                widget: {widgetDebug}
-              </AppText>
-            ) : null}
-          </View>
         ) : null}
 
         <AppText variant="meta" color={colors.textTertiary} tabular style={{ textAlign: 'center' }}>
