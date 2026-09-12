@@ -27,8 +27,8 @@
 // evening-reminder.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPush, type PushMessage } from '../_shared/push.ts';
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
 // Kept in sync by hand with src/i18n/tr.ts + en.ts — see notify/index.ts's
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     const tokenByUser = new Map((tokenRows ?? []).map((r) => [r.user_id as string, r.token as string]));
 
     const now = new Date().toISOString();
-    const messages: { to: string; title: string; body: string; data: Record<string, unknown> }[] = [];
+    const messages: PushMessage[] = [];
 
     for (const profile of profiles) {
       const uid = profile.id as string;
@@ -154,24 +154,24 @@ Deno.serve(async (req) => {
         body = c.bodyMany(perChallenge.size);
       }
 
+      const single = perChallenge.size === 1;
       messages.push({
         to: token,
         title: c.title(total),
         body,
-        data: { challengeId: perChallenge.size === 1 ? lastChallengeId : undefined },
-      });
+        // Birden fazla halkadan mesaj varsa açılacak tek bir halka yok; eskiden
+        // challengeId undefined bırakılıyordu ve dokunuş HİÇBİR ŞEY yapmıyordu
+        // (uygulama nerede kaldıysa orada açılıyordu). Artık açıkça ana ekrana
+        // götürüyoruz — hangi halka olduğunu orada seçer.
+        data: single ? { challengeId: lastChallengeId } : { home: true },
+        userId: profile.id as string,
+        kind: 'digest',
+        challengeId: single ? (lastChallengeId as string) : null,
+      } as PushMessage);
     }
 
-    // Expo's push endpoint accepts at most 100 messages per request — this
-    // loop covers EVERY user with a token, so chunk instead of one POST that
-    // would be rejected (or partially dropped) past 100 users.
-    for (let i = 0; i < messages.length; i += 100) {
-      await fetch(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(messages.slice(i, i + 100)),
-      });
-    }
+    // Parçalama, ticket okuma, ölü token silme ve loglama ortak katmanda.
+    await sendPush(admin, messages);
 
     // Slide EVERY checked user's window forward to now, not just the ones
     // who got a push — otherwise a quiet user's cutoff never moves and the

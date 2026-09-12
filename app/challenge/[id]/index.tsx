@@ -36,7 +36,7 @@ import type { Message, Participant } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
-import { setActiveChallengeId } from '@/lib/push';
+import { setActiveChallengeId, isPermissionUndetermined, registerForPushToken } from '@/lib/push';
 import { clockOf } from '@/lib/day';
 import { fetchPendingInvites } from '@/data/invites';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -55,6 +55,7 @@ import {
   NudgeMessageSheet,
   ReportSheet,
   WidgetHintSheet,
+  NotifPromptSheet,
 } from '@/components/Sheets';
 import { hasWidgetInstalled } from '@/lib/widget';
 import {
@@ -62,6 +63,7 @@ import {
   dismissWidgetHint,
   isWidgetHintDismissed,
 } from '@/lib/widgetHint';
+import { isNotifPromptDone, markNotifPromptDone } from '@/lib/notifPrompt';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
@@ -218,6 +220,35 @@ export default function DetailScreen() {
   /** Faz 2 §2.6 — offer the widget once the habit is real, never before. */
   const [widgetHintReady, setWidgetHintReady] = useState(false);
   const [showWidgetHint, setShowWidgetHint] = useState(false);
+  /** Bildirim izni ön-sorusu — onboarding'den buraya taşındı. */
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+
+  // İzin ilk halkanın kendi ekranında isteniyor. Onboarding'de sorulduğunda
+  // kullanıcının daha tek bir halkası yoktu; iOS sistem dialogunu ömür boyu
+  // bir kez gösterdiği için, sebebi henüz oluşmamış birine sormak o hakkı
+  // yakmak demekti. Bu ekrandaysa taahhüt zaten verilmiş: hatırlatma bu
+  // halkanın varlık sebebi.
+  //
+  // İki koşul da gerekli: daha önce sorulmamış olmak (kendi bayrağımız) ve
+  // iOS'ta durumun hâlâ 'undetermined' olması. İkincisi tek başına yetmez —
+  // "şimdi değil" diyen birinin durumu undetermined kalır ve her halka
+  // açılışında yeniden sorardık.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (await isNotifPromptDone()) return;
+      if (!(await isPermissionUndetermined())) {
+        // Zaten sorulmuş (izin verilmiş ya da reddedilmiş): bayrağı kapat,
+        // bir daha bakma.
+        void markNotifPromptDone();
+        return;
+      }
+      if (alive) setShowNotifPrompt(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const myCheckins = challenge?.days.filter((d) => d === 'done' || d === 'joker').length ?? 0;
   useEffect(() => {
@@ -1303,6 +1334,25 @@ export default function DetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {showNotifPrompt ? (
+        <NotifPromptSheet
+          onAllow={async () => {
+            // Sistem dialogu ancak BURADA açılıyor — kullanıcı kendi
+            // ekranımızda evet dedikten sonra.
+            await registerForPushToken();
+            void markNotifPromptDone();
+            setShowNotifPrompt(false);
+          }}
+          onDismiss={() => {
+            // "Şimdi değil" de bir cevap: geri gelmiyor. iOS izni
+            // undetermined kaldığı için fikrini değiştirirse Ayarlar'dan
+            // açabilir.
+            void markNotifPromptDone();
+            setShowNotifPrompt(false);
+          }}
+        />
+      ) : null}
 
       {showWidgetHint ? (
         <WidgetHintSheet

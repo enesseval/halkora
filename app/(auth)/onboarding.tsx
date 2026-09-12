@@ -7,12 +7,10 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import type { SegmentState } from '@/hooks';
 import { ProgressRing } from '@/components/ProgressRing';
-import { registerForPushToken } from '@/lib/push';
 import { takePendingInviteCode } from '@/lib/pendingInvite';
 import { slugifyUsername } from '@/lib/username';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
@@ -241,46 +239,19 @@ function TermsNotice() {
 }
 
 /* O5 — push permission */
-function NotifStep() {
-  const { t } = useT();
-  return (
-    <View style={{ flex: 1, justifyContent: 'center' }}>
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 20,
-          backgroundColor: colors.emberSoft,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 24,
-        }}
-      >
-        <Feather name="bell" size={26} color={colors.ember} />
-      </View>
-      <AppText variant="hero">{t.onboarding.notif.title}</AppText>
-      <AppText variant="secondary" style={{ marginTop: 14, maxWidth: 320 }}>
-        {t.onboarding.notif.subtitle}
-      </AppText>
-    </View>
-  );
-}
-
 export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useT();
   const { saveName, ensureUsername, appleSuggestedName } = useAuth();
-  const [step, setStep] = useState(0); // 0,1,2 intro · 3 name · 4 notifications
+  const [step, setStep] = useState(0); // 0,1,2 intro · 3 name
   // Seeded with whatever Apple handed back at sign-in — a suggestion, edited
   // or replaced like any other text. Apple only returns it on the very first
   // authorization, so this is the one chance to use it.
   const [name, setName] = useState(appleSuggestedName ?? '');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [askingPermission, setAskingPermission] = useState(false);
 
   const isName = step === 3;
-  const isNotif = step === 4;
   const canSubmitName = name.trim().length >= 2 && !saving;
 
   const submitName = async () => {
@@ -292,19 +263,19 @@ export default function OnboardingScreen() {
       // Best-effort, never blocks onboarding — a slow/failed attempt just
       // leaves the handle unset for now (Ayarlar has a manual fallback).
       ensureUsername(name).catch(() => {});
-      setStep(4);
+      await finishOnboarding();
     } catch {
       setErr(t.errors.saveFailed);
       setSaving(false);
     }
   };
 
-  const finishNotifStep = async (allow: boolean) => {
-    if (allow) {
-      setAskingPermission(true);
-      await registerForPushToken(); // fire-and-forget; useSyncPushToken() persists the token
-      setAskingPermission(false);
-    }
+  // Bildirim izni artık BURADA istenmiyor. iOS sistem dialogunu ömür boyu bir
+  // kez gösterir ve bu ekranda kullanıcının daha tek bir halkası yok — henüz
+  // sebebi olmayan birine sorup "şimdi değil" almak o hakkı yakmaktı. Soru
+  // ilk halka kurulduktan sonra, halkanın kendi ekranında soruluyor
+  // (src/lib/notifPrompt.ts + NotifPromptSheet).
+  const finishOnboarding = async () => {
     // A /join/{code} deep link tapped before signing in gets stashed by the
     // root guard (src/lib/pendingInvite.ts) — resume it now instead of
     // dropping the visitor on the generic fork screen.
@@ -322,7 +293,7 @@ export default function OnboardingScreen() {
       >
         {/* skip */}
         <View style={{ height: 28, justifyContent: 'center', alignItems: 'flex-end' }}>
-          {!isName && !isNotif ? (
+          {!isName ? (
             <AppText variant="secondary" color={colors.textSecondary} onPress={() => setStep(3)}>
               {t.common.skip}
             </AppText>
@@ -333,7 +304,6 @@ export default function OnboardingScreen() {
         {step === 1 ? <Mechanic /> : null}
         {step === 2 ? <Stake /> : null}
         {isName ? <NameStep name={name} setName={setName} onSubmit={submitName} /> : null}
-        {isNotif ? <NotifStep /> : null}
 
         {err ? (
           <AppText variant="meta" color={colors.joker} style={{ marginBottom: 8 }}>
@@ -342,7 +312,7 @@ export default function OnboardingScreen() {
         ) : null}
 
         <View style={{ gap: 16, paddingBottom: spacing.section, paddingTop: 8 }}>
-          {!isName && !isNotif ? <Dots step={step} /> : null}
+          {!isName ? <Dots step={step} /> : null}
           {isName ? (
             <>
               <Button
@@ -356,24 +326,7 @@ export default function OnboardingScreen() {
               <TermsNotice />
             </>
           ) : null}
-          {isNotif ? (
-            <>
-              <Button
-                label={askingPermission ? t.onboarding.notif.asking : t.onboarding.notif.allow}
-                onPress={() => finishNotifStep(true)}
-                disabled={askingPermission}
-              />
-              <AppText
-                variant="secondary"
-                color={colors.textSecondary}
-                onPress={() => (askingPermission ? undefined : finishNotifStep(false))}
-                style={{ textAlign: 'center' }}
-              >
-                {t.onboarding.notif.notNow}
-              </AppText>
-            </>
-          ) : null}
-          {!isName && !isNotif ? (
+          {!isName ? (
             <Button label={step === 2 ? t.onboarding.start : t.common.continue} onPress={advance} />
           ) : null}
         </View>

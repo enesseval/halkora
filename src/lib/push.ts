@@ -52,6 +52,25 @@ export interface PushRegistration {
   environment: string | null;
 }
 
+/**
+ * iOS'a bu cihazda bildirim izni hiç sorulmuş mu?
+ *
+ * 'undetermined' = sistem dialogu henüz açılmadı, yani tek atışlık hak duruyor.
+ * 'granted'/'denied' = soru sorulmuş, bir daha ön-soru göstermenin anlamı yok.
+ *
+ * Ön-soru ekranı (NotifPromptSheet) bunu okur; hata durumunda false döner,
+ * çünkü emin olunamayan bir durumda kullanıcıyı rahatsız etmemek doğrusu.
+ */
+export async function isPermissionUndetermined(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'undetermined';
+  } catch {
+    return false;
+  }
+}
+
 export async function registerForPushToken(): Promise<PushRegistration | null> {
   if (Platform.OS === 'web') return null; // native-only feature; expo-notifications' web shim is partial
   try {
