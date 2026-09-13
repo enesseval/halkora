@@ -42,6 +42,8 @@ export const en: Dictionary = {
   },
 
   errors: {
+    crashTitle: 'Something went wrong',
+    crashBody: 'This screen failed to load. Trying again usually sorts it out.',
     generic: 'Something went wrong. Try again.',
     checkConnection: 'Check your connection.',
     offlineTitle: 'No connection',

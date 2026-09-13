@@ -17,6 +17,7 @@ import { markNotificationOpened } from '@/data/notifications';
 import { initLocale, useT } from '@/i18n';
 import { ErrorState } from '@/components/ErrorState';
 import { BootSplash } from '@/components/BootSplash';
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -325,7 +326,12 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bgBase }}>
         <SafeAreaProvider>
           <StatusBar style="light" />
-          <RootNavigator />
+          {/* SafeAreaProvider'ın İÇİNDE: yedek ekran da güvenli alanı ve
+              temayı kullanıyor. Daha dışarı koymak, hata ekranını çentiğin
+              altında bırakırdı. */}
+          <AppErrorBoundary>
+            <RootNavigator />
+          </AppErrorBoundary>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>

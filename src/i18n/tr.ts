@@ -43,6 +43,8 @@ export const tr = {
   },
 
   errors: {
+    crashTitle: 'Bir şeyler ters gitti',
+    crashBody: 'Bu ekran yüklenemedi. Tekrar denemek çoğu zaman yeterli oluyor.',
     generic: 'Bir şeyler ters gitti. Tekrar dene.',
     checkConnection: 'Bağlantını kontrol et.',
     offlineTitle: 'Bağlantı yok',
