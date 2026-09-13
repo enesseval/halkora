@@ -30,6 +30,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendPush, type PushMessage } from '../_shared/push.ts';
+import { secretsMatch } from '../_shared/auth.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
   // Fail closed: no secret configured means no calls are trusted, not "allow
   // everything". Set WEBHOOK_SECRET (supabase secrets set) and the matching
   // DB Webhook header before this function is useful.
-  if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  if (!secretsMatch(WEBHOOK_SECRET, req.headers.get('x-webhook-secret'))) {
     return unauthorized();
   }
 

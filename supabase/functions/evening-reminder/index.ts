@@ -38,6 +38,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendPush, type PushMessage } from '../_shared/push.ts';
+import { secretsMatch } from '../_shared/auth.ts';
 
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
@@ -265,7 +266,7 @@ function median(values: number[]): number {
 
 Deno.serve(async (req) => {
   // Fail closed: no secret configured means no calls are trusted.
-  if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  if (!secretsMatch(WEBHOOK_SECRET, req.headers.get('x-webhook-secret'))) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
   }
 
@@ -324,30 +325,83 @@ Deno.serve(async (req) => {
       currentDay: number;
     }[] = [];
 
+    // Katılımcılar ve bugünün check-in'leri TOPLUCA çekiliyor. Eskiden bu
+    // döngünün içinde halka başına iki sorgu vardı: saatlik cron 1000 canlı
+    // halkada çalışma başına 2000 istek demekti. Artık halka sayısından
+    // bağımsız, sabit sayıda sorgu.
+    const liveIds = live.map((c) => c.id as string);
+    /** .in(...) listesi GET query string'ine giriyor, o yüzden parçalıyoruz. */
+    const IN_CHUNK = 100;
+
+    const participantsByChallenge = new Map<
+      string,
+      { id: string; user_id: string; joined_at: string | null }[]
+    >();
+    for (let i = 0; i < liveIds.length; i += IN_CHUNK) {
+      const { data } = await admin
+        .from('participants')
+        .select('id, user_id, joined_at, challenge_id')
+        .in('challenge_id', liveIds.slice(i, i + IN_CHUNK));
+      for (const row of data ?? []) {
+        const cid = row.challenge_id as string;
+        const list = participantsByChallenge.get(cid) ?? [];
+        list.push({
+          id: row.id as string,
+          user_id: row.user_id as string,
+          joined_at: row.joined_at as string | null,
+        });
+        participantsByChallenge.set(cid, list);
+      }
+    }
+
+    // Her halkanın kendi currentDay'i farklı. Gün filtresini tamamen
+    // kaldırıp hepsini tek sorguda çekmek, halkaların BÜTÜN geçmiş
+    // check-in'lerini indirmek olurdu — N+1'den beteri. Bunun yerine
+    // halkaları gün numarasına göre grupluyoruz: sorgu sayısı halka
+    // sayısıyla değil, sahadaki FARKLI gün numarası sayısıyla orantılı
+    // (pratikte bir avuç), ve hiçbir fazladan satır inmiyor.
+    const challengesByDay = new Map<number, string[]>();
+    for (const c of live) {
+      const day = (c as Record<string, unknown>).currentDay as number;
+      const list = challengesByDay.get(day) ?? [];
+      list.push(c.id as string);
+      challengesByDay.set(day, list);
+    }
+
+    const doneByChallengeDay = new Map<string, Set<string>>();
+    for (const [day, ids] of challengesByDay) {
+      for (let i = 0; i < ids.length; i += IN_CHUNK) {
+        const { data } = await admin
+          .from('check_ins')
+          .select('participant_id, challenge_id')
+          .eq('day_number', day)
+          .in('challenge_id', ids.slice(i, i + IN_CHUNK));
+        for (const row of data ?? []) {
+          const key = `${row.challenge_id as string}:${day}`;
+          const set = doneByChallengeDay.get(key) ?? new Set<string>();
+          set.add(row.participant_id as string);
+          doneByChallengeDay.set(key, set);
+        }
+      }
+    }
+
     for (const challenge of live) {
       const currentDay = (challenge as Record<string, unknown>).currentDay as number;
       const timeZone = challenge.timezone as string;
       const lastCallHour = deadlineHour(challenge.deadline_time as string | null);
 
-      const { data: participants } = await admin
-        .from('participants')
-        .select('id, user_id, joined_at')
-        .eq('challenge_id', challenge.id as string);
+      const participants = participantsByChallenge.get(challenge.id as string);
       if (!participants || participants.length === 0) continue;
 
       // Bugünün döngü tarihi — katılım günüyle karşılaştıracağız.
       const deadline = ((challenge.deadline_time as string | null) ?? '00:00').slice(0, 5);
       const todayCycle = cycleStartFor(timeZone, deadline);
 
-      const { data: doneToday } = await admin
-        .from('check_ins')
-        .select('participant_id')
-        .eq('challenge_id', challenge.id as string)
-        .eq('day_number', currentDay);
-      const doneIds = new Set((doneToday ?? []).map((c) => c.participant_id as string));
+      const doneIds =
+        doneByChallengeDay.get(`${challenge.id as string}:${currentDay}`) ?? new Set<string>();
 
       for (const p of participants) {
-        if (doneIds.has(p.id as string)) continue;
+        if (doneIds.has(p.id)) continue;
 
         // İlk gün sessiz. Sabah kurulan halkanın akşamı "bugün check-in
         // yapmadın" demek, insanın daha halkayla tanışmadığı bir anda en sert
@@ -355,14 +409,13 @@ Deno.serve(async (req) => {
         // deadline'ı gece yarısından farklı olan bir halkada gün sınırı başka
         // yerde, ve iki yerde farklı hesaplamak tam da sessiz kalması gereken
         // günü kaçırmak olurdu.
-        const joinedAt = p.joined_at as string | null;
-        if (joinedAt && cycleStartFor(timeZone, deadline, new Date(joinedAt)) === todayCycle) {
+        if (p.joined_at && cycleStartFor(timeZone, deadline, new Date(p.joined_at)) === todayCycle) {
           continue;
         }
 
         pending.push({
-          userId: p.user_id as string,
-          participantId: p.id as string,
+          userId: p.user_id,
+          participantId: p.id,
           challengeId: challenge.id as string,
           timeZone,
           lastCallHour,

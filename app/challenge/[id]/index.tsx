@@ -68,6 +68,10 @@ import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
 
+/** Sohbet mesajı üst sınırı. Veritabanındaki messages_text_length son
+ *  savunma hattı (2000); bu onun altında kalan arayüz sınırı. */
+const MESSAGE_MAX = 1000;
+
 type Row =
   | { kind: 'participant'; p: Participant }
   | { kind: 'pendingInvite'; id: string; username: string }
@@ -1284,6 +1288,12 @@ export default function DetailScreen() {
               onChangeText={setDraft}
               placeholder={t.detail.composerPlaceholder}
               placeholderTextColor={colors.textTertiary}
+              // Sohbet, uzunluk sınırı olmayan tek metin alanıydı — başlık,
+              // eylem, bahis, ad ve kullanıcı adının hepsinde vardı. Veritabanı
+              // da 2000'de kesiyor (messages_text_length); buradaki sınır daha
+              // dar, çünkü kullanıcının bir hata mesajıyla karşılaşması değil
+              // hiç o noktaya gelmemesi gerekir.
+              maxLength={MESSAGE_MAX}
               style={{
                 flex: 1,
                 height: 44,

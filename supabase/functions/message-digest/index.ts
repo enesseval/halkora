@@ -28,6 +28,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendPush, type PushMessage } from '../_shared/push.ts';
+import { secretsMatch } from '../_shared/auth.ts';
 
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
@@ -53,7 +54,7 @@ function copyFor(locale: string | null | undefined): (typeof COPY)['tr'] {
 }
 
 Deno.serve(async (req) => {
-  if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  if (!secretsMatch(WEBHOOK_SECRET, req.headers.get('x-webhook-secret'))) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
   }
 
@@ -63,125 +64,180 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const [{ data: profiles }, { data: participants }] = await Promise.all([
-      admin.from('profiles').select('id, locale, last_message_notified_at'),
-      admin.from('participants').select('challenge_id, user_id'),
-    ]);
-    if (!profiles || profiles.length === 0) {
-      return new Response(JSON.stringify({ notified: 0 }), { status: 200 });
-    }
+    // Bu fonksiyon SAYFALI çalışır. Önceki hali dört sorguyu da filtresiz
+    // atıyordu (bütün profiller, bütün katılımcılar, bütün token'lar, bütün
+    // yeni mesajlar), sonra O(kullanıcı × mesaj) iç içe döngü kuruyor ve tek
+    // halkası olan HER kullanıcı için ayrı bir başlık sorgusu yapıyordu.
+    // Kullanıcı sayısı arttıkça önce yavaşlar, sonra Edge Function süre
+    // limitine takılır; PostgREST'in satır sınırı devreye girerse de hata
+    // vermeden EKSİK çalışırdı — bildirim alması gereken insanlar hiç
+    // görünmezdi.
 
-    // challenge_id -> Set(user_id) — who's in each challenge, to attribute
-    // new messages to every OTHER participant.
-    const membersByChallenge = new Map<string, Set<string>>();
-    // user_id -> Set(challenge_id) — the reverse, to scope each recipient's count.
-    const challengesByUser = new Map<string, Set<string>>();
-    for (const p of participants ?? []) {
-      const cid = p.challenge_id as string;
-      const uid = p.user_id as string;
-      if (!membersByChallenge.has(cid)) membersByChallenge.set(cid, new Set());
-      membersByChallenge.get(cid)!.add(uid);
-      if (!challengesByUser.has(uid)) challengesByUser.set(uid, new Set());
-      challengesByUser.get(uid)!.add(cid);
-    }
+    /** Tek seferde işlenecek alıcı sayısı. */
+    const BATCH = 500;
+    /** .in(...) listesi GET query string'ine girdiği için parçalıyoruz. */
+    const IN_CHUNK = 100;
 
-    // Bound the messages query to the OLDEST last_message_notified_at across
-    // all users — anything before that can't be "new" for anyone.
-    const earliestCutoff = (profiles as { last_message_notified_at: string }[])
-      .map((p) => p.last_message_notified_at)
-      .filter(Boolean)
-      .sort()[0];
+    const now = new Date().toISOString();
+
+    // Mesajları BİR KEZ çekip halkaya göre indeksliyoruz. Alt sınır, tüm
+    // kullanıcıların en eski penceresi: ondan öncesi kimse için "yeni"
+    // olamaz.
+    const { data: oldest } = await admin
+      .from('profiles')
+      .select('last_message_notified_at')
+      .not('last_message_notified_at', 'is', null)
+      .order('last_message_notified_at', { ascending: true })
+      .limit(1);
+    const earliestCutoff = (oldest?.[0]?.last_message_notified_at as string | undefined) ?? null;
     if (!earliestCutoff) {
       return new Response(JSON.stringify({ notified: 0 }), { status: 200 });
     }
 
-    const { data: newMessages } = await admin
-      .from('messages')
-      .select('challenge_id, user_id, created_at')
-      .eq('kind', 'message')
-      .gt('created_at', earliestCutoff);
-
-    if (!newMessages || newMessages.length === 0) {
-      // Nobody has anything new — still slide everyone's window forward so
-      // the next run's cutoff stays tight instead of drifting backwards.
-      await admin
-        .from('profiles')
-        .update({ last_message_notified_at: new Date().toISOString() })
-        .in('id', profiles.map((p) => p.id as string));
-      return new Response(JSON.stringify({ notified: 0 }), { status: 200 });
-    }
-
-    const { data: tokenRows } = await admin.from('push_tokens').select('user_id, token');
-    const tokenByUser = new Map((tokenRows ?? []).map((r) => [r.user_id as string, r.token as string]));
-
-    const now = new Date().toISOString();
-    const messages: PushMessage[] = [];
-
-    for (const profile of profiles) {
-      const uid = profile.id as string;
-      const token = tokenByUser.get(uid);
-      if (!token) continue;
-      const myChallenges = challengesByUser.get(uid);
-      if (!myChallenges || myChallenges.size === 0) continue;
-      const cutoff = (profile.last_message_notified_at as string) ?? earliestCutoff;
-
-      // challenge_id -> count of new messages from OTHER people in a
-      // challenge this user is actually a member of.
-      const perChallenge = new Map<string, number>();
-      let lastChallengeId: string | undefined;
-      for (const m of newMessages) {
+    type NewMsg = { userId: string; createdAt: string };
+    const newByChallenge = new Map<string, NewMsg[]>();
+    for (let from = 0; ; from += BATCH) {
+      const { data: page } = await admin
+        .from('messages')
+        .select('challenge_id, user_id, created_at')
+        .eq('kind', 'message')
+        .gt('created_at', earliestCutoff)
+        .order('created_at', { ascending: true })
+        .range(from, from + BATCH - 1);
+      if (!page || page.length === 0) break;
+      for (const m of page) {
         const cid = m.challenge_id as string;
-        if (!myChallenges.has(cid)) continue;
-        if (m.user_id === uid) continue; // never notify someone about their own message
-        if ((m.created_at as string) <= cutoff) continue; // this user's own window may be tighter than earliestCutoff
-        perChallenge.set(cid, (perChallenge.get(cid) ?? 0) + 1);
-        lastChallengeId = cid;
+        const list = newByChallenge.get(cid) ?? [];
+        list.push({ userId: m.user_id as string, createdAt: m.created_at as string });
+        newByChallenge.set(cid, list);
       }
-      const total = Array.from(perChallenge.values()).reduce((a, b) => a + b, 0);
-      if (total === 0) continue;
-
-      const c = copyFor(profile.locale as string | null);
-      let body: string;
-      if (perChallenge.size === 1) {
-        const [onlyChallengeId] = perChallenge.keys();
-        const { data: challenge } = await admin
-          .from('challenges')
-          .select('title')
-          .eq('id', onlyChallengeId)
-          .single();
-        body = c.bodyOne((challenge?.title as string | undefined) ?? '');
-      } else {
-        body = c.bodyMany(perChallenge.size);
-      }
-
-      const single = perChallenge.size === 1;
-      messages.push({
-        to: token,
-        title: c.title(total),
-        body,
-        // Birden fazla halkadan mesaj varsa açılacak tek bir halka yok; eskiden
-        // challengeId undefined bırakılıyordu ve dokunuş HİÇBİR ŞEY yapmıyordu
-        // (uygulama nerede kaldıysa orada açılıyordu). Artık açıkça ana ekrana
-        // götürüyoruz — hangi halka olduğunu orada seçer.
-        data: single ? { challengeId: lastChallengeId } : { home: true },
-        userId: profile.id as string,
-        kind: 'digest',
-        challengeId: single ? (lastChallengeId as string) : null,
-      } as PushMessage);
+      if (page.length < BATCH) break;
     }
 
-    // Parçalama, ticket okuma, ölü token silme ve loglama ortak katmanda.
-    await sendPush(admin, messages);
+    let notified = 0;
 
-    // Slide EVERY checked user's window forward to now, not just the ones
-    // who got a push — otherwise a quiet user's cutoff never moves and the
-    // messages query keeps growing.
-    await admin
-      .from('profiles')
-      .update({ last_message_notified_at: now })
-      .in('id', profiles.map((p) => p.id as string));
+    // Alıcı evreni push_tokens: token'ı olmayana zaten gönderilemez, o yüzden
+    // sayfalamaya en dar kümeden başlıyoruz.
+    for (let from = 0; ; from += BATCH) {
+      const { data: tokenRows } = await admin
+        .from('push_tokens')
+        .select('user_id, token')
+        .order('user_id', { ascending: true })
+        .range(from, from + BATCH - 1);
+      if (!tokenRows || tokenRows.length === 0) break;
 
-    return new Response(JSON.stringify({ notified: messages.length }), { status: 200 });
+      const userIds = tokenRows.map((r) => r.user_id as string);
+      const tokenByUser = new Map(tokenRows.map((r) => [r.user_id as string, r.token as string]));
+
+      const [{ data: profiles }, { data: participants }] = await Promise.all([
+        admin.from('profiles').select('id, locale, last_message_notified_at').in('id', userIds),
+        admin.from('participants').select('challenge_id, user_id').in('user_id', userIds),
+      ]);
+
+      if (profiles && profiles.length > 0) {
+        const challengesByUser = new Map<string, Set<string>>();
+        for (const p of participants ?? []) {
+          const uid = p.user_id as string;
+          if (!challengesByUser.has(uid)) challengesByUser.set(uid, new Set());
+          challengesByUser.get(uid)!.add(p.challenge_id as string);
+        }
+
+        // Önce herkesin sayımını çıkar, başlıkları SONRA tek seferde çek.
+        type Pending = {
+          userId: string;
+          token: string;
+          locale: string | null;
+          total: number;
+          challengeIds: string[];
+        };
+        const pending: Pending[] = [];
+
+        for (const profile of profiles) {
+          const uid = profile.id as string;
+          const token = tokenByUser.get(uid);
+          if (!token) continue;
+          const myChallenges = challengesByUser.get(uid);
+          if (!myChallenges || myChallenges.size === 0) continue;
+          const cutoff = (profile.last_message_notified_at as string) ?? earliestCutoff;
+
+          // Artık bütün mesajları taramıyoruz — yalnızca bu kişinin
+          // halkalarının indeksine bakıyoruz.
+          const perChallenge = new Map<string, number>();
+          for (const cid of myChallenges) {
+            let n = 0;
+            for (const m of newByChallenge.get(cid) ?? []) {
+              if (m.userId === uid) continue; // kendi mesajı bildirim olmaz
+              if (m.createdAt <= cutoff) continue; // bu kişinin penceresi daha dar olabilir
+              n += 1;
+            }
+            if (n > 0) perChallenge.set(cid, n);
+          }
+
+          const total = Array.from(perChallenge.values()).reduce((a, b) => a + b, 0);
+          if (total === 0) continue;
+          pending.push({
+            userId: uid,
+            token,
+            locale: profile.locale as string | null,
+            total,
+            challengeIds: Array.from(perChallenge.keys()),
+          });
+        }
+
+        // Tek halkalı özetler için gereken başlıkları topluca çek — eskiden
+        // bu kullanıcı başına bir sorguydu.
+        const titleNeeded = Array.from(
+          new Set(pending.filter((x) => x.challengeIds.length === 1).map((x) => x.challengeIds[0])),
+        );
+        const titleById = new Map<string, string>();
+        for (let i = 0; i < titleNeeded.length; i += IN_CHUNK) {
+          const { data: rows } = await admin
+            .from('challenges')
+            .select('id, title')
+            .in('id', titleNeeded.slice(i, i + IN_CHUNK));
+          for (const r of rows ?? []) titleById.set(r.id as string, (r.title as string) ?? '');
+        }
+
+        const messages: PushMessage[] = pending.map((x) => {
+          const c = copyFor(x.locale);
+          const single = x.challengeIds.length === 1;
+          const only = x.challengeIds[0];
+          return {
+            to: x.token,
+            title: c.title(x.total),
+            body: single ? c.bodyOne(titleById.get(only) ?? '') : c.bodyMany(x.challengeIds.length),
+            // Birden fazla halkadan mesaj varsa açılacak tek bir halka yok;
+            // eskiden challengeId undefined bırakılıyordu ve dokunuş HİÇBİR
+            // ŞEY yapmıyordu (uygulama nerede kaldıysa orada açılıyordu).
+            // Artık açıkça ana ekrana götürüyoruz.
+            data: single ? { challengeId: only } : { home: true },
+            userId: x.userId,
+            kind: 'digest',
+            challengeId: single ? only : null,
+          } as PushMessage;
+        });
+
+        // Parçalama, ticket okuma, ölü token silme ve loglama ortak katmanda.
+        if (messages.length > 0) {
+          await sendPush(admin, messages);
+          notified += messages.length;
+        }
+
+        // Kontrol edilen HERKESİN penceresi ilerlesin, yalnız bildirim
+        // alanların değil — yoksa sessiz bir kullanıcının alt sınırı hiç
+        // kıpırdamaz ve yukarıdaki mesaj sorgusu sürekli büyür.
+        for (let i = 0; i < userIds.length; i += IN_CHUNK) {
+          await admin
+            .from('profiles')
+            .update({ last_message_notified_at: now })
+            .in('id', userIds.slice(i, i + IN_CHUNK));
+        }
+      }
+
+      if (tokenRows.length < BATCH) break;
+    }
+
+    return new Response(JSON.stringify({ notified }), { status: 200 });
   } catch (e) {
     console.error('message-digest failed', e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {

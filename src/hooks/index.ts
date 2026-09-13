@@ -628,12 +628,25 @@ export function useRealtimeChallenge(id: string | undefined) {
         () => bump(messagesKey(id)),
       )
       .on(
-        // message_reactions has no challenge_id column to filter on, so this
-        // channel sees reactions from every challenge — harmless, it only
-        // ever invalidates this challenge's own message-list query.
+        // message_reactions'ta challenge_id sütunu yok, yani sunucu tarafında
+        // filtrelenemiyor: bu kanal HER halkanın reaksiyonunu görüyor. Eskiden
+        // hepsi doğrudan invalidate ediyordu ve "zararsız" diye not düşülmüştü
+        // — değil: her invalidate bu halkanın bütün mesaj listesini yeniden
+        // indiriyor, yani bambaşka bir halkadaki bir reaksiyon buradaki
+        // sohbeti baştan çektiriyordu. Gelen satırın mesajı bu halkaya ait mi,
+        // önbellekten bakıp öyle karar veriyoruz.
         'postgres_changes',
         { event: '*', schema: 'public', table: 'message_reactions' },
-        () => bump(messagesKey(id)),
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { message_id?: string } | undefined;
+          const messageId = row?.message_id;
+          if (!messageId) return;
+          const cached = queryClient.getQueryData<{ id: string }[]>(messagesKey(id));
+          // Önbellek henüz yoksa ekran zaten ilk yüklemesini yapıyor demektir;
+          // o durumda dokunmuyoruz.
+          if (!cached) return;
+          if (cached.some((m) => m.id === messageId)) bump(messagesKey(id));
+        },
       )
       .subscribe();
     return () => {
