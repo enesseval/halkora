@@ -263,13 +263,10 @@ export const tr = {
     notifyMessagePreview: 'Bildirimde mesaj içeriği',
     notifyMessagePreviewOn: 'Görünür',
     notifyMessagePreviewOff: 'Gizli',
-    purchasesDebug: 'DEV: mağaza tanılama',
-    widgetDebug: 'Widget teşhis',
     account: 'Hesap',
     accountLinking: 'Bağlanıyor…',
     accountUnsecured: 'Güvence yok',
     accountLinked: 'Apple ile bağlı',
-    seeOnboardingAgain: "Onboarding'i tekrar gör",
     username: 'Kullanıcı adı',
     usernameNotSet: 'ayarlanmadı',
     usernameEditTitle: 'Kullanıcı adını düzenle',
@@ -505,7 +502,6 @@ export const tr = {
     notReadyTitle: 'Neredeyse hazır',
     notReadyBody: 'Abonelikler çok yakında açılıyor.',
     // DEV-only (Ayarlar) — RevenueCat gelmeden gate'i test etmek için.
-    devToggle: 'DEV: Pro’yu aç/kapat',
   },
 
   join: {

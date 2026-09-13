@@ -1,19 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { edgeFunctionError } from '@/lib/errors';
-import { getDict } from '@/i18n';
 
 export type CheckInType = 'done' | 'joker';
-
-async function myParticipantId(challengeId: string, userId: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('participants')
-    .select('id')
-    .eq('challenge_id', challengeId)
-    .eq('user_id', userId)
-    .single();
-  if (error) throw error;
-  return data.id as string;
-}
 
 /**
  * Real check-in write. The day_number is computed and validated
@@ -34,19 +22,26 @@ export async function insertCheckIn(
   return { dayNumber: (data as { day_number: number }).day_number };
 }
 
-/** Undo — removes the check-in this device just added (own row only, RLS-scoped). */
+/**
+ * Undo — removes the check-in this device just added.
+ *
+ * ONE request. It used to look up `myParticipantId` first and then delete by
+ * that id: two round trips, and offline both of them run all the way to the
+ * 12s ceiling before the failure surfaces, so the error landed long after the
+ * animation had finished and the button had already settled (saha testi
+ * bulgusu — "geri alıyor, birkaç saniye sonra bağlantını kontrol et diyor").
+ *
+ * The lookup was never doing any work the database wasn't already doing:
+ * check_ins' "delete own check-in" policy is
+ * `exists (select 1 from participants p where p.id = participant_id and
+ * p.user_id = auth.uid())`, so filtering on the ring and the day can only
+ * ever reach this device's own row.
+ */
 export async function deleteCheckIn(challengeId: string, dayNumber: number): Promise<void> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user;
-  if (!user) throw new Error(getDict().errors.sessionMissing);
-  const participantId = await myParticipantId(challengeId, user.id);
-
   const { error } = await supabase
     .from('check_ins')
     .delete()
-    .eq('participant_id', participantId)
+    .eq('challenge_id', challengeId)
     .eq('day_number', dayNumber)
     // Undo belongs to the check-in button, and that button only ever writes a
     // 'done'. Without this the same call would happily remove a joker sitting

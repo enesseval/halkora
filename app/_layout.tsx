@@ -13,6 +13,7 @@ import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
 import { colors } from '@/theme/tokens';
 import { useAuth, useAuthInit, useSyncPushToken, useSyncLocale } from '@/hooks/useAuth';
 import { stashPendingInviteCode, takePendingInviteCode } from '@/lib/pendingInvite';
+import { markNotificationOpened } from '@/data/notifications';
 import { initLocale, useT } from '@/i18n';
 import { ErrorState } from '@/components/ErrorState';
 import { BootSplash } from '@/components/BootSplash';
@@ -106,7 +107,14 @@ function useNotificationDeepLink(navigatorMounted: boolean) {
     if (!navigatorMounted || Platform.OS === 'web') return;
 
     const go = (data: unknown) => {
-      const d = data as { challengeId?: string; inviteCode?: string } | undefined;
+      const d = data as
+        | { challengeId?: string; inviteCode?: string; home?: boolean; logId?: string }
+        | undefined;
+      // Açılma ölçümü. Gönderim sayısını Edge Function'lar yazıyor; açılmayı
+      // yalnızca burası bilebilir, çünkü iOS bir bildirimin kapatıldığını
+      // uygulamaya bildirmez. Yönlendirmeden önce ve await edilmeden: ölçüm
+      // hiçbir zaman kullanıcının gideceği ekranı geciktirmemeli.
+      if (d?.logId) markNotificationOpened(d.logId);
       // dismissTo, not push. Every tap used to stack another screen: three
       // notifications meant three ring screens to back out of one at a time,
       // and tapping a notification for the ring you were already looking at
@@ -123,6 +131,12 @@ function useNotificationDeepLink(navigatorMounted: boolean) {
         router.dismissTo(`/join/${d.inviteCode}`);
       } else if (d?.challengeId) {
         router.dismissTo(`/challenge/${d.challengeId}`);
+      } else if (d?.home) {
+        // Birden fazla halkadan mesaj özeti: açılacak tek bir halka yok.
+        // Eskiden challengeId undefined geliyordu ve dokunuş hiçbir şey
+        // yapmıyordu — uygulama nerede kaldıysa orada açılıyordu. Ana ekran
+        // en azından hangi halkaların beklediğini gösterir.
+        router.dismissTo('/');
       }
     };
 

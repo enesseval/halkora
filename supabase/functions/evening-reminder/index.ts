@@ -20,14 +20,26 @@
 // Still one push per person per day (profiles.last_reminder_date), however
 // many rings are waiting: the body says how many.
 //
+// KİMSENİN İLK GÜNÜ HATIRLATILMAZ. Sabah halkayı kuran birine akşam "bugün
+// check-in yapmadın" demek, halka 11 saatlikken en sert metni göndermek
+// demekti — üstelik alışkanlık verisi olmadığı için tam da son-çağrı metnine
+// düşüyordu. Kişinin o halkadaki kendi ilk günü (participants.joined_at)
+// sessiz; hatırlatma ikinci günden itibaren başlar.
+//
+// Ve metin artık gerçek duruma bağlı: halkadaki kaç kişinin bugünü
+// işaretlediği, ya da tek kişilikse serinin kaç günlük olduğu. Jenerik bir
+// "halkan bekliyor" ikinci haftada görünmez oluyor; "3 kişiden 2'si bugünü
+// işaretledi" olmuyor.
+//
 // Deployed with --no-verify-jwt (the caller is pg_cron/pg_net, not a
 // signed-in user) — WEBHOOK_SECRET stands in for auth. Without it, anyone
 // who finds this function's URL could trigger it on demand and spam every
 // pending participant.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPush, type PushMessage } from '../_shared/push.ts';
+import { secretsMatch } from '../_shared/auth.ts';
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
 /** How far back to look for someone's usual check-in time. */
@@ -41,32 +53,158 @@ const HABIT_MIN_SAMPLES = 3;
 /** How long after their usual hour someone counts as late. */
 const HABIT_GRACE_HOURS = 1;
 
-// Kept in sync by hand with src/i18n/tr.ts + en.ts — see notify/index.ts's
-// comment for why this Edge Function can't just import those directly.
-const COPY = {
+// Bu metinler YALNIZCA burada yaşıyor — uygulama arayüzü değil, sunucunun
+// yazdığı push kopyası (src/i18n'de karşılıkları yok). İki dil de bu tabloda,
+// birlikte değişirler.
+//
+// Her kova bir DİZİ, tek metin değil. Tek metin ikinci haftada görünmez
+// oluyordu; aynı bildirimi her akşam gören insan onu okumayı bırakıyor.
+// Seçim aşağıdaki pick() ile dönüyor.
+//
+// Kovalar güçlüden zayıfa: sosyal sinyal > seri > jenerik. Halkadaki başka
+// birinin bugünü işaretlemiş olması, uygulamanın söyleyebileceği en ikna edici
+// şey; onu söyleyebiliyorsak jenerik metne düşmüyoruz.
+type Tone = 'habit' | 'lastCall';
+
+/**
+ * Havuzların şekli açıkça yazılı, `as const` çıkarımına bırakılmadı: iki dilin
+ * tuple tipleri birbirinden farklı çıkıyor ve pick()'in tip değişkeni ortak
+ * üst tipe ({}) düşüyordu. Açık tip hem bunu çözer hem de yeni bir metin
+ * eklerken kovanın imzasını zorunlu kılar.
+ */
+type Pools = {
+  title: Record<Tone, readonly string[]>;
+  plain: Record<Tone, readonly string[]>;
+  social: Record<Tone, readonly ((done: number, total: number) => string)[]>;
+  streak: Record<Tone, readonly ((n: number) => string)[]>;
+  multi: Record<Tone, readonly ((n: number) => string)[]>;
+};
+
+const COPY: Record<'tr' | 'en', Pools> = {
   tr: {
-    title: 'Halkan bekliyor',
-    single: 'Bugün için check-in yapmadın — halka seni bekliyor.',
-    multi: (n: number) => `${n} halka bugün seni bekliyor.`,
-    // Erken, alışkanlık saatine göre: acele ettirmeden hatırlatır.
-    habitTitle: 'Bugünü işaretlemedin',
-    habitSingle: 'Genelde bu saatlerde yapıyorsun — halkan hazır.',
-    habitMulti: (n: number) => `${n} halkada bugünü henüz işaretlemedin.`,
+    title: {
+      habit: ['Bugünü işaretlemedin', 'Halkan hazır', 'Küçük bir hatırlatma'],
+      lastCall: ['Halkan bekliyor', 'Gün bitiyor', 'Son çağrı'],
+    },
+    plain: {
+      habit: [
+        'Genelde bu saatlerde yapıyorsun — halkan hazır.',
+        'Her zamanki saatin geçti, bugün henüz işaretli değil.',
+        'Bugünü işaretlemeyi unuttun galiba.',
+      ],
+      lastCall: [
+        'Bugün için check-in yapmadın — halka seni bekliyor.',
+        'Gün bitmeden bir dokunuş kaldı.',
+        'Bugünü işaretlemek için son fırsat.',
+      ],
+    },
+    social: {
+      habit: [
+        (done: number, total: number) => `Halkanda ${done}/${total} bugünü tamamladı.`,
+        (done: number, _total: number) => `${done} kişi bugünü işaretledi bile.`,
+      ],
+      lastCall: [
+        (done: number, total: number) => `${done}/${total} kişi bugünü işaretledi — sıra sende.`,
+        (done: number, _total: number) => `Halkandan ${done} kişi bugünü tamamladı, gün bitiyor.`,
+      ],
+    },
+    streak: {
+      habit: [
+        (n: number) => `${n} günlük serin sürüyor, bugün henüz işaretli değil.`,
+        (n: number) => `${n} gündür yapıyorsun — bugünü de ekle.`,
+      ],
+      lastCall: [
+        (n: number) => `${n} günlük serin var — bugün de bozma.`,
+        (n: number) => `${n} gündür aralıksız. Bugün kalan tek eksik.`,
+      ],
+    },
+    multi: {
+      habit: [
+        (n: number) => `${n} halkada bugünü henüz işaretlemedin.`,
+        (n: number) => `${n} halkan bugünü bekliyor.`,
+      ],
+      lastCall: [
+        (n: number) => `${n} halka bugün seni bekliyor.`,
+        (n: number) => `${n} halkada bugün hâlâ işaretsiz.`,
+      ],
+    },
   },
   en: {
-    title: 'Your ring is waiting',
-    single: "You haven't checked in today — your ring is waiting on you.",
-    multi: (n: number) => `${n} rings are waiting on you today.`,
-    habitTitle: "Today isn't marked yet",
-    habitSingle: 'This is usually when you do it — your ring is ready.',
-    habitMulti: (n: number) => `${n} rings are still unmarked today.`,
+    title: {
+      habit: ["Today isn't marked yet", 'Your ring is ready', 'A small reminder'],
+      lastCall: ['Your ring is waiting', 'The day is ending', 'Last call'],
+    },
+    plain: {
+      habit: [
+        'This is usually when you do it — your ring is ready.',
+        "Your usual time has passed, and today isn't marked yet.",
+        'Looks like you forgot to mark today.',
+      ],
+      lastCall: [
+        "You haven't checked in today — your ring is waiting on you.",
+        "One tap left before the day's out.",
+        'Last chance to mark today.',
+      ],
+    },
+    social: {
+      habit: [
+        (done: number, total: number) => `${done}/${total} in your ring finished today.`,
+        (done: number, _total: number) => `${done} already marked today.`,
+      ],
+      lastCall: [
+        (done: number, total: number) => `${done}/${total} marked today — you're up.`,
+        (done: number, _total: number) => `${done} in your ring finished today, and the day is ending.`,
+      ],
+    },
+    streak: {
+      habit: [
+        (n: number) => `Your ${n}-day streak is alive, but today isn't marked.`,
+        (n: number) => `${n} days running — add today to it.`,
+      ],
+      lastCall: [
+        (n: number) => `You're on a ${n}-day streak — don't break it today.`,
+        (n: number) => `${n} days straight. Today is the only one missing.`,
+      ],
+    },
+    multi: {
+      habit: [
+        (n: number) => `${n} rings are still unmarked today.`,
+        (n: number) => `${n} of your rings are waiting on today.`,
+      ],
+      lastCall: [
+        (n: number) => `${n} rings are waiting on you today.`,
+        (n: number) => `${n} rings are still unmarked today.`,
+      ],
+    },
   },
-} as const;
+};
 
 type Locale = keyof typeof COPY;
 
-function copyFor(locale: string | null | undefined): (typeof COPY)['tr'] {
+function copyFor(locale: string | null | undefined): Pools {
   return COPY[(locale as Locale) ?? 'tr'] ?? COPY.tr;
+}
+
+/** Kullanıcı id'sini sabit bir sayıya indirger — herkesin havuzda farklı bir
+ *  yerden başlaması için. */
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+/**
+ * Havuzdan bugünün metnini seçer.
+ *
+ * (hash + günIndeksi) % uzunluk — rastgele değil, DÖNEN bir seçim. Saf hash
+ * olsaydı iki gün üst üste aynı metnin gelme ihtimali 1/N olurdu; burada
+ * indeks her gün tam olarak bir artıyor, yani havuz tükenmeden hiçbir metin
+ * tekrar etmiyor. Farklı kullanıcılar farklı offsetten başladığı için de
+ * herkes aynı gün aynı cümleyi görmüyor.
+ */
+function pick<T>(pool: readonly T[], userId: string, dayIndex: number): { value: T; index: number } {
+  const index = (hashCode(userId) + dayIndex) % pool.length;
+  return { value: pool[index], index };
 }
 
 /**
@@ -84,19 +222,19 @@ function deadlineHour(deadline: string | null): number {
 /** The opening date of the cycle we're in, as "YYYY-MM-DD". Mirrors
  * public.challenge_cycle_start() and src/lib/cycle.ts — one formula, four
  * copies, change them together. */
-function cycleStartFor(timeZone: string, deadline: string): string {
+function cycleStartFor(timeZone: string, deadline: string, when: Date = new Date()): string {
   const date = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date());
+  }).format(when);
   const time = new Intl.DateTimeFormat('en-GB', {
     timeZone,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(new Date());
+  }).format(when);
   if (time >= deadline) return date;
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - 1);
@@ -128,7 +266,7 @@ function median(values: number[]): number {
 
 Deno.serve(async (req) => {
   // Fail closed: no secret configured means no calls are trusted.
-  if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  if (!secretsMatch(WEBHOOK_SECRET, req.headers.get('x-webhook-secret'))) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
   }
 
@@ -180,34 +318,110 @@ Deno.serve(async (req) => {
       challengeId: string;
       timeZone: string;
       lastCallHour: number;
+      /** Bugün halkada kaç kişi işaretledi / halka kaç kişilik. */
+      doneCount: number;
+      totalCount: number;
+      /** Bu kişinin halkadaki gün numarası — seri hesabı için. */
+      currentDay: number;
     }[] = [];
+
+    // Katılımcılar ve bugünün check-in'leri TOPLUCA çekiliyor. Eskiden bu
+    // döngünün içinde halka başına iki sorgu vardı: saatlik cron 1000 canlı
+    // halkada çalışma başına 2000 istek demekti. Artık halka sayısından
+    // bağımsız, sabit sayıda sorgu.
+    const liveIds = live.map((c) => c.id as string);
+    /** .in(...) listesi GET query string'ine giriyor, o yüzden parçalıyoruz. */
+    const IN_CHUNK = 100;
+
+    const participantsByChallenge = new Map<
+      string,
+      { id: string; user_id: string; joined_at: string | null }[]
+    >();
+    for (let i = 0; i < liveIds.length; i += IN_CHUNK) {
+      const { data } = await admin
+        .from('participants')
+        .select('id, user_id, joined_at, challenge_id')
+        .in('challenge_id', liveIds.slice(i, i + IN_CHUNK));
+      for (const row of data ?? []) {
+        const cid = row.challenge_id as string;
+        const list = participantsByChallenge.get(cid) ?? [];
+        list.push({
+          id: row.id as string,
+          user_id: row.user_id as string,
+          joined_at: row.joined_at as string | null,
+        });
+        participantsByChallenge.set(cid, list);
+      }
+    }
+
+    // Her halkanın kendi currentDay'i farklı. Gün filtresini tamamen
+    // kaldırıp hepsini tek sorguda çekmek, halkaların BÜTÜN geçmiş
+    // check-in'lerini indirmek olurdu — N+1'den beteri. Bunun yerine
+    // halkaları gün numarasına göre grupluyoruz: sorgu sayısı halka
+    // sayısıyla değil, sahadaki FARKLI gün numarası sayısıyla orantılı
+    // (pratikte bir avuç), ve hiçbir fazladan satır inmiyor.
+    const challengesByDay = new Map<number, string[]>();
+    for (const c of live) {
+      const day = (c as Record<string, unknown>).currentDay as number;
+      const list = challengesByDay.get(day) ?? [];
+      list.push(c.id as string);
+      challengesByDay.set(day, list);
+    }
+
+    const doneByChallengeDay = new Map<string, Set<string>>();
+    for (const [day, ids] of challengesByDay) {
+      for (let i = 0; i < ids.length; i += IN_CHUNK) {
+        const { data } = await admin
+          .from('check_ins')
+          .select('participant_id, challenge_id')
+          .eq('day_number', day)
+          .in('challenge_id', ids.slice(i, i + IN_CHUNK));
+        for (const row of data ?? []) {
+          const key = `${row.challenge_id as string}:${day}`;
+          const set = doneByChallengeDay.get(key) ?? new Set<string>();
+          set.add(row.participant_id as string);
+          doneByChallengeDay.set(key, set);
+        }
+      }
+    }
 
     for (const challenge of live) {
       const currentDay = (challenge as Record<string, unknown>).currentDay as number;
       const timeZone = challenge.timezone as string;
       const lastCallHour = deadlineHour(challenge.deadline_time as string | null);
 
-      const { data: participants } = await admin
-        .from('participants')
-        .select('id, user_id')
-        .eq('challenge_id', challenge.id as string);
+      const participants = participantsByChallenge.get(challenge.id as string);
       if (!participants || participants.length === 0) continue;
 
-      const { data: doneToday } = await admin
-        .from('check_ins')
-        .select('participant_id')
-        .eq('challenge_id', challenge.id as string)
-        .eq('day_number', currentDay);
-      const doneIds = new Set((doneToday ?? []).map((c) => c.participant_id as string));
+      // Bugünün döngü tarihi — katılım günüyle karşılaştıracağız.
+      const deadline = ((challenge.deadline_time as string | null) ?? '00:00').slice(0, 5);
+      const todayCycle = cycleStartFor(timeZone, deadline);
+
+      const doneIds =
+        doneByChallengeDay.get(`${challenge.id as string}:${currentDay}`) ?? new Set<string>();
 
       for (const p of participants) {
-        if (doneIds.has(p.id as string)) continue;
+        if (doneIds.has(p.id)) continue;
+
+        // İlk gün sessiz. Sabah kurulan halkanın akşamı "bugün check-in
+        // yapmadın" demek, insanın daha halkayla tanışmadığı bir anda en sert
+        // metni göndermekti. Karşılaştırma takvim günüyle değil DÖNGÜ günüyle:
+        // deadline'ı gece yarısından farklı olan bir halkada gün sınırı başka
+        // yerde, ve iki yerde farklı hesaplamak tam da sessiz kalması gereken
+        // günü kaçırmak olurdu.
+        if (p.joined_at && cycleStartFor(timeZone, deadline, new Date(p.joined_at)) === todayCycle) {
+          continue;
+        }
+
         pending.push({
-          userId: p.user_id as string,
-          participantId: p.id as string,
+          userId: p.user_id,
+          participantId: p.id,
           challengeId: challenge.id as string,
           timeZone,
           lastCallHour,
+          doneCount: doneIds.size,
+          totalCount: participants.length,
+          currentDay,
         });
       }
     }
@@ -222,7 +436,7 @@ Deno.serve(async (req) => {
     const since = new Date(Date.now() - HABIT_DAYS * 86_400_000).toISOString();
     const { data: history } = await admin
       .from('check_ins')
-      .select('participant_id, created_at')
+      .select('participant_id, created_at, day_number')
       .in('participant_id', pending.map((p) => p.participantId))
       .gte('created_at', since);
 
@@ -230,6 +444,7 @@ Deno.serve(async (req) => {
     // this" is a question about the person's own day.
     const tzByParticipant = new Map(pending.map((p) => [p.participantId, p.timeZone]));
     const hoursByParticipant = new Map<string, number[]>();
+    const daysByParticipant = new Map<string, Set<number>>();
     for (const row of history ?? []) {
       const pid = row.participant_id as string;
       const tz = tzByParticipant.get(pid);
@@ -237,11 +452,34 @@ Deno.serve(async (req) => {
       const list = hoursByParticipant.get(pid) ?? [];
       list.push(hourIn(tz, new Date(row.created_at as string)));
       hoursByParticipant.set(pid, list);
+      const days = daysByParticipant.get(pid) ?? new Set<number>();
+      days.add(row.day_number as number);
+      daysByParticipant.set(pid, days);
     }
+
+    /** Dünden geriye kaç gün aralıksız işaretlenmiş. Joker de sayılır —
+     *  serinin korunması jokerin varlık sebebi. */
+    const streakOf = (participantId: string, currentDay: number): number => {
+      const days = daysByParticipant.get(participantId);
+      if (!days) return 0;
+      let n = 0;
+      for (let d = currentDay - 1; d >= 1 && days.has(d); d--) n += 1;
+      return n;
+    };
 
     // Whose hour is now? A ring counts if THIS person's reminder hour for it
     // is the hour its timezone is currently in.
-    const dueNow = new Map<string, { count: number; challengeId: string; habit: boolean }>();
+    const dueNow = new Map<
+      string,
+      {
+        count: number;
+        challengeId: string;
+        habit: boolean;
+        doneCount: number;
+        totalCount: number;
+        streak: number;
+      }
+    >();
     for (const p of pending) {
       const hours = hoursByParticipant.get(p.participantId) ?? [];
       // Their usual hour, plus grace — but never past the ring's own last
@@ -259,7 +497,14 @@ Deno.serve(async (req) => {
         // the whole push the last-call one.
         seen.habit = seen.habit && useHabit;
       } else {
-        dueNow.set(p.userId, { count: 1, challengeId: p.challengeId, habit: useHabit });
+        dueNow.set(p.userId, {
+          count: 1,
+          challengeId: p.challengeId,
+          habit: useHabit,
+          doneCount: p.doneCount,
+          totalCount: p.totalCount,
+          streak: streakOf(p.participantId, p.currentDay),
+        });
       }
     }
 
@@ -280,7 +525,12 @@ Deno.serve(async (req) => {
     // timezones within the same run window.
     const nowUtcDate = new Date().toISOString().slice(0, 10);
 
-    const messages: { to: string; title: string; body: string; data: Record<string, unknown> }[] = [];
+    // Havuz içindeki dönme bu sayıya bağlı: her takvim gününde bir artar, yani
+    // seçilen metin her gün bir sonrakine kayar ve havuz tükenmeden tekrar
+    // etmez.
+    const dayIndex = Math.floor(Date.now() / 86_400_000);
+
+    const messages: PushMessage[] = [];
     const remindedIds: string[] = [];
 
     for (const profile of profiles ?? []) {
@@ -289,35 +539,58 @@ Deno.serve(async (req) => {
       if (!token) continue;
       const due = dueNow.get(profile.id as string);
       if (!due) continue;
+
       const c = copyFor(profile.locale as string | null);
+      const userId = profile.id as string;
+      const tone = due.habit ? 'habit' : 'lastCall';
+
+      // Güçlüden zayıfa. Halkadaki başka birinin bugünü bitirmiş olması
+      // söylenebilecek en ikna edici şey; onu söyleyebiliyorsak jenerik
+      // metne düşmüyoruz. Tek kişilik halkada sosyal sinyal yok, seri var.
+      let body: string;
+      let variant: string;
+      if (due.count > 1) {
+        const p = pick(c.multi[tone], userId, dayIndex);
+        body = p.value(due.count);
+        variant = `multi.${tone}.${p.index}`;
+      } else if (due.totalCount > 1 && due.doneCount > 0) {
+        const p = pick(c.social[tone], userId, dayIndex);
+        body = p.value(due.doneCount, due.totalCount);
+        variant = `social.${tone}.${p.index}`;
+      } else if (due.streak >= 2) {
+        const p = pick(c.streak[tone], userId, dayIndex);
+        body = p.value(due.streak);
+        variant = `streak.${tone}.${p.index}`;
+      } else {
+        const p = pick(c.plain[tone], userId, dayIndex);
+        body = p.value;
+        variant = `plain.${tone}.${p.index}`;
+      }
+
+      const title = pick(c.title[tone], userId, dayIndex).value;
+
       messages.push({
         to: token,
-        title: due.habit ? c.habitTitle : c.title,
-        body: due.habit
-          ? due.count === 1
-            ? c.habitSingle
-            : c.habitMulti(due.count)
-          : due.count === 1
-            ? c.single
-            : c.multi(due.count),
+        title,
+        body,
         data: { challengeId: due.challengeId },
+        userId,
+        kind: 'reminder',
+        challengeId: due.challengeId,
+        variant,
       });
-      remindedIds.push(profile.id as string);
+      remindedIds.push(userId);
     }
 
     if (messages.length === 0) {
       return new Response(JSON.stringify({ reminded: 0 }), { status: 200 });
     }
 
-    await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(messages),
-    });
+    const { sent, dropped } = await sendPush(admin, messages);
 
     await admin.from('profiles').update({ last_reminder_date: nowUtcDate }).in('id', remindedIds);
 
-    return new Response(JSON.stringify({ reminded: remindedIds.length }), { status: 200 });
+    return new Response(JSON.stringify({ reminded: sent, dropped }), { status: 200 });
   } catch (e) {
     console.error('evening-reminder failed', e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {

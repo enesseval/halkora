@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Modal, Pressable, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge } from '@/data/types';
@@ -875,6 +876,118 @@ export function JokerDaySheet({
  * itself and there is no such thing as a tooltip on the Home Screen, so the
  * only place this can be explained is inside the app.
  */
+/**
+ * Bildirim izni ön-sorusu — ilk halka kurulduktan/katılındıktan sonra.
+ *
+ * iOS sistem dialogu ömür boyu bir kez açılır, o yüzden onu doğrudan
+ * göstermiyoruz: önce burada soruyoruz, sistem dialogu ancak kullanıcı
+ * "izin ver" derse açılıyor. "Şimdi değil" diyen birinin iOS izni
+ * `undetermined` kalır — yani fikrini değiştirirse Ayarlar'dan açabilir,
+ * hakkı yanmaz.
+ *
+ * Metinler onboarding'in eski 4. adımından geliyor (t.onboarding.notif.*):
+ * aynı soru, doğru anda soruluyor.
+ */
+export function NotifPromptSheet({
+  onAllow,
+  onDismiss,
+}: {
+  onAllow: () => Promise<void> | void;
+  onDismiss: () => void;
+}) {
+  const { t } = useT();
+  const [asking, setAsking] = useState(false);
+
+  const allow = async () => {
+    if (asking) return;
+    setAsking(true);
+    try {
+      await onAllow();
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.scrim,
+        justifyContent: 'flex-end',
+        zIndex: 30,
+      }}
+    >
+      {/* Dışarı dokunmak "şimdi değil" ile aynı şey — sistem dialogu açılmaz
+          ve bir daha sorulmaz. */}
+      <Pressable
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        onPress={asking ? undefined : onDismiss}
+      />
+      <Animated.View
+        entering={SlideInDown.duration(280)}
+        style={{
+          backgroundColor: colors.bgElevated,
+          borderTopLeftRadius: radius.sheet,
+          borderTopRightRadius: radius.sheet,
+          paddingHorizontal: 24,
+          paddingTop: 12,
+          paddingBottom: 40,
+        }}
+      >
+        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+          <View
+            style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.strokeSubtle }}
+          />
+        </View>
+
+        <View style={{ alignItems: 'center', marginTop: 10, marginBottom: 20 }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 18,
+              backgroundColor: colors.emberSoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 18,
+            }}
+          >
+            <Feather name="bell" size={24} color={colors.ember} />
+          </View>
+          <AppText variant="screenTitle" style={{ fontSize: 20, textAlign: 'center' }}>
+            {t.onboarding.notif.title}
+          </AppText>
+          <AppText
+            variant="secondary"
+            style={{ marginTop: 12, textAlign: 'center', maxWidth: 300 }}
+          >
+            {t.onboarding.notif.subtitle}
+          </AppText>
+        </View>
+
+        <Button
+          label={asking ? t.onboarding.notif.asking : t.onboarding.notif.allow}
+          onPress={allow}
+          disabled={asking}
+        />
+        <AppText
+          variant="secondary"
+          color={colors.textSecondary}
+          onPress={asking ? undefined : onDismiss}
+          style={{ textAlign: 'center', marginTop: 16 }}
+        >
+          {t.onboarding.notif.notNow}
+        </AppText>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
 export function WidgetHintSheet({ onClose }: { onClose: () => void }) {
   const { t } = useT();
   const steps = [t.widgetHint.step1, t.widgetHint.step2, t.widgetHint.step3];

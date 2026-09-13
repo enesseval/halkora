@@ -36,7 +36,7 @@ import type { Message, Participant } from '@/hooks';
 import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage, alertOnce } from '@/lib/errors';
 import { blockUser, reportMessage, type ReportReason } from '@/data/moderation';
-import { setActiveChallengeId } from '@/lib/push';
+import { setActiveChallengeId, isPermissionUndetermined, registerForPushToken } from '@/lib/push';
 import { clockOf } from '@/lib/day';
 import { fetchPendingInvites } from '@/data/invites';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -55,6 +55,7 @@ import {
   NudgeMessageSheet,
   ReportSheet,
   WidgetHintSheet,
+  NotifPromptSheet,
 } from '@/components/Sheets';
 import { hasWidgetInstalled } from '@/lib/widget';
 import {
@@ -62,9 +63,14 @@ import {
   dismissWidgetHint,
   isWidgetHintDismissed,
 } from '@/lib/widgetHint';
+import { isNotifPromptDone, markNotifPromptDone } from '@/lib/notifPrompt';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
+
+/** Sohbet mesajı üst sınırı. Veritabanındaki messages_text_length son
+ *  savunma hattı (2000); bu onun altında kalan arayüz sınırı. */
+const MESSAGE_MAX = 1000;
 
 type Row =
   | { kind: 'participant'; p: Participant }
@@ -218,6 +224,35 @@ export default function DetailScreen() {
   /** Faz 2 §2.6 — offer the widget once the habit is real, never before. */
   const [widgetHintReady, setWidgetHintReady] = useState(false);
   const [showWidgetHint, setShowWidgetHint] = useState(false);
+  /** Bildirim izni ön-sorusu — onboarding'den buraya taşındı. */
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+
+  // İzin ilk halkanın kendi ekranında isteniyor. Onboarding'de sorulduğunda
+  // kullanıcının daha tek bir halkası yoktu; iOS sistem dialogunu ömür boyu
+  // bir kez gösterdiği için, sebebi henüz oluşmamış birine sormak o hakkı
+  // yakmak demekti. Bu ekrandaysa taahhüt zaten verilmiş: hatırlatma bu
+  // halkanın varlık sebebi.
+  //
+  // İki koşul da gerekli: daha önce sorulmamış olmak (kendi bayrağımız) ve
+  // iOS'ta durumun hâlâ 'undetermined' olması. İkincisi tek başına yetmez —
+  // "şimdi değil" diyen birinin durumu undetermined kalır ve her halka
+  // açılışında yeniden sorardık.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (await isNotifPromptDone()) return;
+      if (!(await isPermissionUndetermined())) {
+        // Zaten sorulmuş (izin verilmiş ya da reddedilmiş): bayrağı kapat,
+        // bir daha bakma.
+        void markNotifPromptDone();
+        return;
+      }
+      if (alive) setShowNotifPrompt(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const myCheckins = challenge?.days.filter((d) => d === 'done' || d === 'joker').length ?? 0;
   useEffect(() => {
@@ -590,7 +625,19 @@ export default function DetailScreen() {
           onPress: async () => {
             setLeaving(true);
             try {
-              await actions.leaveChallenge(t.detail.systemLeft(myName));
+              // Alone in your own ring, "leave" means CLOSE — and it has to
+              // close it the way the copy promises, keeping you in it.
+              // leave_challenge also closes the ring, but it removes your
+              // participant row on the way out, so the ring stopped being
+              // yours to see: it vanished from Geçmiş and read as deleted
+              // (saha testi bulgusu — "tek kişiyken istatistikler geçmişte
+              // kalır diyor ama halkayı siliyor"). close_challenge leaves
+              // everyone where they are.
+              if (closes) {
+                await actions.closeChallenge(t.detail.systemClosed(myName));
+              } else {
+                await actions.leaveChallenge(t.detail.systemLeft(myName));
+              }
               goHomeAfterExit();
             } catch (e) {
               alertOnce(t.detail.leaveChallengeFailed, friendlyErrorMessage(e));
@@ -1160,7 +1207,17 @@ export default function DetailScreen() {
               path of every other gesture, which is how the swipe on Home came to
               open the ring instead of revealing its actions. */}
           <GestureDetector gesture={timeReveal}>
-          <View style={{ flex: 1 }}>
+          {/* Claims the touch ONLY while a menu is open, and only when the
+              touch starts somewhere nothing else wants it: React Native asks
+              the deepest view first, so a bubble's own Pressable still gets
+              its taps and long-presses. That is what lets a long-press on
+              another message open ITS menu while this one is up, and a tap on
+              empty space still put the menu away. */}
+          <View
+            style={{ flex: 1 }}
+            onStartShouldSetResponder={() => menuAnchor !== null}
+            onResponderRelease={() => setMenuAnchor(null)}
+          >
             <FlashList
               ref={listRef}
               data={rows}
@@ -1231,6 +1288,12 @@ export default function DetailScreen() {
               onChangeText={setDraft}
               placeholder={t.detail.composerPlaceholder}
               placeholderTextColor={colors.textTertiary}
+              // Sohbet, uzunluk sınırı olmayan tek metin alanıydı — başlık,
+              // eylem, bahis, ad ve kullanıcı adının hepsinde vardı. Veritabanı
+              // da 2000'de kesiyor (messages_text_length); buradaki sınır daha
+              // dar, çünkü kullanıcının bir hata mesajıyla karşılaşması değil
+              // hiç o noktaya gelmemesi gerekir.
+              maxLength={MESSAGE_MAX}
               style={{
                 flex: 1,
                 height: 44,
@@ -1281,6 +1344,25 @@ export default function DetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {showNotifPrompt ? (
+        <NotifPromptSheet
+          onAllow={async () => {
+            // Sistem dialogu ancak BURADA açılıyor — kullanıcı kendi
+            // ekranımızda evet dedikten sonra.
+            await registerForPushToken();
+            void markNotifPromptDone();
+            setShowNotifPrompt(false);
+          }}
+          onDismiss={() => {
+            // "Şimdi değil" de bir cevap: geri gelmiyor. iOS izni
+            // undetermined kaldığı için fikrini değiştirirse Ayarlar'dan
+            // açabilir.
+            void markNotifPromptDone();
+            setShowNotifPrompt(false);
+          }}
+        />
+      ) : null}
 
       {showWidgetHint ? (
         <WidgetHintSheet

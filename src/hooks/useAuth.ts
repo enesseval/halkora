@@ -559,32 +559,6 @@ async function deleteAccount(): Promise<void> {
   useAuthStore.setState({ session: null, name: null, username: null, isPro: false, messagePreview: true });
 }
 
-/**
- * Clears the profile name so the root guard routes back through onboarding —
- * keeps the same (anonymous) user. Handy for re-viewing the flow.
- */
-async function resetOnboarding(): Promise<void> {
-  const session = useAuthStore.getState().session;
-  if (!session) return;
-  await supabase
-    .from('profiles')
-    .update({ name: null, initials: null })
-    .eq('id', session.user.id);
-  useAuthStore.setState({ name: null });
-}
-
-/**
- * DEV-ONLY: flip is_pro on the current profile so the paywall / advanced-stats
- * gating can be exercised before RevenueCat (Faz B) is wired. Guarded by
- * __DEV__ at the (single) call site — never reachable in a release build.
- */
-async function setProDev(next: boolean): Promise<void> {
-  const session = useAuthStore.getState().session;
-  if (!session) return;
-  await supabase.from('profiles').update({ is_pro: next }).eq('id', session.user.id);
-  useAuthStore.setState({ isPro: next });
-}
-
 /** Settings' "show message content in notifications" toggle — optimistic
  * (Settings just flips it back on failure, same as the language switcher). */
 async function setMessagePreview(next: boolean): Promise<void> {
@@ -627,8 +601,6 @@ export function useAuth() {
     saveUsername,
     signOut,
     deleteAccount,
-    resetOnboarding,
-    setProDev,
     setMessagePreview,
   };
 }

@@ -155,6 +155,11 @@ export function MessageBubble({ message, onOpenMenu, menuOpen, onCloseMenu }: Bu
               onCloseMenu();
               return;
             }
+            // Always opens — even while another bubble's menu is up. The
+            // screen holds one anchor, so pointing it here replaces what was
+            // there in a single press (saha testi bulgusu — "menü kapanıyor
+            // ama diğer mesajın menüsü açılmıyor").
+            //
             // measureInWindow, not onLayout: the menu is drawn OUTSIDE the
             // list, so it needs where this bubble is on the screen right now,
             // not where it sits inside its row.
@@ -210,7 +215,7 @@ export function MessageBubble({ message, onOpenMenu, menuOpen, onCloseMenu }: Bu
 }
 
 /** Roughly how tall the menu is. Only used to decide above-or-below. */
-const MENU_H = 46;
+const MENU_H = 52;
 /** Breathing room from the bubble, and from the screen/keyboard edges. */
 const MENU_GAP = 6;
 const SCREEN_PAD = 12;
@@ -275,10 +280,15 @@ export function ChatMenu({
   };
 
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
-      {/* Anywhere else puts it away. Covers the whole screen, so it catches
-          the tap before the list underneath ever sees it. */}
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
+    // box-none, and no scrim. A full-screen Pressable over the list caught
+    // every touch first, so long-pressing a DIFFERENT message only dismissed
+    // this menu and never reached that bubble. Touches pass straight through
+    // now; the list's own conditional responder closes the menu when you tap
+    // empty space, and each bubble handles its own press.
+    <View
+      pointerEvents="box-none"
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}
+    >
       <Animated.View
         entering={FadeIn.duration(150)}
         style={{
@@ -287,13 +297,17 @@ export function ChatMenu({
           ...side,
           maxWidth: screenW - SCREEN_PAD * 2,
           flexDirection: 'row',
+          alignItems: 'center',
           gap: 4,
           backgroundColor: colors.bgElevated,
           borderWidth: hairline,
           borderColor: colors.strokeSubtle,
           borderRadius: radius.pill,
           paddingHorizontal: 8,
-          paddingVertical: 6,
+          // Emoji glyphs sit taller than their font box, so 6pt of padding
+          // clipped them top and bottom (saha testi bulgusu — "emojiler
+          // açılan menü içerisine sığmıyor").
+          paddingVertical: 9,
         }}
       >
         {REACTION_EMOJIS.map((e) => (
@@ -309,7 +323,9 @@ export function ChatMenu({
               transform: [{ scale: pressed ? 1.25 : 1 }],
             })}
           >
-            <AppText style={{ fontSize: 20 }}>{e}</AppText>
+            {/* An explicit lineHeight: the default one for a 20pt font is
+                shorter than the emoji actually draws. */}
+            <AppText style={{ fontSize: 20, lineHeight: 26 }}>{e}</AppText>
           </Pressable>
         ))}
 

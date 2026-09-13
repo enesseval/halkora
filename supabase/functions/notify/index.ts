@@ -29,13 +29,14 @@
 // fake payload and push arbitrary notifications to real users.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPush, type PushMessage } from '../_shared/push.ts';
+import { secretsMatch } from '../_shared/auth.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET');
 
 // Push bodies shouldn't blow up over a long pasted message.
@@ -78,8 +79,12 @@ const COPY = {
 
 type Locale = keyof typeof COPY;
 
+// `as const` her dile ayrı literal tipler verdiği için EN tablosu TR'ninkine
+// atanamıyordu (tip hatası; esbuild tipleri kontrol etmeden attığı için
+// çalışma zamanında görünmüyordu). Dönüş tipini TR'nin şekli olarak
+// sabitlemek ikisini de kabul edilebilir kılar — davranış değişmiyor.
 function copyFor(locale: string | null | undefined): (typeof COPY)['tr'] {
-  return COPY[(locale as Locale) ?? 'tr'] ?? COPY.tr;
+  return (COPY[(locale as Locale) ?? 'tr'] ?? COPY.tr) as (typeof COPY)['tr'];
 }
 
 type WebhookPayload = {
@@ -107,7 +112,7 @@ Deno.serve(async (req) => {
   // Fail closed: no secret configured means no calls are trusted, not "allow
   // everything". Set WEBHOOK_SECRET (supabase secrets set) and the matching
   // DB Webhook header before this function is useful.
-  if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  if (!secretsMatch(WEBHOOK_SECRET, req.headers.get('x-webhook-secret'))) {
     return unauthorized();
   }
 
@@ -241,30 +246,28 @@ Deno.serve(async (req) => {
               ? c.rematchBody(challengeTitle ?? c.challengeFallback)
               : c.inviteBody;
         }
-        return { to: r.token as string, title, subtitle, body, data: { challengeId, inviteCode } };
+        return {
+          to: r.token as string,
+          title,
+          subtitle,
+          body,
+          data: { challengeId, inviteCode },
+          userId: r.user_id as string,
+          // notification_log'da 'mesaj mı davet mi' ayrımı — hangi türün
+          // açıldığını hangisinin yok sayıldığını ancak böyle ayırabiliriz.
+          kind: table === 'messages' ? 'message' : table === 'nudges' ? 'nudge' : 'invite',
+          challengeId: challengeId ?? null,
+        } as PushMessage;
       });
     if (messages.length === 0) return ok();
 
-    // Expo's push endpoint accepts at most 100 messages per request — group
-    // size is deliberately uncapped, so send in chunks instead of one POST
-    // that would be rejected (or partially dropped) past that limit.
-    let sent = 0;
-    for (let i = 0; i < messages.length; i += 100) {
-      const res = await fetch(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(messages.slice(i, i + 100)),
-      });
-      // res.ok only reflects Expo's HTTP-level acceptance of the batch — a
-      // per-message rejection (DeviceNotRegistered, InvalidCredentials, ...)
-      // still comes back with HTTP 200 nested inside the body, so it'd never
-      // otherwise show up anywhere in this function's logs.
-      const resBody = await res.text();
-      console.log('notify: expo push response', { status: res.status, body: resBody });
-      if (res.ok) sent += Math.min(100, messages.length - i);
-    }
+    // Parçalama, ticket okuma, ölü token silme ve loglama artık ortak
+    // katmanda (_shared/push.ts). Buradaki eski döngü Expo'nun cevabını
+    // yalnızca log'a basıyordu: DeviceNotRegistered dönen token hiç
+    // silinmiyor, her gönderimde yeniden deneniyordu.
+    const { sent, dropped } = await sendPush(admin, messages);
 
-    return ok({ sent });
+    return ok({ sent, dropped });
   } catch (e) {
     // A webhook is fire-and-forget from Postgres's perspective — never let a
     // push failure surface as a DB-visible error. Log-and-200 instead.

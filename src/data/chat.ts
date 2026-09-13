@@ -11,6 +11,15 @@ interface MessageRow {
   created_at: string;
 }
 
+/**
+ * Sohbette gösterilen en yeni mesaj sayısı.
+ *
+ * Bu sorgunun sınırı yoktu: halka eskidikçe her açılışta, her yeni mesajda ve
+ * 20 saniyelik her yoklamada bütün geçmiş yeniden iniyordu. Sınır hem yükü
+ * hem de aşağıdaki reaksiyon sorgusunu sınırlıyor.
+ */
+const PAGE = 200;
+
 /** Messages + reaction counts for one challenge, newest last. */
 export async function fetchMessages(challengeId: string): Promise<Message[]> {
   // getSession() (local, no network) instead of getUser() (network round-trip
@@ -21,21 +30,29 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
   } = await supabase.auth.getSession();
   const user = session?.user;
 
+  // En yeniden geriye doğru çekip sonra ters çeviriyoruz: "son PAGE mesaj"
+  // istiyoruz, ilk PAGE mesajı değil.
   const { data: msgs, error } = await supabase
     .from('messages')
     .select('id, user_id, day_number, kind, text, created_at')
     .eq('challenge_id', challengeId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .limit(PAGE);
   if (error) throw error;
 
-  const rows = (msgs ?? []) as MessageRow[];
+  const rows = ((msgs ?? []) as MessageRow[]).reverse();
   if (rows.length === 0) return [];
 
-  const ids = rows.map((m) => m.id);
   const userIds = Array.from(new Set(rows.map((m) => m.user_id)));
 
   const [{ data: reactions }, { data: profs }] = await Promise.all([
-    supabase.from('message_reactions').select('message_id, emoji').in('message_id', ids),
+    // Mesaj id'lerini tek tek .in() ile göndermek yerine halkanın üzerinden
+    // birleştiriyoruz. .in() listesi GET query string'ine giriyordu ve mesaj
+    // sayısıyla büyüyordu — birkaç yüz mesajda URL uzunluk sınırına dayanır.
+    supabase
+      .from('message_reactions')
+      .select('message_id, emoji, messages!inner(challenge_id)')
+      .eq('messages.challenge_id', challengeId),
     supabase.from('profiles').select('id, name').in('id', userIds),
   ]);
 
@@ -60,15 +77,29 @@ export async function fetchMessages(challengeId: string): Promise<Message[]> {
   }));
 }
 
+/**
+ * Veritabanındaki messages_text_length sınırıyla aynı sayı.
+ *
+ * Arayüzdeki maxLength (MESSAGE_MAX, 1000) bunun altında kalıyor; buradaki
+ * kırpma, metnin arayüzü baypas ederek (yapıştırma, otomatik doldurma, ileride
+ * başka bir çağrı yeri) geldiği durumlar için. Kırpmak, kullanıcının yazdığını
+ * bir 23514 hatasıyla kaybetmesinden iyidir.
+ */
+const TEXT_MAX = 2000;
+
 export async function insertMessage(challengeId: string, dayNumber: number, text: string): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
   const user = session?.user;
   if (!user) throw new Error(getDict().errors.sessionMissing);
-  const { error } = await supabase
-    .from('messages')
-    .insert({ challenge_id: challengeId, user_id: user.id, day_number: dayNumber, kind: 'message', text });
+  const { error } = await supabase.from('messages').insert({
+    challenge_id: challengeId,
+    user_id: user.id,
+    day_number: dayNumber,
+    kind: 'message',
+    text: text.slice(0, TEXT_MAX),
+  });
   if (error) throw error;
 }
 
