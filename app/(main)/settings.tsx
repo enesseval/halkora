@@ -11,7 +11,7 @@ import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
 import { PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '@/lib/legal';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
-import { NameSheet, UsernameSheet, WidgetHintSheet } from '@/components/Sheets';
+import { NameSheet, UsernameSheet, WidgetHintSheet, FeedbackSheet } from '@/components/Sheets';
 import { BlockedSheet } from '@/components/BlockedSheet';
 import { useT, type Locale } from '@/i18n';
 
@@ -119,6 +119,7 @@ export default function SettingsScreen() {
   const [editingName, setEditingName] = useState(false);
   const [showWidgetHint, setShowWidgetHint] = useState(false);
   const [showBlocked, setShowBlocked] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const notifGranted = useNotificationStatus();
 
   const displayName = name ?? ME_NAME;
@@ -346,6 +347,16 @@ export default function SettingsScreen() {
                 label={t.settings.legalSupport}
                 onPress={() => openLegal(SUPPORT_URL)}
               />
+              <Divider />
+              {/* Şikayetin (mesaj menüsündeki "Bildir") yanında değil burada:
+                  şikayet bir kişiyi/mesajı hedefler ve bağlamı sohbettir;
+                  öneri uygulamanın tamamı hakkındadır ve aranacağı yer
+                  Ayarlar'dır. İkisi ayrı gelen kutusuna düşüyor. */}
+              <Row
+                icon="message-square"
+                label={t.settings.feedback}
+                onPress={() => setShowFeedback(true)}
+              />
             </Group>
           </View>
         </View>
@@ -390,6 +401,8 @@ export default function SettingsScreen() {
       {showWidgetHint ? <WidgetHintSheet onClose={() => setShowWidgetHint(false)} /> : null}
 
       {showBlocked ? <BlockedSheet onClose={() => setShowBlocked(false)} /> : null}
+
+      {showFeedback ? <FeedbackSheet onClose={() => setShowFeedback(false)} /> : null}
 
       {editingName ? (
         <NameSheet current={displayName} onClose={() => setEditingName(false)} onSave={saveName} />

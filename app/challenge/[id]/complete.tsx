@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ import { AppText, Avatar, Button, Card, IconButton, Screen, SectionLabel } from 
 import { ProgressRing } from '@/components/ProgressRing';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
+import { FeedbackSheet, FeedbackPromptSheet } from '@/components/Sheets';
+import { isFeedbackPromptDone, markFeedbackPromptDone } from '@/lib/feedbackPrompt';
 import { useT } from '@/i18n';
 import type { SegmentState } from '@/hooks';
 
@@ -46,6 +48,25 @@ export default function CompleteScreen() {
   const { loading, firstLoadError, error, refetch } = useChallengesQuery();
   const actions = useChallengeActions(id ?? '');
   const [settling, setSettling] = useState(false);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  // Geri bildirim isteği tam burada: kişi baştan sona bir halka yaşamış ve
+  // söyleyecek somut bir şeyi var. "7 gündür kullanıyorsun" gibi zamana bağlı
+  // bir tetik hiç check-in yapmamış birine de çıkardı.
+  //
+  // Bir kez. Geri gelen bir istek reklamdır (widgetHint.ts ile aynı gerekçe);
+  // "şimdi değil" de bir cevaptır ve Ayarlar'daki buton her zaman yerinde.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (await isFeedbackPromptDone()) return;
+      if (alive) setShowFeedbackPrompt(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Derived here (not inside the JSX) so the settle button's visibility rule
   // stays readable: there's nothing to "mark as paid" when the stake was
@@ -356,6 +377,22 @@ export default function CompleteScreen() {
           <Button label={t.complete.shareResult} onPress={share} />
         </View>
       </ScrollView>
+
+      {showFeedbackPrompt ? (
+        <FeedbackPromptSheet
+          onAccept={() => {
+            void markFeedbackPromptDone();
+            setShowFeedbackPrompt(false);
+            setShowFeedback(true);
+          }}
+          onDismiss={() => {
+            void markFeedbackPromptDone();
+            setShowFeedbackPrompt(false);
+          }}
+        />
+      ) : null}
+
+      {showFeedback ? <FeedbackSheet onClose={() => setShowFeedback(false)} /> : null}
     </Screen>
   );
 }

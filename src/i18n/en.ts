@@ -292,6 +292,7 @@ export const en: Dictionary = {
     legalTerms: 'Terms of Use',
     legalPrivacy: 'Privacy Policy',
     legalSupport: 'Support',
+    feedback: 'Send feedback',
     legalOpenFailed: 'Could not open the page.',
     version: (v: string) => `Version ${v}`,
   },
@@ -519,6 +520,24 @@ export const en: Dictionary = {
   },
 
   /** Guideline 1.2 — reporting, blocking, terms of use. */
+  feedback: {
+    title: 'What do you think?',
+    subtitle: "Anything missing, anything annoying, anything you wish existed — write it here. I read all of it.",
+    kindSuggestion: 'Suggestion',
+    kindBug: 'Something is broken',
+    kindOther: 'Other',
+    placeholder: 'Write here…',
+    send: 'Send',
+    sending: 'Sending…',
+    sent: 'Thank you — it arrived.',
+    failed: "Couldn't send",
+    /** Asked once, after a ring is finished. */
+    promptTitle: 'You finished a ring',
+    promptBody: 'How did it go? If there is anything you wish it did, or anything that got in your way, I would like to hear it.',
+    promptAccept: 'Write a few lines',
+    promptDismiss: 'Not now',
+  },
+
   moderation: {
     report: 'Report',
     block: 'Block',

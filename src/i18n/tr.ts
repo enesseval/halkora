@@ -296,6 +296,7 @@ export const tr = {
     legalTerms: 'Kullanım Şartları',
     legalPrivacy: 'Gizlilik Politikası',
     legalSupport: 'Destek',
+    feedback: 'Öneri ve görüş gönder',
     legalOpenFailed: 'Sayfa açılamadı.',
     version: (v: string) => `Sürüm ${v}`,
   },
@@ -538,6 +539,24 @@ export const tr = {
   },
 
   /** Guideline 1.2 — şikayet, engelleme, kullanım şartları. */
+  feedback: {
+    title: 'Ne düşünüyorsun?',
+    subtitle: 'Eksik bulduğun, canını sıkan ya da olsa dediğin ne varsa yaz. Hepsini okuyorum.',
+    kindSuggestion: 'Öneri',
+    kindBug: 'Bir sorun var',
+    kindOther: 'Diğer',
+    placeholder: 'Buraya yaz…',
+    send: 'Gönder',
+    sending: 'Gönderiliyor…',
+    sent: 'Teşekkürler, ulaştı.',
+    failed: 'Gönderilemedi',
+    /** Halka bitince bir kez çıkan istek. */
+    promptTitle: 'Bir halkayı bitirdin',
+    promptBody: 'Nasıl gitti? Eklenmesini istediğin ya da canını sıkan bir şey varsa duymak isterim.',
+    promptAccept: 'Birkaç satır yazayım',
+    promptDismiss: 'Şimdi değil',
+  },
+
   moderation: {
     // Mesaja uzun basınca çıkan eylemler
     report: 'Bildir',
