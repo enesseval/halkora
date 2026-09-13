@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -21,6 +21,7 @@ import { addDays, formatLongDate, formatShortDate, isSameDay } from '@/lib/day';
 import type { StakeKind } from '@/data/types';
 import { AppText, Button, Chip, IconButton, Screen } from '@/components/ui';
 import { useT } from '@/i18n';
+import { track } from '@/data/events';
 
 /** Head count used only to make the collective-target formula concrete. The
  * real one isn't known while creating (a lobby has no participants yet), so
@@ -417,6 +418,14 @@ export default function CreateScreen() {
   const router = useRouter();
   const { t } = useT();
   const create = useCreateChallenge();
+
+  // Bu ekranı açıp vazgeçen kimse veritabanında iz bırakmıyor — halka
+  // kurulmadıysa hiçbir satır yok. Açılış ile gerçekten kurulan halka
+  // sayısını karşılaştırmak, formun neresinde kaybettiğimizi söyleyen tek
+  // sinyal.
+  useEffect(() => {
+    track('ring_create_open');
+  }, []);
 
   // "Aynı grupla tekrar halka kur" (ROADMAP MVP-sonrası) — the finish screen
   // links here with the just-completed challenge's id; its own data (still

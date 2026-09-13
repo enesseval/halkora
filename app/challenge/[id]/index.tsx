@@ -64,6 +64,7 @@ import {
   isWidgetHintDismissed,
 } from '@/lib/widgetHint';
 import { isNotifPromptDone, markNotifPromptDone } from '@/lib/notifPrompt';
+import { track } from '@/data/events';
 import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { useT } from '@/i18n';
@@ -1350,11 +1351,13 @@ export default function DetailScreen() {
           onAllow={async () => {
             // Sistem dialogu ancak BURADA açılıyor — kullanıcı kendi
             // ekranımızda evet dedikten sonra.
+            track('notif_prompt', { action: 'allow' });
             await registerForPushToken();
             void markNotifPromptDone();
             setShowNotifPrompt(false);
           }}
           onDismiss={() => {
+            track('notif_prompt', { action: 'dismiss' });
             // "Şimdi değil" de bir cevap: geri gelmiyor. iOS izni
             // undetermined kaldığı için fikrini değiştirirse Ayarlar'dan
             // açabilir.

@@ -14,6 +14,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { FeedbackSheet, FeedbackPromptSheet } from '@/components/Sheets';
 import { isFeedbackPromptDone, markFeedbackPromptDone } from '@/lib/feedbackPrompt';
 import { maybeAskForRating } from '@/lib/rateApp';
+import { track, trackError } from '@/data/events';
 import { useT } from '@/i18n';
 import type { SegmentState } from '@/hooks';
 
@@ -111,6 +112,7 @@ export default function CompleteScreen() {
     try {
       await actions.settleStake();
     } catch (e) {
+      trackError('settle_stake', e);
       alertOnce(t.complete.settleFailed, friendlyErrorMessage(e));
     } finally {
       setSettling(false);
@@ -400,11 +402,13 @@ export default function CompleteScreen() {
       {showFeedbackPrompt ? (
         <FeedbackPromptSheet
           onAccept={() => {
+            track('feedback_prompt', { action: 'accept' });
             void markFeedbackPromptDone();
             setShowFeedbackPrompt(false);
             setShowFeedback(true);
           }}
           onDismiss={() => {
+            track('feedback_prompt', { action: 'dismiss' });
             void markFeedbackPromptDone();
             setShowFeedbackPrompt(false);
           }}

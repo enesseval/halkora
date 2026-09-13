@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { getDict, getLocale } from '@/i18n';
+import { track } from '@/data/events';
 
 /**
  * Öneri / görüş kutusu — şikayetten (src/data/moderation.ts) ayrı.
@@ -41,5 +42,7 @@ export async function submitFeedback(kind: FeedbackKind, body: string): Promise<
   // Haber ayağı, şikayetteki desenin aynısı: kayıt zaten yazıldı, mailin
   // başarısız olması kullanıcıya "gitmedi" dedirtmemeli. Bu yüzden hatası
   // yutuluyor ve beklenmiyor.
+  track('feedback_sent', { kind });
+
   supabase.functions.invoke('feedback-alert', { body: { feedback_id: data.id } }).catch(() => {});
 }

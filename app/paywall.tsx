@@ -8,6 +8,7 @@ import { colors, fonts, hairline, radius, type } from '@/theme/tokens';
 import { AppText, Button } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useT } from '@/i18n';
+import { track } from '@/data/events';
 import {
   fetchPlans,
   hasProEntitlement,
@@ -162,6 +163,13 @@ export default function Paywall() {
   // device that can't reach the store at all).
   const [plans, setPlans] = useState<Plans>({});
   const [busy, setBusy] = useState(false);
+
+  // Hangi sebeple açıldığı önemli: limit duvarına toslayan biriyle
+  // istatistik kilidine takılan biri aynı kullanıcı değil. Satın almanın
+  // kendisi RevenueCat'te, burada yalnızca görüntülenme var.
+  useEffect(() => {
+    track('paywall_view', { reason: key });
+  }, [key]);
 
   useEffect(() => {
     let alive = true;

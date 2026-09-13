@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as StoreReview from 'expo-store-review';
+import { track } from '@/data/events';
 
 /**
  * App Store puan isteği.
@@ -56,6 +57,9 @@ export async function maybeAskForRating(challengeId: string, completionPct: numb
 
     await AsyncStorage.setItem(ASKED_AT_KEY, new Date().toISOString());
     await AsyncStorage.setItem(ASKED_FOR_KEY, challengeId);
+    // Apple gösterip göstermediğini söylemiyor; kaydettiğimiz "istedik".
+    // Bu satır hiç birikmiyorsa kapılar fazla dar demektir.
+    track('rate_prompt', { pct: Math.round(completionPct) });
     await StoreReview.requestReview();
   } catch {
     // Puan isteği hiçbir zaman bir hata yüzeyi değil: çalışmazsa kullanıcı

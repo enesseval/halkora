@@ -33,6 +33,7 @@ import {
 } from '@/data/chat';
 import { RECEIVED_INVITES_KEY } from '@/components/InvitesSheet';
 import { friendlyErrorMessage, isErrorCode, isNetworkError, alertOnce } from '@/lib/errors';
+import { trackError } from '@/data/events';
 import { router } from 'expo-router';
 import {
   ME_ID,
@@ -224,6 +225,7 @@ export function useRefreshChallenges() {
       // left running under a spinner that already went away.
       await queryClient.refetchQueries({ queryKey: MY_CHALLENGES_KEY }, { throwOnError: true });
     } catch (e) {
+      trackError('refresh', e);
       Alert.alert(
         isNetworkError(e) ? t.errors.offlineTitle : t.errors.loadFailed,
         friendlyErrorMessage(e),
@@ -419,6 +421,7 @@ export function useCheckIn(id: string) {
         .catch((e) => {
           undo(id); // roll back the optimistic update
           syncWidgetSnapshot(useMockStore.getState().challenges);
+          trackError('checkin', e);
           alertOnce(t.errors.checkInFailed, friendlyErrorMessage(e));
         });
     }
@@ -440,6 +443,7 @@ export function useCheckIn(id: string) {
         // instead, and say why.
         checkIn(id);
         syncWidgetSnapshot(useMockStore.getState().challenges);
+        trackError('checkin_undo', e);
         alertOnce(t.errors.undoFailed, friendlyErrorMessage(e));
       });
   };
@@ -698,6 +702,7 @@ export function useChallengeActions(id: string) {
           } catch {
             // best-effort resync; the alert below still tells the user it failed
           }
+          trackError('joker', e);
           alertOnce(t.errors.jokerFailed, friendlyErrorMessage(e));
         });
     }
@@ -717,6 +722,7 @@ export function useChallengeActions(id: string) {
         return true;
       } catch (e) {
         removeMessageMock(id, localId); // roll back — it never actually sent
+        trackError('send_message', e);
         alertOnce(t.errors.messageFailed, friendlyErrorMessage(e));
         return false;
       }
@@ -778,6 +784,7 @@ export function useChallengeActions(id: string) {
         // until the next 60s poll: `nudged` is derived from the server's own
         // rows, so a refetch is what tells the truth here.
         queryClient.invalidateQueries({ queryKey: MY_CHALLENGES_KEY });
+        trackError('nudge', e);
         alertOnce(t.errors.nudgeFailed, friendlyErrorMessage(e));
       });
   };
@@ -982,6 +989,7 @@ export function useCreateChallenge() {
           if (isNetworkError(e)) {
             Alert.alert(t.errors.offlineTitle, t.errors.checkConnection);
           } else {
+            trackError('create_ring', e);
             alertOnce(t.errors.createFailed, friendlyErrorMessage(e));
           }
           return null;
