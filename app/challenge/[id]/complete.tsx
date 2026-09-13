@@ -13,6 +13,7 @@ import { RingScreenSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { FeedbackSheet, FeedbackPromptSheet } from '@/components/Sheets';
 import { isFeedbackPromptDone, markFeedbackPromptDone } from '@/lib/feedbackPrompt';
+import { maybeAskForRating } from '@/lib/rateApp';
 import { useT } from '@/i18n';
 import type { SegmentState } from '@/hooks';
 
@@ -51,6 +52,13 @@ export default function CompleteScreen() {
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
+  // Aşağıdaki `stats` yükleme kontrollerinden SONRA tanımlı; efekt ise
+  // bileşenin en üstünde çalışmak zorunda, o yüzden ihtiyacı olan iki değeri
+  // burada ayrıca türetiyoruz. Halka henüz yüklenmediyse ikisi de boş kalır
+  // ve efekt bağımlılıklarından yeniden çalışır.
+  const challengeId = challenge?.id;
+  const pct = challenge?.finishStats?.completionPct ?? null;
+
   // Geri bildirim isteği tam burada: kişi baştan sona bir halka yaşamış ve
   // söyleyecek somut bir şeyi var. "7 gündür kullanıyorsun" gibi zamana bağlı
   // bir tetik hiç check-in yapmamış birine de çıkardı.
@@ -60,13 +68,24 @@ export default function CompleteScreen() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      if (await isFeedbackPromptDone()) return;
-      if (alive) setShowFeedbackPrompt(true);
+      if (!(await isFeedbackPromptDone())) {
+        if (alive) setShowFeedbackPrompt(true);
+        return;
+      }
+      // Geri bildirim zaten sorulmuş demek, bu ilk bitirilen halka değil.
+      // Puan isteği ancak buradan sonra devreye giriyor ve ASLA geri bildirim
+      // isteğiyle aynı ekranda çıkmıyor: üst üste iki dialog ikisini de
+      // değersizleştirir.
+      //
+      // İlk halkada geri bildirim, sonrakilerde puan — sırası bilinçli. Erken
+      // dönemde neyin bozuk olduğunu öğrenmek, bir puandan daha kıymetli.
+      if (!challengeId || pct == null) return;
+      await maybeAskForRating(challengeId, pct);
     })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [challengeId, pct]);
 
   // Derived here (not inside the JSX) so the settle button's visibility rule
   // stays readable: there's nothing to "mark as paid" when the stake was
