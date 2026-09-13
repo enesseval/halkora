@@ -7,6 +7,7 @@ import { colors, fonts, hairline, radius, spacing, type } from '@/theme/tokens';
 import { Challenge } from '@/data/types';
 import { friendlyErrorMessage } from '@/lib/errors';
 import type { ReportReason } from '@/data/moderation';
+import { submitFeedback, FEEDBACK_MAX, type FeedbackKind } from '@/data/feedback';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useT } from '@/i18n';
 import { ProgressRing } from './ProgressRing';
@@ -742,6 +743,168 @@ export function NudgeMessageSheet({
  * a report with no category can't be triaged, and being asked why makes
  * casual mis-reporting less likely.
  */
+/**
+ * Öneri / görüş kutusu — şikayetten (ReportSheet) ayrı, kasten.
+ *
+ * Şikayet bir moderasyon işidir ve tek dokunuşla sebep seçilir; öneri ise
+ * serbest metindir ve yazması zahmetlidir. İkisini aynı ekranda birleştirmek,
+ * şikayeti yavaşlatıp öneriyi bir sebep listesine sıkıştırmak olurdu.
+ */
+export function FeedbackSheet({ onClose }: { onClose: () => void }) {
+  const { t } = useT();
+  const inputRef = useRef<TextInput>(null);
+  const [kind, setKind] = useState<FeedbackKind>('suggestion');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const kinds: { key: FeedbackKind; label: string }[] = [
+    { key: 'suggestion', label: t.feedback.kindSuggestion },
+    { key: 'bug', label: t.feedback.kindBug },
+    { key: 'other', label: t.feedback.kindOther },
+  ];
+
+  const canSend = body.trim().length > 0 && !sending;
+
+  const send = async () => {
+    if (!canSend) return;
+    setSending(true);
+    setErr(null);
+    try {
+      await submitFeedback(kind, body);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onClose();
+    } catch (e) {
+      setErr(friendlyErrorMessage(e));
+      setSending(false);
+    }
+  };
+
+  return (
+    <SheetOverlay onClose={sending ? () => {} : onClose} focusRef={inputRef}>
+      <SheetCard>
+        <AppText variant="screenTitle" style={{ fontSize: 22 }}>
+          {t.feedback.title}
+        </AppText>
+        <AppText variant="meta" color={colors.textTertiary} style={{ marginTop: 6 }}>
+          {t.feedback.subtitle}
+        </AppText>
+
+        {/* Tür seçimi tek satırda: üç seçenek, biri hep seçili. Bir hata
+            bildirimini öneriden ayırmak, gelen kutusunda hangisine önce
+            bakılacağını belirliyor. */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
+          {kinds.map((k) => {
+            const active = k.key === kind;
+            return (
+              <Pressable
+                key={k.key}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setKind(k.key);
+                }}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  borderRadius: radius.badge,
+                  borderWidth: hairline,
+                  borderColor: active ? colors.ember : colors.strokeSubtle,
+                  backgroundColor: active ? colors.emberSoft : colors.bgElevated,
+                }}
+              >
+                <AppText variant="meta" color={active ? colors.ember : colors.textSecondary}>
+                  {k.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={{ marginTop: 14 }}>
+          <TextInput
+            ref={inputRef}
+            value={body}
+            onChangeText={setBody}
+            placeholder={t.feedback.placeholder}
+            placeholderTextColor={colors.textTertiary}
+            multiline
+            textAlignVertical="top"
+            maxLength={FEEDBACK_MAX}
+            editable={!sending}
+            style={{
+              height: 130,
+              backgroundColor: colors.bgElevated,
+              borderRadius: radius.badge,
+              borderWidth: hairline,
+              borderColor: colors.strokeSubtle,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              color: colors.textPrimary,
+              fontFamily: fonts.bodyMedium,
+              fontSize: 16,
+            }}
+          />
+        </View>
+
+        {err ? (
+          <AppText variant="meta" color={colors.joker} style={{ marginTop: 10 }}>
+            {err}
+          </AppText>
+        ) : null}
+
+        <View style={{ marginTop: 18 }}>
+          <Button
+            label={sending ? t.feedback.sending : t.feedback.send}
+            onPress={send}
+            disabled={!canSend}
+          />
+        </View>
+      </SheetCard>
+    </SheetOverlay>
+  );
+}
+
+/**
+ * Halka bittikten sonra bir kez çıkan istek.
+ *
+ * Kendisi bir form değil, yalnızca kapı: "evet" derse FeedbackSheet açılır.
+ * Doğrudan formu açmak, hiçbir şey yazmak istemeyen birini klavyeyle baş
+ * başa bırakmak olurdu.
+ */
+export function FeedbackPromptSheet({
+  onAccept,
+  onDismiss,
+}: {
+  onAccept: () => void;
+  onDismiss: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <SheetOverlay onClose={onDismiss}>
+      <SheetCard>
+        <AppText variant="screenTitle" style={{ fontSize: 20 }}>
+          {t.feedback.promptTitle}
+        </AppText>
+        <AppText variant="secondary" style={{ marginTop: 10 }}>
+          {t.feedback.promptBody}
+        </AppText>
+        <View style={{ marginTop: 20 }}>
+          <Button label={t.feedback.promptAccept} onPress={onAccept} />
+        </View>
+        <AppText
+          variant="secondary"
+          color={colors.textSecondary}
+          onPress={onDismiss}
+          style={{ textAlign: 'center', marginTop: 16 }}
+        >
+          {t.feedback.promptDismiss}
+        </AppText>
+      </SheetCard>
+    </SheetOverlay>
+  );
+}
+
 export function ReportSheet({
   onPick,
   onClose,
