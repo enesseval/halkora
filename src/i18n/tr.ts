@@ -493,12 +493,12 @@ export const tr = {
     // Fiyat bloğu — Faz A'da placeholder (gerçek fiyatlar RevenueCat'ten, Faz B).
     planMonthlyLabel: 'Aylık',
     planAnnualLabel: 'Yıllık',
-    monthlyPrice: '₺59',
+    monthlyPrice: '₺49,99',
     monthlyPer: '/ay',
     monthlyNote: 'İstediğin an iptal',
-    annualPrice: '₺399',
+    annualPrice: '₺499,99',
     annualPer: '/yıl',
-    annualNote: "≈₺33/ay'a denk gelir",
+    annualNote: "≈₺41,67/ay'a denk gelir",
     annualPerMonth: (p: string) => `≈${p}'a denk gelir`,
     saveBadge: '2 ay bedava',
     // Faz A: satın alma henüz bağlı değil (RevenueCat = Faz B).

@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0D0E11",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "associatedDomains": ["applinks:halkora.app"],
       "bundleIdentifier": "com.halkora.app",
       "buildNumber": "48",
