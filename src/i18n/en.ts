@@ -482,7 +482,7 @@ export const en: Dictionary = {
     annualPer: '/yr',
     annualNote: '≈₺33/mo',
     annualPerMonth: (p: string) => `≈${p}`,
-    saveBadge: '2 months free',
+    saveBadge: 'Save 17%',
     notReadyTitle: 'Almost ready',
     notReadyBody: 'Subscriptions are coming very soon.',
   },
