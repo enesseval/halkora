@@ -500,7 +500,7 @@ export const tr = {
     annualPer: '/yıl',
     annualNote: "≈₺41,67/ay'a denk gelir",
     annualPerMonth: (p: string) => `≈${p}'a denk gelir`,
-    saveBadge: '2 ay bedava',
+    saveBadge: '%17 indirim',
     // Faz A: satın alma henüz bağlı değil (RevenueCat = Faz B).
     notReadyTitle: 'Neredeyse hazır',
     notReadyBody: 'Abonelikler çok yakında açılıyor.',
