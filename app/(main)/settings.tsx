@@ -259,14 +259,20 @@ export default function SettingsScreen() {
             {/* Permanent home for the widget instructions — the one-shot card
                 on the detail screen is easy to miss or dismiss, and there was
                 nowhere to go looking for it afterwards (Faz 2 §2.6). */}
-            <Row
-              icon="smartphone"
-              label={t.widgetHint.settingsRow}
-              onPress={() => setShowWidgetHint(true)}
-            />
+            {/* Yalnızca iOS — widget @bacons/apple-targets ile kurulu bir
+                WidgetKit uzantısı, Android'de karşılığı yok. */}
+            {Platform.OS === 'ios' ? (
+              <>
+                <Row
+                  icon="smartphone"
+                  label={t.widgetHint.settingsRow}
+                  onPress={() => setShowWidgetHint(true)}
+                />
+                <Divider />
+              </>
+            ) : null}
             {/* Guideline 1.2 — blocking has to be undoable, and this is the
                 only place someone can find who they've blocked. */}
-            <Divider />
             <Row
               icon="slash"
               label={t.moderation.blockedRow}
@@ -284,14 +290,23 @@ export default function SettingsScreen() {
                   }}
                 />
                 <Divider />
-                <Row
-                  icon="key"
-                  label={t.settings.account}
-                  value={linking ? t.settings.accountLinking : isAnonymous ? t.settings.accountUnsecured : t.settings.accountLinked}
-                  tint={isAnonymous ? colors.ember : undefined}
-                  onPress={isAnonymous ? secureAccount : undefined}
-                />
-                <Divider />
+                {/* Yalnızca iOS. Hesabı güvenceye almanın tek yolu Apple ile
+                    giriş; Android'de bu satır "güvende değil" deyip ember
+                    renginde çağırıyordu ama dokununca linkAppleIdentity()
+                    patlıyordu — kullanıcıyı çözemeyeceği bir uyarıyla baş
+                    başa bırakan bir çıkmaz sokak. */}
+                {Platform.OS === 'ios' ? (
+                  <>
+                    <Row
+                      icon="key"
+                      label={t.settings.account}
+                      value={linking ? t.settings.accountLinking : isAnonymous ? t.settings.accountUnsecured : t.settings.accountLinked}
+                      tint={isAnonymous ? colors.ember : undefined}
+                      onPress={isAnonymous ? secureAccount : undefined}
+                    />
+                    <Divider />
+                  </>
+                ) : null}
                 <Row
                   icon="at-sign"
                   label={t.settings.username}

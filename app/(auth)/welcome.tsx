@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { colors, spacing } from '@/theme/tokens';
@@ -58,14 +58,22 @@ export default function WelcomeScreen() {
       </View>
 
       <View style={{ gap: 12, paddingBottom: spacing.section }}>
-        <Button
-          label={t.welcome.continueWithApple}
-          onPress={() => run(signInWithApple)}
-          disabled={busy}
-          style={{ backgroundColor: colors.textPrimary }}
-          textStyle={{ color: colors.bgBase }}
-          icon={<FontAwesome name="apple" size={18} color={colors.bgBase} />}
-        />
+        {/* Yalnızca iOS. signInWithApple() Android'de sessizce anonim girişe
+            düşüyor — yani buton çalışıyor ama "Apple ile devam et" yazıp
+            bambaşka bir şey yapıyor. Eski Google butonu tam bu yüzden
+            kaldırılmıştı (aşağıdaki nota bak); aynı yanıltmayı Apple
+            butonuyla tekrarlamayalım. Android'de misafir girişi tek ve
+            dürüst yol olarak kalıyor. */}
+        {Platform.OS === 'ios' ? (
+          <Button
+            label={t.welcome.continueWithApple}
+            onPress={() => run(signInWithApple)}
+            disabled={busy}
+            style={{ backgroundColor: colors.textPrimary }}
+            textStyle={{ color: colors.bgBase }}
+            icon={<FontAwesome name="apple" size={18} color={colors.bgBase} />}
+          />
+        ) : null}
         {/* Android/web (or a not-yet-configured Apple provider) fall back to
             anonymous sign-in inside signInWithApple() itself — there is no
             separate "Google" button anymore since it never actually did real

@@ -15,13 +15,27 @@ import Purchases, { LOG_LEVEL, type PurchasesPackage } from 'react-native-purcha
 // entitlements, and it never leaves the server). Read from the environment
 // anyway so the repo carries no keys at all.
 const IOS_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
+const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '';
+
+/**
+ * Bu cihazın mağazasına ait anahtar.
+ *
+ * RevenueCat'te App Store ve Google Play AYRI anahtarlar kullanıyor; birini
+ * diğerinin platformunda kullanmak sessizce boş bir teklif listesi döndürür.
+ * Platform başına seçmek, "paywall açılıyor ama satın alınamıyor" hatasının
+ * tek sebebini ortadan kaldırıyor.
+ */
+const STORE_KEY = Platform.OS === 'ios' ? IOS_KEY : Platform.OS === 'android' ? ANDROID_KEY : '';
 
 /** Matches the entitlement configured in RevenueCat. */
 export const PRO_ENTITLEMENT = 'pro';
 /** The offering the paywall reads its packages from. */
 export const DEFAULT_OFFERING = 'default';
 
-export const isPurchasesConfigured = Boolean(IOS_KEY) && Platform.OS === 'ios';
+// Anahtarı olmayan platformda kapalı kalır — Android anahtarı tanımlanmadıysa
+// Android'de davranış eskisiyle birebir aynı, yani iOS tarafı etkilenmiyor.
+export const isPurchasesConfigured =
+  Boolean(STORE_KEY) && (Platform.OS === 'ios' || Platform.OS === 'android');
 
 let configured = false;
 /**
@@ -44,7 +58,7 @@ export function configurePurchases(supabaseUserId: string): void {
       return;
     }
     if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.WARN);
-    Purchases.configure({ apiKey: IOS_KEY, appUserID: supabaseUserId });
+    Purchases.configure({ apiKey: STORE_KEY, appUserID: supabaseUserId });
     configured = true;
   } catch {
     // A paywall that can't reach the store is a degraded screen, never a

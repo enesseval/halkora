@@ -265,7 +265,12 @@ export default function DetailScreen() {
     // answers go through the same await now, so nothing is written during the
     // effect itself.
     let alive = true;
-    const eligible = myCheckins >= HINT_AFTER_CHECKINS && !hasWidgetInstalled();
+    // Platform kontrolü şart: Android'de widget deposu yok, hasWidgetInstalled()
+    // hep false dönüyor, yani !hasWidgetInstalled() hep true — ipucu üçüncü
+    // check-in'den sonra Android'de de çıkıp var olmayan bir widget'ı
+    // eklemeyi öğretirdi.
+    const eligible =
+      Platform.OS === 'ios' && myCheckins >= HINT_AFTER_CHECKINS && !hasWidgetInstalled();
     (eligible ? isWidgetHintDismissed() : Promise.resolve(true)).then((done) => {
       if (alive) setWidgetHintReady(!done);
     });
