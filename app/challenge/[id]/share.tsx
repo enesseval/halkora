@@ -6,6 +6,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, runOnJS } from 'react-native-reanimated';
 import ViewShot from 'react-native-view-shot';
 import * as Haptics from 'expo-haptics';
+import * as Sharing from 'expo-sharing';
 import { Feather } from '@expo/vector-icons';
 import { colors, fonts, hairline, radius } from '@/theme/tokens';
 import { AppText, Button } from '@/components/ui';
@@ -120,6 +121,12 @@ export default function ShareScreen() {
     close();
     const url = uri.startsWith('file://') || uri.startsWith('content://') ? uri : `file://${uri}`;
     setTimeout(() => {
+      // Android ignores Share's `url` and would send the text alone;
+      // expo-sharing hands it the image file instead.
+      if (Platform.OS === 'android') {
+        Sharing.shareAsync(url, { mimeType: 'image/png' }).catch(() => {});
+        return;
+      }
       Share.share({
         message: t.complete.shareMessage(challenge.title, challenge.totalDays),
         url,

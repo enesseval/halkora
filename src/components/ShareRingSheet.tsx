@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { Alert, Modal, Pressable, Share, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, Share, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { colors, fonts, hairline, radius, spacing } from '@/theme/tokens';
@@ -133,6 +134,14 @@ export function ShareRingSheet({
     // takes over — presenting into a window still being dismissed is the
     // other half of the same freeze.
     setTimeout(() => {
+      // React Native's Share reads `url` on iOS only; Android sends the
+      // message alone and the image never leaves the phone. expo-sharing
+      // hands Android the file itself. It can't carry text alongside it, so
+      // the link goes out through "share link" instead.
+      if (Platform.OS === 'android') {
+        Sharing.shareAsync(uri, { mimeType: 'image/png' }).catch(() => {});
+        return;
+      }
       Share.share({ message, url: uri }).catch(() => {
         // Cancelling is a normal thing to do, not an error.
       });
@@ -165,6 +174,13 @@ export function ShareRingSheet({
     setBusy(false);
     onClose();
     setTimeout(() => {
+      // Android ignores `url` in Share and opened an empty sheet. There is no
+      // system "save image" action to reach there, so the image goes to the
+      // system share sheet and the person picks where it lands.
+      if (Platform.OS === 'android') {
+        Sharing.shareAsync(uri, { mimeType: 'image/png' }).catch(() => {});
+        return;
+      }
       // No message: a share sheet holding only an image is the one that
       // offers to save it. Adding text turns it into a "send this" sheet.
       Share.share({ url: uri }).catch(() => {});
