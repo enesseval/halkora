@@ -28,6 +28,9 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+# Firebase: repo public, API anahtarı içeriyor. .env gibi elle kopyalanır.
+google-services.json
+GoogleService-Info.plist
 
 # Metro
 .metro-health-check*
