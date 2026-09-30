@@ -95,7 +95,8 @@
         }
       ],
       "@bacons/apple-targets",
-      "./plugins/withAndroidSigning"
+      "./plugins/withAndroidSigning",
+      "./plugins/withOptionalGoogleServices"
     ],
     "extra": {
       "router": {},
