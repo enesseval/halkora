@@ -9,6 +9,7 @@ import { colors, hairline, radius, spacing } from '@/theme/tokens';
 import { ME_NAME, ME_INITIALS } from '@/hooks';
 import { useAuth, initialsFrom } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { isGoogleSignInAvailable } from '@/lib/googleAuth';
 import { PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '@/lib/legal';
 import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { NameSheet, UsernameSheet, WidgetHintSheet, FeedbackSheet } from '@/components/Sheets';
@@ -107,6 +108,7 @@ export default function SettingsScreen() {
     isPro,
     messagePreview,
     linkAppleIdentity,
+    linkGoogleIdentity,
     saveName,
     saveUsername,
     signOut,
@@ -129,7 +131,7 @@ export default function SettingsScreen() {
     if (linking) return;
     setLinking(true);
     try {
-      await linkAppleIdentity();
+      await (Platform.OS === 'ios' ? linkAppleIdentity() : linkGoogleIdentity());
     } catch (e) {
       Alert.alert(t.errors.linkFailed, friendlyErrorMessage(e));
     } finally {
@@ -294,13 +296,15 @@ export default function SettingsScreen() {
                     giriş; Android'de bu satır "güvende değil" deyip ember
                     renginde çağırıyordu ama dokununca linkAppleIdentity()
                     patlıyordu — kullanıcıyı çözemeyeceği bir uyarıyla baş
-                    başa bırakan bir çıkmaz sokak. */}
-                {Platform.OS === 'ios' ? (
+                    başa bırakan bir çıkmaz sokak. Android'de aynı satır
+                    Google'a bağlıyor; yalnızca Google girişi yapılandırılmışsa
+                    görünür, yoksa aynı çıkmaz sokak geri gelir. */}
+                {Platform.OS === 'ios' || (Platform.OS === 'android' && isGoogleSignInAvailable) ? (
                   <>
                     <Row
                       icon="key"
                       label={t.settings.account}
-                      value={linking ? t.settings.accountLinking : isAnonymous ? t.settings.accountUnsecured : t.settings.accountLinked}
+                      value={linking ? t.settings.accountLinking : isAnonymous ? t.settings.accountUnsecured : Platform.OS === 'ios' ? t.settings.accountLinked : t.settings.accountLinkedGoogle}
                       tint={isAnonymous ? colors.ember : undefined}
                       onPress={isAnonymous ? secureAccount : undefined}
                     />

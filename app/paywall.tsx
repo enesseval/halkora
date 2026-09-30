@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -226,7 +226,7 @@ export default function Paywall() {
     try {
       const ok = await restore();
       if (ok) await onEntitled();
-      else Alert.alert(t.pro.restoreNoneTitle, t.pro.restoreNoneBody);
+      else Alert.alert(t.pro.restoreNoneTitle, Platform.OS === 'android' ? t.pro.restoreNoneBodyAndroid : t.pro.restoreNoneBody);
     } catch (e) {
       if (!isCancelled(e)) alertOnce(t.pro.restoreFailed, friendlyErrorMessage(e));
     } finally {
@@ -248,7 +248,7 @@ export default function Paywall() {
     // refresh (any foreground resume) will pick it up.
     Alert.alert(
       unlocked ? t.pro.thanksTitle : t.pro.pendingTitle,
-      unlocked ? t.pro.thanksBody : t.pro.pendingBody,
+      unlocked ? t.pro.thanksBody : Platform.OS === 'android' ? t.pro.pendingBodyAndroid : t.pro.pendingBody,
     );
     close();
   };
@@ -364,7 +364,7 @@ export default function Paywall() {
               renewal terms, a restore path, and links to the terms and the
               privacy policy. A missing restore button is its own rejection. */}
           <AppText variant="meta" color={colors.textTertiary} style={{ textAlign: 'center' }}>
-            {t.pro.renewalTerms}
+            {Platform.OS === 'android' ? t.pro.renewalTermsAndroid : t.pro.renewalTerms}
           </AppText>
           {/* Restoring goes to the App Store and then waits on the webhook to
               write is_pro, which takes long enough that a link that doesn't

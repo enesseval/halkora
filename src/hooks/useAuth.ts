@@ -12,6 +12,7 @@ import { registerForPushToken } from '@/lib/push';
 import { syncWidgetSession, reconcileWidgetSession } from '@/lib/widgetAuth';
 import { syncWidgetSnapshot } from '@/lib/widget';
 import { configurePurchases } from '@/lib/purchases';
+import { getGoogleIdToken, isGoogleSignInAvailable } from '@/lib/googleAuth';
 import {
   savePushToken,
   clearPushToken,
@@ -480,6 +481,34 @@ async function linkAppleIdentity(): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Native Google girişi — yalnızca Android (src/lib/googleAuth.android.ts).
+ * Apple'daki gibi ID token'ı Supabase'e veriyor; Supabase'in Google
+ * sağlayıcısı açık ve Client IDs alanında Web istemci ID'si olmalı.
+ */
+async function signInWithGoogle(): Promise<void> {
+  if (!isGoogleSignInAvailable) throw new Error(getDict().errors.googleUnavailable);
+  const idToken = await getGoogleIdToken();
+  if (idToken === null) return; // kullanıcı seçiciyi kapattı, hata değil
+  if (!idToken) throw new Error(getDict().errors.googleIncomplete);
+  const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
+  if (error) throw error;
+}
+
+/**
+ * linkAppleIdentity'nin Android karşılığı: mevcut anonim kullanıcıya Google
+ * kimliği bağlar — aynı user id, aynı halkalar. Supabase Auth'ta "Allow
+ * manual linking" açık olmalı (Apple bağlama için zaten açık).
+ */
+async function linkGoogleIdentity(): Promise<void> {
+  if (!isGoogleSignInAvailable) throw new Error(getDict().errors.googleUnavailable);
+  const idToken = await getGoogleIdToken();
+  if (idToken === null) return;
+  if (!idToken) throw new Error(getDict().errors.googleIncomplete);
+  const { error } = await supabase.auth.linkIdentity({ provider: 'google', token: idToken });
+  if (error) throw error;
+}
+
 async function saveName(name: string): Promise<void> {
   const session = useAuthStore.getState().session;
   if (!session) return;
@@ -596,6 +625,8 @@ export function useAuth() {
     signInAnonymously,
     signInWithApple,
     linkAppleIdentity,
+    signInWithGoogle,
+    linkGoogleIdentity,
     saveName,
     ensureUsername,
     saveUsername,

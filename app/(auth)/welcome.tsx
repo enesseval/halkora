@@ -7,6 +7,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { AppText, Button, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { friendlyErrorMessage } from '@/lib/errors';
+import { isGoogleSignInAvailable } from '@/lib/googleAuth';
 import { useT } from '@/i18n';
 import type { SegmentState } from '@/hooks';
 
@@ -18,7 +19,7 @@ const LOGO_DAYS: SegmentState[] = [
 export default function WelcomeScreen() {
   const router = useRouter();
   const { t } = useT();
-  const { configured, signInWithApple, signInAnonymously } = useAuth();
+  const { configured, signInWithApple, signInWithGoogle, signInAnonymously } = useAuth();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -62,8 +63,8 @@ export default function WelcomeScreen() {
             düşüyor — yani buton çalışıyor ama "Apple ile devam et" yazıp
             bambaşka bir şey yapıyor. Eski Google butonu tam bu yüzden
             kaldırılmıştı (aşağıdaki nota bak); aynı yanıltmayı Apple
-            butonuyla tekrarlamayalım. Android'de misafir girişi tek ve
-            dürüst yol olarak kalıyor. */}
+            butonuyla tekrarlamayalım. Android'in karşılığı aşağıdaki
+            Google butonu. */}
         {Platform.OS === 'ios' ? (
           <Button
             label={t.welcome.continueWithApple}
@@ -74,11 +75,31 @@ export default function WelcomeScreen() {
             icon={<FontAwesome name="apple" size={18} color={colors.bgBase} />}
           />
         ) : null}
-        {/* Android/web (or a not-yet-configured Apple provider) fall back to
-            anonymous sign-in inside signInWithApple() itself — there is no
-            separate "Google" button anymore since it never actually did real
-            Google OAuth, it silently signed in anonymously, which is
-            misleading (docs/ROADMAP.md Faz 3A-3). This is the HONEST guest
+        {/* Yalnızca Android — Apple butonunun karşılığı, aynı görünüm. Gerçek
+            native Google girişi (src/lib/googleAuth.android.ts); eski sahte
+            Google butonunun aksine anonim girişe düşmüyor. */}
+        {Platform.OS === 'android' && isGoogleSignInAvailable ? (
+          <Button
+            label={t.welcome.continueWithGoogle}
+            onPress={() =>
+              run(async () => {
+                await signInWithGoogle();
+                // Seçici kapatılınca signInWithGoogle hatasız döner ama oturum
+                // açılmaz; busy'yi burada bırakmazsak butonlar kilitli kalır.
+                // Başarılı girişte de zararsız: root guard zaten yönlendiriyor.
+                setBusy(false);
+              })
+            }
+            disabled={busy}
+            style={{ backgroundColor: colors.textPrimary }}
+            textStyle={{ color: colors.bgBase }}
+            icon={<FontAwesome name="google" size={18} color={colors.bgBase} />}
+          />
+        ) : null}
+        {/* The old "Google" button never did real Google OAuth — it silently
+            signed in anonymously, which was misleading (docs/ROADMAP.md Faz
+            3A-3). The Android Google button above is the real thing now.
+            This is the HONEST guest
             path instead — same anonymous sign-in, but labeled for what it is.
             Upgradeable later from Settings ("Hesabını güvenceye al"). */}
         <AppText
