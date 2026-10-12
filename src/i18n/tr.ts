@@ -303,6 +303,10 @@ export const tr = {
     legalPrivacy: 'Gizlilik Politikası',
     legalSupport: 'Destek',
     feedback: 'Öneri ve görüş gönder',
+    shareApp: 'Halkora’yı paylaş',
+    shareAppMessage: (url: string) =>
+      `Arkadaşlarınla halka kurup sözünü tuttuğun bir uygulama: Halkora. ${url}`,
+    rateApp: 'Halkora’yı değerlendir',
     legalOpenFailed: 'Sayfa açılamadı.',
     version: (v: string) => `Sürüm ${v}`,
   },

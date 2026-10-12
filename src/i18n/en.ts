@@ -299,6 +299,10 @@ export const en: Dictionary = {
     legalPrivacy: 'Privacy Policy',
     legalSupport: 'Support',
     feedback: 'Send feedback',
+    shareApp: 'Share Halkora',
+    shareAppMessage: (url: string) =>
+      `An app where you start a circle with friends and keep your word: Halkora. ${url}`,
+    rateApp: 'Rate Halkora',
     legalOpenFailed: 'Could not open the page.',
     version: (v: string) => `Version ${v}`,
   },

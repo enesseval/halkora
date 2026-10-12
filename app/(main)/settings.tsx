@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Share, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { Feather } from '@expo/vector-icons';
@@ -15,6 +15,9 @@ import { AppText, Avatar, IconButton, Screen, SectionLabel } from '@/components/
 import { NameSheet, UsernameSheet, WidgetHintSheet, FeedbackSheet } from '@/components/Sheets';
 import { BlockedSheet } from '@/components/BlockedSheet';
 import { useT, type Locale } from '@/i18n';
+
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.halkora.app';
+const PLAY_STORE_MARKET_URL = 'market://details?id=com.halkora.app';
 
 /** null while the initial permission check is in flight. Push is native-only —
  * expo-notifications' web shim doesn't fully implement this, so skip there. */
@@ -192,6 +195,18 @@ export default function SettingsScreen() {
   // /hesap-silme/ page exists for App Store Connect's own field.
   const openLegal = (url: string) => {
     Linking.openURL(url).catch(() => Alert.alert(t.settings.legalOpenFailed));
+  };
+
+  // Android only for now: the iOS build is live and stays as it is. Opens the
+  // Play listing rather than the in-app review sheet, which Google shows only
+  // when it decides to and never to closed-test installs.
+  const shareApp = () => {
+    Share.share({ message: t.settings.shareAppMessage(PLAY_STORE_URL) }).catch(() => {});
+  };
+  const rateApp = () => {
+    Linking.openURL(PLAY_STORE_MARKET_URL)
+      .catch(() => Linking.openURL(PLAY_STORE_URL))
+      .catch(() => Alert.alert(t.settings.legalOpenFailed));
   };
 
   return (
@@ -376,6 +391,14 @@ export default function SettingsScreen() {
                 label={t.settings.feedback}
                 onPress={() => setShowFeedback(true)}
               />
+              {Platform.OS === 'android' ? (
+                <>
+                  <Divider />
+                  <Row icon="share-2" label={t.settings.shareApp} onPress={shareApp} />
+                  <Divider />
+                  <Row icon="star" label={t.settings.rateApp} onPress={rateApp} />
+                </>
+              ) : null}
             </Group>
           </View>
         </View>
