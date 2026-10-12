@@ -58,6 +58,8 @@ export const tr = {
     appleIncomplete: 'Apple girişi tamamlanamadı.',
     googleUnavailable: 'Google ile giriş şu an kullanılamıyor.',
     googleIncomplete: 'Google girişi tamamlanamadı.',
+    googleAlreadyLinked:
+      'Bu Google hesabı zaten başka bir Halkora hesabına bağlı, bu yüzden bu hesaba bağlanamadı. Farklı bir Google hesabı seçebilirsin.',
     updateFailed: 'Güncellenemedi',
     checkInFailed: 'Check-in kaydedilemedi',
     undoFailed: 'Check-in geri alınamadı',

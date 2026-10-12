@@ -57,6 +57,8 @@ export const en: Dictionary = {
     appleIncomplete: "Apple sign-in didn't complete.",
     googleUnavailable: "Google sign-in isn't available right now.",
     googleIncomplete: "Google sign-in didn't complete.",
+    googleAlreadyLinked:
+      'This Google account is already linked to another Halkora account, so it couldn’t be linked to this one. You can choose a different Google account.',
     updateFailed: "Couldn't update",
     checkInFailed: "Couldn't save check-in",
     undoFailed: "Couldn't undo the check-in",

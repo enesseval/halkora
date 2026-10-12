@@ -506,6 +506,12 @@ async function linkGoogleIdentity(): Promise<void> {
   if (idToken === null) return;
   if (!idToken) throw new Error(getDict().errors.googleIncomplete);
   const { error } = await supabase.auth.linkIdentity({ provider: 'google', token: idToken });
+  // The Google account already belongs to another Halkora user. Supabase
+  // reports it in English ("Identity is already linked to another user"),
+  // and the alert showed that text as-is.
+  if (error?.code === 'identity_already_exists') {
+    throw new Error(getDict().errors.googleAlreadyLinked);
+  }
   if (error) throw error;
 }
 
